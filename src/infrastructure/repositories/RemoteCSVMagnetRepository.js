@@ -26,35 +26,43 @@ export class RemoteCSVMagnetRepository extends MagnetRepository {
     if (this.#isInitialized) return;
 
     try {
-      this.#logger.info(`Cargando magnets desde URL remota: ${this.#url}`);
-      
-      const response = await this.#fetchWithTimeout(this.#url, this.#timeout);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const csvText = await response.text();
-      const stream = Readable.from(csvText).pipe(csv());
-      
-      for await (const row of stream) {
-        try {
-          const magnet = new Magnet(row);
-          this.#magnets.push(magnet);
-          if (!this.#magnetMap.has(magnet.imdb_id)) {
-            this.#magnetMap.set(magnet.imdb_id, []);
-          }
-          this.#magnetMap.get(magnet.imdb_id).push(magnet);
-        } catch (error) {
-          this.#logger.error(`Fila CSV inválida: ${JSON.stringify(row)}, error: ${error.message}`);
-        }
-      }
-      
+      await this.#loadFromRemoteCSV();
       this.#isInitialized = true;
-      this.#logger.info(`Cargados ${this.#magnets.length} magnets desde URL remota`);
     } catch (error) {
       throw new RepositoryError(`Error al cargar CSV desde URL: ${this.#url}`, error);
     }
+  }
+
+  async #loadFromRemoteCSV() {
+    this.#logger.info(`Cargando magnets desde URL remota: ${this.#url}`);
+    
+    const response = await this.#fetchWithTimeout(this.#url, this.#timeout);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const csvText = await response.text();
+    const stream = Readable.from(csvText).pipe(csv());
+    
+    for await (const row of stream) {
+      try {
+        const magnet = new Magnet(row);
+        this.#magnets.push(magnet);
+        this.#addToMap(magnet);
+      } catch (error) {
+        this.#logger.error(`Fila CSV inválida: ${JSON.stringify(row)}, error: ${error.message}`);
+      }
+    }
+    
+    this.#logger.info(`Cargados ${this.#magnets.length} magnets desde URL remota`);
+  }
+
+  #addToMap(magnet) {
+    if (!this.#magnetMap.has(magnet.imdb_id)) {
+      this.#magnetMap.set(magnet.imdb_id, []);
+    }
+    this.#magnetMap.get(magnet.imdb_id).push(magnet);
   }
 
   async #fetchWithTimeout(url, timeout) {

@@ -20,23 +20,32 @@ export class CSVMagnetRepository extends MagnetRepository {
     if (this.#isInitialized) return;
 
     try {
-      const stream = createReadStream(this.#filePath).pipe(csv());
-      for await (const row of stream) {
-        try {
-          const magnet = new Magnet(row);
-          this.#magnets.push(magnet);
-          if (!this.#magnetMap.has(magnet.imdb_id)) {
-            this.#magnetMap.set(magnet.imdb_id, []);
-          }
-          this.#magnetMap.get(magnet.imdb_id).push(magnet);
-        } catch (error) {
-          this.#logger.error(`Fila CSV inválida: ${JSON.stringify(row)}, error: ${error.message}`);
-        }
-      }
+      await this.#loadFromCSV();
       this.#isInitialized = true;
     } catch (error) {
       throw new RepositoryError(`Error al cargar el archivo CSV: ${this.#filePath}`, error);
     }
+  }
+
+  async #loadFromCSV() {
+    const stream = createReadStream(this.#filePath).pipe(csv());
+    
+    for await (const row of stream) {
+      try {
+        const magnet = new Magnet(row);
+        this.#magnets.push(magnet);
+        this.#addToMap(magnet);
+      } catch (error) {
+        this.#logger.error(`Fila CSV inválida: ${JSON.stringify(row)}, error: ${error.message}`);
+      }
+    }
+  }
+
+  #addToMap(magnet) {
+    if (!this.#magnetMap.has(magnet.imdb_id)) {
+      this.#magnetMap.set(magnet.imdb_id, []);
+    }
+    this.#magnetMap.get(magnet.imdb_id).push(magnet);
   }
 
   async getAllMagnets() {
