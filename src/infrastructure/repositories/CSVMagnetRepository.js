@@ -8,10 +8,12 @@ export class CSVMagnetRepository extends MagnetRepository {
   #magnets = [];
   #magnetMap = new Map();
   #isInitialized = false;
+  #logger;
 
-  constructor(filePath) {
+  constructor(filePath, logger = console) {
     super();
     this.#filePath = filePath;
+    this.#logger = logger;
   }
 
   async initialize() {
@@ -28,7 +30,7 @@ export class CSVMagnetRepository extends MagnetRepository {
           }
           this.#magnetMap.get(magnet.imdb_id).push(magnet);
         } catch (error) {
-          console.error(`Fila CSV inválida: ${JSON.stringify(row)}, error: ${error.message}`);
+          this.#logger.error(`Fila CSV inválida: ${JSON.stringify(row)}, error: ${error.message}`);
         }
       }
       this.#isInitialized = true;

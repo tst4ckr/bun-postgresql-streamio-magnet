@@ -30,7 +30,7 @@ const config = {
     logLevel: process.env.LOG_LEVEL || 'info', // 'debug', 'info', 'warn', 'error'
   },
   repository: {
-    csvFilePath: process.env.CSV_FILE_PATH || 'c:\\Users\\Ankel\\Documents\\HAZ-BUN-TV-PROD\\bun-postgresql-streamio-magnet\\data\\magnets.csv'
+    csvFilePath: process.env.CSV_FILE_PATH || './data/magnets.csv'
   }
 };
 

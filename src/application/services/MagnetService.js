@@ -3,7 +3,6 @@
  * Actúa como un intermediario entre los handlers y los repositorios, aplicando la lógica de negocio.
  */
 
-import { Magnet } from '../../domain/entities/Magnet.js';
 import { MagnetNotFoundError, RepositoryError } from '../../domain/repositories/MagnetRepository.js';
 
 /**
@@ -54,15 +53,11 @@ export class MagnetService {
     }
 
     try {
-      const magnets = await this.#magnetRepository.getMagnetsByImdbId(imdbId);
-      if (magnets.length === 0) {
-        throw new MagnetNotFoundError(imdbId);
-      }
-      return magnets;
+      return await this.#magnetRepository.getMagnetsByImdbId(imdbId);
     } catch (error) {
       this.#logger.error(`Error al buscar magnets para ${imdbId}:`, error);
       if (error instanceof MagnetNotFoundError) {
-        throw error; // Re-lanzar para que el handler lo gestione
+        throw error;
       }
       throw new Error('Ocurrió un error al buscar los magnets.');
     }
