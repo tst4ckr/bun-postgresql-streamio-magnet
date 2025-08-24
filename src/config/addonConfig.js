@@ -30,7 +30,8 @@ const config = {
     logLevel: process.env.LOG_LEVEL || 'info', // 'debug', 'info', 'warn', 'error'
   },
   repository: {
-    csvFilePath: process.env.CSV_FILE_PATH || './data/magnets.csv'
+    csvSource: process.env.CSV_SOURCE || process.env.CSV_FILE_PATH || './data/magnets.csv',
+    timeout: parseInt(process.env.CSV_TIMEOUT) || 30000
   }
 };
 

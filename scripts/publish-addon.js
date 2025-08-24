@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * @fileoverview Script para publicar el addon de TV IPTV en Stremio Central
+ * @fileoverview Script para publicar el addon de Magnet Search en Stremio Central
  * Utiliza la función publishToCentral del SDK oficial de Stremio
  */
 

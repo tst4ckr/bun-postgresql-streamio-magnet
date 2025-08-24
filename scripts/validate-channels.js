@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
 /**
- * @fileoverview Script de validación de canales
- * Valida que todos los streams estén funcionando y genera un reporte
+ * @fileoverview Script para validar enlaces magnéticos
+ * Valida que todos los enlaces magnéticos estén funcionando y genera un reporte
  */
 
 import { TVAddonConfig } from '../src/infrastructure/config/TVAddonConfig.js';
@@ -114,7 +114,7 @@ class ChannelValidator {
         method: 'HEAD',
         signal: controller.signal,
         headers: {
-          'User-Agent': 'Stremio-TV-IPTV-Addon/1.0.0'
+          'User-Agent': 'Stremio-Magnet-Search-Addon/1.0.0'
         }
       });
 
@@ -351,7 +351,7 @@ class ChannelValidator {
  * Función principal
  */
 async function main() {
-  console.log('📺 Stremio TV IPTV Addon - Validador de Canales');
+  console.log('🧲 Stremio Magnet Search Addon - Validador de Enlaces');
   console.log('='.repeat(50) + '\n');
 
   const validator = new ChannelValidator();

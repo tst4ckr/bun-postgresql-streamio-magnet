@@ -1,7 +1,7 @@
 {
-  "name": "stremio-tv-iptv-addon",
+  "name": "stremio-magnet-search-addon",
   "version": "1.0.0",
-  "description": "Addon profesional de Stremio para canales de TV en vivo usando streams IPTV con arquitectura Clean y DDD",
+  "description": "Addon profesional de Stremio para búsqueda de enlaces magnéticos con arquitectura Clean y DDD",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
@@ -21,15 +21,12 @@
   "keywords": [
     "stremio",
     "addon",
-    "tv",
-    "iptv",
-    "streaming",
-    "m3u",
-    "rtmp",
+    "magnet",
+    "torrent",
     "clean-architecture",
     "ddd"
   ],
-  "author": "Stremio TV IPTV Addon",
+  "author": "Stremio Magnet Search Addon",
   "license": "MIT",
   "dependencies": {
     "axios": "^1.6.2",
@@ -54,10 +51,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/stremio/tv-iptv-addon.git"
+    "url": "git+https://github.com/stremio/magnet-search-addon.git"
   },
   "bugs": {
-    "url": "https://github.com/stremio/tv-iptv-addon/issues"
+    "url": "https://github.com/stremio/magnet-search-addon/issues"
   },
-  "homepage": "https://github.com/stremio/tv-iptv-addon#readme"
+  "homepage": "https://github.com/stremio/magnet-search-addon#readme"
 }

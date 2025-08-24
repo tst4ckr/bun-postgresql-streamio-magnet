@@ -1,6 +1,6 @@
-# 📺 Stremio TV IPTV Addon
+# 🧲 Stremio Magnet Search Addon
 
-Un addon profesional de Stremio para canales de TV en vivo usando streams IPTV, desarrollado con **Clean Architecture**, **Domain-Driven Design (DDD)** y **Bun** como runtime.
+Un addon profesional de Stremio para búsqueda de enlaces magnéticos de películas y series, desarrollado con **Clean Architecture**, **Domain-Driven Design (DDD)** y **Bun** como runtime.
 
 ## ✨ Características Principales
 
@@ -46,8 +46,8 @@ Un addon profesional de Stremio para canales de TV en vivo usando streams IPTV, 
 
 ```bash
 # Clonar el repositorio
-git clone https://github.com/tu-usuario/stremio-tv-iptv-addon.git
-cd stremio-tv-iptv-addon
+git clone https://github.com/tu-usuario/stremio-magnet-search-addon.git
+cd stremio-magnet-search-addon
 
 # Instalar dependencias
 bun install
@@ -76,10 +76,24 @@ HOST=0.0.0.0                # Host de binding
 
 #### Fuentes de Datos
 ```bash
-CHANNELS_SOURCE=csv          # Fuente: csv, m3u, remote_m3u, hybrid
-CHANNELS_FILE=data/channels.csv
-M3U_URL=https://tu-lista.m3u8
-UPDATE_INTERVAL_HOURS=4      # Auto-actualización cada X horas
+CSV_SOURCE=./data/magnets.csv    # Fuente: archivo local o URL remota
+CSV_TIMEOUT=30000               # Timeout para URLs remotas en milisegundos
+UPDATE_INTERVAL_HOURS=4         # Auto-actualización cada X horas
+```
+
+#### 🌐 Soporte para URLs Remotas
+
+El addon ahora soporta cargar magnets desde URLs remotas:
+
+```bash
+# Archivo local
+CSV_SOURCE=./data/magnets.csv
+
+# URL remota
+CSV_SOURCE=https://example.com/magnets.csv
+
+# Timeout personalizado (30 segundos)
+CSV_TIMEOUT=30000
 ```
 
 #### Filtros y Restricciones
@@ -390,8 +404,8 @@ Este proyecto está licenciado bajo la **Licencia MIT**. Ver el archivo [LICENSE
 
 ### Reportar Problemas
 
-- 🐛 **Issues**: [GitHub Issues](https://github.com/tu-usuario/stremio-tv-iptv-addon/issues)
-- 💬 **Discusiones**: [GitHub Discussions](https://github.com/tu-usuario/stremio-tv-iptv-addon/discussions)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/tu-usuario/stremio-magnet-search-addon/issues)
+- 💬 **Discusiones**: [GitHub Discussions](https://github.com/tu-usuario/stremio-magnet-search-addon/discussions)
 - 📧 **Email**: support@example.com
 
 ### Recursos Útiles

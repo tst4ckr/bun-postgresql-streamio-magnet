@@ -1,4 +1,4 @@
-# 📺 TV IPTV Addon para Stremio - Documentación Técnica
+# 🧲 Magnet Search Addon para Stremio - Documentación Técnica
 
 ## 📋 Índice
 
@@ -13,7 +13,7 @@
 
 ## 🎯 Visión General
 
-El **TV IPTV Addon** es una extensión para Stremio que proporciona acceso a canales de televisión en vivo desde fuentes IPTV (archivos M3U/M3U8 y CSV). Está diseñado siguiendo principios de Clean Architecture y Domain-Driven Design (DDD) para mantener una base de código escalable y mantenible.
+El **Magnet Search Addon** es una extensión para Stremio que proporciona acceso a enlaces magnéticos de películas y series desde archivos CSV. Está diseñado siguiendo principios de Clean Architecture y Domain-Driven Design (DDD) para mantener una base de código escalable y mantenible.
 
 ### Características Principales
 - ✅ Soporte para múltiples fuentes de datos (CSV, M3U local/remoto)
@@ -158,8 +158,7 @@ Convierte canales al formato requerido por Stremio:
 ```bash
 # Fuente de datos
 CHANNELS_SOURCE=remote_m3u          # csv, m3u, remote_m3u, hybrid
-M3U_URL=https://iptv-org.github.io/iptv/countries/es.m3u
-BACKUP_M3U_URL=https://iptv-org.github.io/iptv/countries/mx.m3u
+CSV_FILE_PATH=./data/magnets.csv
 
 # Filtros
 ALLOWED_COUNTRIES=MX,ES,AR,CO,US
@@ -238,16 +237,16 @@ bun run dev
 bun run build
 
 # Ejecutar con PM2
-pm2 start src/index.js --name tv-iptv-addon
+pm2 start src/index.js --name magnet-search-addon
 ```
 
 ### Docker
 ```bash
 # Construir imagen
-docker build -t tv-iptv-addon .
+docker build -t magnet-search-addon .
 
 # Ejecutar
-docker run -p 7000:7000 --env-file .env tv-iptv-addon
+docker run -p 7000:7000 --env-file .env magnet-search-addon
 ```
 
 ## 📊 Monitoreo y Debugging
@@ -335,4 +334,4 @@ Para reportar problemas o solicitar features:
 
 ---
 
-*Documentación generada automáticamente basada en el código fuente del TV IPTV Addon*
+*Documentación generada automáticamente basada en el código fuente del Magnet Search Addon*

@@ -5,7 +5,7 @@
 
 import { addonBuilder, serveHTTP } from 'stremio-addon-sdk';
 import { addonConfig, manifest } from './config/addonConfig.js';
-import { CSVMagnetRepository } from './infrastructure/repositories/CSVMagnetRepository.js';
+import { MagnetRepositoryFactory } from './infrastructure/factories/MagnetRepositoryFactory.js';
 import { MagnetService } from './application/services/MagnetService.js';
 import { StreamHandler } from './application/handlers/StreamHandler.js';
 
@@ -32,7 +32,11 @@ class MagnetAddon {
     this.#logger.info('Configuración cargada:', this.#config);
 
     // 1. Inicializar Repositorio
-    this.#magnetRepository = new CSVMagnetRepository(this.#config.repository.csvFilePath, this.#logger);
+    this.#magnetRepository = MagnetRepositoryFactory.create(
+      this.#config.repository.csvSource,
+      this.#logger,
+      this.#config.repository.timeout
+    );
     await this.#magnetRepository.initialize();
     this.#logger.info('Repositorio de magnets inicializado.');
 
