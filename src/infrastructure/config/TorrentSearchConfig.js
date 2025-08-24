@@ -124,6 +124,61 @@ export class TorrentSearchConfig {
     return this.get(`providers.${providerId}.enabled`, false);
   }
 
+  /**
+   * Valida la configuración actual
+   * @returns {Object} Resultado de la validación
+   */
+  validate() {
+    const errors = [];
+    const warnings = [];
+
+    // Validar configuración del servidor
+    const port = this.get('server.port');
+    if (!port || port < 1 || port > 65535) {
+      errors.push('Puerto del servidor inválido');
+    }
+
+    // Validar proveedores
+    const providers = ['mejortorrent', 'wolfmax4k', 'cinecalidad'];
+    const enabledProviders = providers.filter(p => this.isProviderEnabled(p));
+    if (enabledProviders.length === 0) {
+      warnings.push('No hay proveedores habilitados');
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings
+    };
+  }
+
+  /**
+   * Obtiene un resumen de la configuración
+   * @returns {Object} Resumen de la configuración
+   */
+  getSummary() {
+    const providers = ['mejortorrent', 'wolfmax4k', 'cinecalidad'];
+    const enabledProviders = providers.filter(p => this.isProviderEnabled(p));
+
+    return {
+      server: {
+        port: this.get('server.port'),
+        host: this.get('server.host')
+      },
+      cache: {
+        enabled: this.get('cache.enabled'),
+        maxAge: this.get('cache.maxAge')
+      },
+      providers: {
+        enabled: enabledProviders,
+        count: enabledProviders.length
+      },
+      search: {
+        timeout: this.get('search.timeout'),
+        maxResults: this.get('search.maxResults')
+      }
+    };
+  }
 
 }
 

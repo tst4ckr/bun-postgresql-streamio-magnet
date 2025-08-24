@@ -541,13 +541,7 @@ export class CinecalidadSearchRepository extends TorrentSearchRepository {
     return [this.provider];
   }
 
-  /**
-   * Obtiene los proveedores habilitados
-   * @returns {Promise<SearchProvider[]>}
-   */
-  async getEnabledProviders() {
-    return this.provider.isAvailable() ? [this.provider] : [];
-  }
+
 
   /**
    * Obtiene un proveedor por ID

@@ -346,9 +346,7 @@ export class MejorTorrentSearchRepository extends TorrentSearchRepository {
     return [this.provider];
   }
 
-  async getEnabledProviders() {
-    return this.provider.isAvailable() ? [this.provider] : [];
-  }
+
 
   async getProviderById(providerId) {
     return providerId === this.provider.id ? this.provider : null;

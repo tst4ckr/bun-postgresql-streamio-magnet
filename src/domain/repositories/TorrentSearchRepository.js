@@ -34,14 +34,7 @@ export class TorrentSearchRepository {
     throw new Error('Método getAvailableProviders debe ser implementado por la clase derivada');
   }
 
-  /**
-   * Obtiene proveedores habilitados ordenados por prioridad
-   * @returns {Promise<SearchProvider[]>}
-   * @throws {SearchRepositoryError}
-   */
-  async getEnabledProviders() {
-    throw new Error('Método getEnabledProviders debe ser implementado por la clase derivada');
-  }
+
 
   /**
    * Obtiene un proveedor por su ID
