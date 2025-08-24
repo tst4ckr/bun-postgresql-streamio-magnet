@@ -33,6 +33,33 @@ export function createTorrentRoutes(torrentSearchService, logger = console) {
   router.get('/manifest.json', controller.getManifest.bind(controller));
 
   /**
+   * Middleware de validación para rutas de stream
+   */
+  const validateStreamParams = (req, res, next) => {
+    const { type, id } = req.params;
+    
+    // Validar type
+    if (!['movie', 'series'].includes(type)) {
+      return res.status(400).json({
+        error: 'Tipo inválido',
+        message: 'El tipo debe ser "movie" o "series"',
+        received: type
+      });
+    }
+    
+    // Validar id (IMDB ID)
+    if (!/^tt\d{7,}/.test(id)) {
+      return res.status(400).json({
+        error: 'ID inválido',
+        message: 'El ID debe ser un IMDB ID válido (formato: tt1234567)',
+        received: id
+      });
+    }
+    
+    next();
+  };
+
+  /**
    * GET /stream/:type/:id.json
    * Obtiene streams para un contenido específico
    * Parámetros:
@@ -42,7 +69,7 @@ export function createTorrentRoutes(torrentSearchService, logger = console) {
    * - season: número de temporada (solo para series)
    * - episode: número de episodio (solo para series)
    */
-  router.get('/stream/:type/:id.json', controller.getStreams.bind(controller));
+  router.get('/stream/:type/:id.json', validateStreamParams, controller.getStreams.bind(controller));
 
   // === RUTAS DE API EXTENDIDA ===
 
@@ -115,13 +142,8 @@ export function createTorrentRoutes(torrentSearchService, logger = console) {
 
   // === RUTAS DE COMPATIBILIDAD ===
 
-  /**
-   * GET /
-   * Ruta raíz - redirige al manifiesto
-   */
-  router.get('/', (req, res) => {
-    res.redirect('/manifest.json');
-  });
+  // Nota: La ruta raíz (/) se maneja directamente en Express para evitar
+  // conflictos con el middleware catch-all de este router
 
   /**
    * GET /configure
@@ -139,60 +161,86 @@ export function createTorrentRoutes(torrentSearchService, logger = console) {
           body { font-family: Arial, sans-serif; margin: 40px; background: #1a1a1a; color: white; }
           .container { max-width: 600px; margin: 0 auto; }
           .header { text-align: center; margin-bottom: 40px; }
-          .info { background: #2a2a2a; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-          .providers { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
-          .provider { background: #333; padding: 15px; border-radius: 6px; text-align: center; }
-          .status { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
-          .status.active { background: #4CAF50; }
-          .status.inactive { background: #f44336; }
+          .logo { font-size: 2em; margin-bottom: 10px; }
+          .subtitle { color: #888; }
+          .section { background: #2a2a2a; padding: 20px; margin: 20px 0; border-radius: 8px; }
+          .endpoint { background: #333; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace; }
+          .method { color: #4CAF50; font-weight: bold; }
+          .url { color: #2196F3; }
+          .description { color: #ccc; margin-top: 5px; }
+          .install-btn { 
+            background: #7B68EE; 
+            color: white; 
+            padding: 15px 30px; 
+            border: none; 
+            border-radius: 5px; 
+            font-size: 1.1em; 
+            cursor: pointer; 
+            text-decoration: none; 
+            display: inline-block; 
+            margin: 10px 0;
+          }
+          .install-btn:hover { background: #6A5ACD; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>🔍 Torrent Search Addon</h1>
-            <p>Addon para búsqueda de torrents en múltiples proveedores</p>
+            <div class="logo">🎬 Torrent Search Addon</div>
+            <div class="subtitle">Addon de búsqueda de torrents para Stremio</div>
           </div>
           
-          <div class="info">
-            <h3>📋 Información</h3>
-            <p><strong>Versión:</strong> 1.0.0</p>
-            <p><strong>Tipos soportados:</strong> Películas y Series</p>
-            <p><strong>Idiomas:</strong> Español (ES)</p>
-            <p><strong>Formato:</strong> Compatible con Stremio</p>
+          <div class="section">
+            <h3>📦 Instalación en Stremio</h3>
+            <p>Copia la siguiente URL en Stremio para instalar el addon:</p>
+            <div class="endpoint">
+              <span class="url">${req.protocol}://${req.get('host')}/manifest.json</span>
+            </div>
+            <a href="stremio://${req.get('host')}/manifest.json" class="install-btn">
+              🚀 Instalar en Stremio
+            </a>
           </div>
           
-          <div class="info">
-            <h3>🔧 Proveedores</h3>
-            <div class="providers">
-              <div class="provider">
-                <span class="status active"></span>
-                <strong>MejorTorrent</strong>
-                <br><small>Español, Alta Calidad</small>
-              </div>
-              <div class="provider">
-                <span class="status active"></span>
-                <strong>Wolfmax4k</strong>
-                <br><small>4K, Ultra HD</small>
-              </div>
-              <div class="provider">
-                <span class="status active"></span>
-                <strong>Cinecalidad</strong>
-                <br><small>Español, Variedad</small>
-              </div>
+          <div class="section">
+            <h3>🔗 Endpoints Disponibles</h3>
+            
+            <div class="endpoint">
+              <span class="method">GET</span> <span class="url">/</span>
+              <div class="description">Ruta raíz - redirige al manifiesto</div>
+            </div>
+            
+            <div class="endpoint">
+              <span class="method">GET</span> <span class="url">/manifest.json</span>
+              <div class="description">Manifiesto del addon para Stremio</div>
+            </div>
+            
+            <div class="endpoint">
+              <span class="method">GET</span> <span class="url">/stream/:type/:id.json</span>
+              <div class="description">Obtiene streams para contenido específico</div>
+            </div>
+            
+            <div class="endpoint">
+              <span class="method">GET</span> <span class="url">/api/search</span>
+              <div class="description">Búsqueda personalizada de torrents</div>
+            </div>
+            
+            <div class="endpoint">
+              <span class="method">GET</span> <span class="url">/api/providers/stats</span>
+              <div class="description">Estadísticas de proveedores</div>
+            </div>
+            
+            <div class="endpoint">
+              <span class="method">GET</span> <span class="url">/api/health</span>
+              <div class="description">Estado del servicio</div>
             </div>
           </div>
           
-          <div class="info">
-            <h3>🚀 Uso</h3>
-            <p>Este addon se instala automáticamente en Stremio. No requiere configuración adicional.</p>
-            <p><strong>Endpoints disponibles:</strong></p>
-            <ul>
-              <li><code>/manifest.json</code> - Manifiesto del addon</li>
-              <li><code>/stream/:type/:id.json</code> - Streams para contenido</li>
-              <li><code>/api/search</code> - Búsqueda personalizada</li>
-              <li><code>/api/health</code> - Estado del servicio</li>
-            </ul>
+          <div class="section">
+            <h3>ℹ️ Información</h3>
+            <p>Este addon permite buscar torrents en múltiples proveedores españoles y convertirlos en streams compatibles con Stremio.</p>
+            <p><strong>Proveedores soportados:</strong> MejorTorrent, Wolfmax4k, Cinecalidad</p>
+            <p><strong>Idiomas:</strong> Español (ES)</p>
+            <p><strong>Tipos de contenido:</strong> Películas y Series</p>
           </div>
         </div>
       </body>
@@ -201,26 +249,6 @@ export function createTorrentRoutes(torrentSearchService, logger = console) {
   });
 
   // === MIDDLEWARE DE MANEJO DE ERRORES ===
-
-  /**
-   * Middleware para rutas no encontradas
-   */
-  router.use('*', (req, res) => {
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.status(404).json({
-      error: 'Endpoint no encontrado',
-      message: `La ruta ${req.method} ${req.originalUrl} no existe`,
-      availableEndpoints: [
-        'GET /manifest.json',
-        'GET /stream/:type/:id.json',
-        'GET /api/search',
-        'GET /api/providers/stats',
-        'GET /api/health'
-      ],
-      timestamp: new Date().toISOString()
-    });
-  });
 
   /**
    * Middleware global de manejo de errores
@@ -238,6 +266,28 @@ export function createTorrentRoutes(torrentSearchService, logger = console) {
         stack: error.stack,
         details: error.message 
       })
+    });
+  });
+
+  /**
+   * Middleware para rutas no encontradas (DEBE IR AL FINAL)
+   */
+  router.use('*', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.status(404).json({
+      error: 'Endpoint no encontrado',
+      message: `La ruta ${req.method} ${req.originalUrl} no existe`,
+      availableEndpoints: [
+        'GET /',
+        'GET /manifest.json',
+        'GET /stream/:type/:id.json',
+        'GET /api/search',
+        'GET /api/providers/stats',
+        'GET /api/health',
+        'GET /configure'
+      ],
+      timestamp: new Date().toISOString()
     });
   });
 

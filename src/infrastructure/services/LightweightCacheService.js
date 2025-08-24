@@ -186,36 +186,6 @@ export class LightweightCacheService {
   }
 
   /**
-   * Obtiene información detallada del cache
-   * @returns {Object}
-   */
-  getInfo() {
-    const stats = this.getStats();
-    const oldestEntry = this.getOldestEntry();
-    const newestEntry = this.getNewestEntry();
-    
-    return {
-      ...stats,
-      oldestEntry: oldestEntry ? {
-        age: Math.round((Date.now() - oldestEntry.createdAt) / 1000),
-        ttl: Math.round((oldestEntry.expiresAt - Date.now()) / 1000)
-      } : null,
-      newestEntry: newestEntry ? {
-        age: Math.round((Date.now() - newestEntry.createdAt) / 1000),
-        ttl: Math.round((newestEntry.expiresAt - Date.now()) / 1000)
-      } : null
-    };
-  }
-
-  /**
-   * Obtiene todas las claves del cache
-   * @returns {string[]}
-   */
-  keys() {
-    return Array.from(this.cache.keys());
-  }
-
-  /**
    * Obtiene el tamaño actual del cache
    * @returns {number}
    */
@@ -310,41 +280,7 @@ export class LightweightCacheService {
     this.stats.memoryUsage = totalSize;
   }
 
-  /**
-   * Obtiene la entrada más antigua
-   * @returns {Object|null}
-   */
-  getOldestEntry() {
-    let oldest = null;
-    let oldestTime = Infinity;
-    
-    for (const [key, entry] of this.cache.entries()) {
-      if (entry.createdAt < oldestTime) {
-        oldestTime = entry.createdAt;
-        oldest = entry;
-      }
-    }
-    
-    return oldest;
-  }
 
-  /**
-   * Obtiene la entrada más nueva
-   * @returns {Object|null}
-   */
-  getNewestEntry() {
-    let newest = null;
-    let newestTime = 0;
-    
-    for (const [key, entry] of this.cache.entries()) {
-      if (entry.createdAt > newestTime) {
-        newestTime = entry.createdAt;
-        newest = entry;
-      }
-    }
-    
-    return newest;
-  }
 
   /**
    * Inicia el timer de limpieza automática

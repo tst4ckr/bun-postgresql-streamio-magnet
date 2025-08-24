@@ -341,7 +341,13 @@ export class TorrentOrchestrationService {
     const streams = results
       .slice(0, maxResults)
       .map(result => this.convertToStremioStream(result, type))
-      .filter(stream => stream !== null);
+      .filter(stream => stream !== null)
+      .sort((a, b) => {
+        // Priorizar streams con más seeders
+        const seedersA = a._meta?.seeders || 0;
+        const seedersB = b._meta?.seeders || 0;
+        return seedersB - seedersA;
+      });
 
     return {
       streams,
@@ -359,26 +365,37 @@ export class TorrentOrchestrationService {
    */
   convertToStremioStream(result, type) {
     try {
+      // Si el resultado ya es un TorrentResult, usar su método toStremioStream
+      if (result.toStremioStream && typeof result.toStremioStream === 'function') {
+        return result.toStremioStream();
+      }
+      
+      // Fallback para resultados que no son TorrentResult
       const title = this.buildStreamTitle(result);
       
-      return {
-        name: result.provider || 'Torrent',
+      const stream = {
+        name: this.buildStreamName(result),
         description: title,
-        url: result.magnetLink || result.torrentUrl,
-        title,
+        infoHash: result.infoHash,
+        sources: this.buildSources(result),
         behaviorHints: {
-          bingeGroup: `torrent-${result.provider}`,
-          countryWhitelist: ['ES', 'MX', 'AR', 'CO', 'PE', 'CL', 'VE']
-        },
-        // Metadata adicional para debugging
-        _meta: {
-          provider: result.provider,
-          quality: result.quality,
-          size: result.size,
-          seeders: result.seeders,
-          score: result.score
+          bingeGroup: `${result.provider}-${result.quality}`,
+          countryWhitelist: ['esp', 'arg', 'mex', 'col', 'chl', 'per', 'ven'],
+          notWebReady: true
         }
       };
+      
+      // Agregar fileIdx si está disponible
+      if (result.fileIndex !== undefined) {
+        stream.fileIdx = result.fileIndex;
+      }
+      
+      // Agregar URL magnet como fallback
+      if (result.magnetLink || result.torrentUrl) {
+        stream.url = result.magnetLink || result.torrentUrl;
+      }
+      
+      return stream;
     } catch (error) {
       console.warn('Error convirtiendo a stream Stremio:', error.message);
       return null;
@@ -399,6 +416,67 @@ export class TorrentOrchestrationService {
     if (result.seeders) parts.push(`👥 ${result.seeders}`);
     
     return parts.join(' | ');
+  }
+
+  /**
+   * Construye el nombre del stream para Stremio
+   * @param {Object} result - Resultado del torrent
+   * @returns {string} Nombre del stream
+   */
+  buildStreamName(result) {
+    const parts = [];
+    
+    // Calidad
+    if (result.quality) {
+      parts.push(result.quality);
+    }
+    
+    // Tamaño
+    if (result.size) {
+      parts.push(result.size);
+    }
+    
+    // Seeders si están disponibles
+    if (result.seeders > 0) {
+      parts.push(`👥${result.seeders}`);
+    }
+    
+    // Verificado
+    if (result.verified) {
+      parts.push('✅');
+    }
+    
+    // Proveedor
+    if (result.provider) {
+      parts.push(`[${result.provider}]`);
+    }
+    
+    return parts.join(' ');
+  }
+
+  /**
+   * Construye las fuentes para el torrent
+   * @param {Object} result - Resultado del torrent
+   * @returns {string[]} Array de fuentes
+   */
+  buildSources(result) {
+    const sources = [];
+    
+    // Agregar trackers comunes para mejorar conectividad
+    const commonTrackers = [
+      'udp://tracker.openbittorrent.com:80',
+      'udp://tracker.opentrackr.org:1337',
+      'udp://9.rarbg.to:2710',
+      'udp://exodus.desync.com:6969',
+      'udp://tracker.torrent.eu.org:451',
+      'udp://open.stealth.si:80'
+    ];
+    
+    commonTrackers.forEach(tracker => {
+      sources.push(`tracker:${tracker}`);
+    });
+    
+    return sources;
   }
 
   /**

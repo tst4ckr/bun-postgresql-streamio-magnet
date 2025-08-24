@@ -107,14 +107,19 @@ export class TorrentSearchController {
 
       // Formatear respuesta para Stremio
       const stremioResponse = {
-        streams: searchResult.results || []
+        streams: searchResult.results || [],
+        cacheMaxAge: 1800, // 30 minutos
+        staleRevalidate: 3600, // 1 hora
+        staleError: 86400 // 24 horas
       };
 
-      // Headers para Stremio
-      res.setHeader('Content-Type', 'application/json');
+      // Headers optimizados para Stremio
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-      res.setHeader('Cache-Control', 'public, max-age=1800'); // 30 minutos
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.setHeader('Cache-Control', 'public, max-age=1800, stale-while-revalidate=3600, stale-if-error=86400');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
 
       res.status(200).json(stremioResponse);
 

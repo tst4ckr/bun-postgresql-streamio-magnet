@@ -332,16 +332,18 @@ export class TorrentSearchApp {
   async configureRoutes() {
     console.log('🔧 Configurando rutas...');
     
+    // Ruta raíz directa en Express (antes del router)
+    this.app.get('/', (req, res) => {
+      res.redirect('/manifest.json');
+    });
+    
     // Crear rutas de torrents
     const torrentRoutes = createTorrentRoutes(
       this.services.torrentSearch,
       console // Logger
     );
     
-    // Agregar validación de parámetros
-    addParameterValidation(torrentRoutes);
-    
-    // Montar rutas
+    // Montar rutas (sin validación global de parámetros)
     this.app.use('/', torrentRoutes);
     
     console.log('✅ Rutas configuradas');

@@ -20,7 +20,9 @@ const TorrentResultSchema = z.object({
   season: z.number().int().min(1).optional(),
   episode: z.number().int().min(1).optional(),
   uploadDate: z.date().optional(),
-  verified: z.boolean().default(false)
+  verified: z.boolean().default(false),
+  fileIndex: z.number().int().min(0).optional(),
+  filename: z.string().optional()
 });
 
 export class TorrentResult {
@@ -38,16 +40,26 @@ export class TorrentResult {
     const streamName = this.buildStreamName();
     const streamDescription = this.buildStreamDescription();
 
-    return {
+    const stream = {
       name: streamName,
       description: streamDescription,
       infoHash: this.infoHash,
       sources: this.buildSources(),
       behaviorHints: {
         bingeGroup: `${this.provider}-${this.quality}`,
-        countryWhitelist: this.language === 'es' ? ['esp', 'arg', 'mex', 'col'] : undefined
+        countryWhitelist: this.language === 'es' ? ['esp', 'arg', 'mex', 'col', 'chl', 'per', 'ven'] : undefined,
+        notWebReady: true
       }
     };
+
+    // Agregar fileIdx si es necesario (para torrents multi-archivo)
+    // Por defecto, Stremio selecciona el archivo más grande
+    // pero podemos especificarlo si conocemos el índice
+    if (this.fileIndex !== undefined) {
+      stream.fileIdx = this.fileIndex;
+    }
+
+    return stream;
   }
 
   /**

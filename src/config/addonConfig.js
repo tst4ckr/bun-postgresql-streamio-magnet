@@ -9,11 +9,19 @@ dotenv.config();
 
 const config = {
   addon: {
-    id: process.env.ADDON_ID || 'com.stremio.magnet.search',
-    version: process.env.ADDON_VERSION || '1.0.0',
-    name: process.env.ADDON_NAME || 'Magnet Search',
-    description: process.env.ADDON_DESCRIPTION || 'Addon para buscar enlaces magnéticos de películas y series en un archivo CSV.',
-    resources: ['stream'],
+    id: process.env.ADDON_ID || 'org.stremio.torrent.search',
+    version: process.env.ADDON_VERSION || '1.2.0',
+    name: process.env.ADDON_NAME || 'Torrent Search Pro',
+    description: process.env.ADDON_DESCRIPTION || 'Advanced torrent search addon with multiple providers (MejorTorrent, Wolfmax4k, Cinecalidad) for movies and series with high-quality streams.',
+    logo: process.env.ADDON_LOGO || 'https://via.placeholder.com/256x256/1a1a1a/ffffff?text=TS',
+    background: process.env.ADDON_BACKGROUND || 'https://via.placeholder.com/1920x1080/1a1a1a/ffffff?text=Torrent+Search',
+    resources: [
+      {
+        name: 'stream',
+        types: ['movie', 'series'],
+        idPrefixes: ['tt']
+      }
+    ],
     types: ['movie', 'series'],
     catalogs: [],
     idPrefixes: ['tt']
@@ -37,7 +45,7 @@ const config = {
 
 /**
  * Genera el manifiesto del addon a partir de la configuración.
- * @returns {Object} Manifiesto de Stremio.
+ * @returns {Object} Manifiesto de Stremio optimizado.
  */
 function generateManifest() {
   return {
@@ -45,13 +53,17 @@ function generateManifest() {
     version: config.addon.version,
     name: config.addon.name,
     description: config.addon.description,
+    logo: config.addon.logo,
+    background: config.addon.background,
     resources: config.addon.resources,
     types: config.addon.types,
     catalogs: config.addon.catalogs,
     idPrefixes: config.addon.idPrefixes,
     behaviorHints: {
       configurable: false,
-      configurationRequired: false
+      configurationRequired: false,
+      adult: false,
+      p2p: true
     }
   };
 }
