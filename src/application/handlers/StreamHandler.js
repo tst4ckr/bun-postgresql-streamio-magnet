@@ -1,44 +1,37 @@
 /**
- * @fileoverview StreamHandler - Maneja las peticiones de streams de Stremio
- * Implementa los principios de Clean Architecture con separación de responsabilidades
+ * @fileoverview StreamHandler - Maneja las peticiones de streams de Stremio para magnets.
+ * Implementa los principios de Clean Architecture con separación de responsabilidades.
  */
 
-import { ChannelNotFoundError } from '../../domain/repositories/ChannelRepository.js';
-
-
+import { MagnetNotFoundError } from '../../domain/repositories/MagnetRepository.js';
+import parse from 'parse-magnet-uri';
 
 /**
- * Handler para peticiones de streams de TV en vivo
- * Responsabilidad única: convertir canales a formato de stream de Stremio
+ * Handler para peticiones de streams de magnets.
+ * Responsabilidad única: convertir magnets a formato de stream de Stremio.
  */
 export class StreamHandler {
   /**
    * @private
    */
-  #channelService;
+  #magnetService;
   #config;
   #logger;
 
-
-
   /**
-   * @param {Object} channelService - Servicio de canales
-   * @param {Object} config - Configuración del addon
-   * @param {Object} logger - Logger para trazabilidad
+   * @param {Object} magnetService - Servicio de magnets.
+   * @param {Object} config - Configuración del addon.
+   * @param {Object} logger - Logger para trazabilidad.
    */
-  constructor(channelService, config, logger = console) {
-    this.#channelService = channelService;
+  constructor(magnetService, config, logger = console) {
+    this.#magnetService = magnetService;
     this.#config = config;
     this.#logger = logger;
-    
-
   }
 
-
-
   /**
-   * Crea el handler para el addon de Stremio
-   * @returns {Function} Handler function para defineStreamHandler
+   * Crea el handler para el addon de Stremio.
+   * @returns {Function} Handler function para defineStreamHandler.
    */
   createAddonHandler() {
     return async (args) => {
@@ -64,94 +57,69 @@ export class StreamHandler {
   }
 
   /**
-   * Maneja la petición de stream de Stremio
+   * Maneja la petición de stream de Stremio.
    * @private
-   * @param {Object} args - Argumentos de la petición
+   * @param {Object} args - Argumentos de la petición.
    * @returns {Promise<Object>}
    */
   async #handleStreamRequest(args) {
-    const { type, id, config: userConfig } = args;
+    const { type, id } = args;
     
-    // Validar argumentos
     this.#validateStreamRequest(args);
     
-    // Solo manejar tipos TV
     if (!this.#isSupportedType(type)) {
       this.#logger.warn(`Tipo no soportado: ${type}`);
       return this.#createEmptyResponse();
     }
 
-    // Obtener el canal
-    const channel = await this.#getChannel(id, userConfig);
+    const magnets = await this.#getMagnets(id);
     
-    if (!channel) {
-      this.#logger.warn(`Canal no encontrado: ${id}`);
+    if (!magnets || magnets.length === 0) {
+      this.#logger.warn(`No se encontraron magnets para: ${id}`);
       return this.#createEmptyResponse();
     }
 
-    // Validar que el canal tenga stream válido
-    if (!channel.isValidStream()) {
-      this.#logger.warn(`Canal con stream inválido: ${id}`);
-      return this.#createEmptyResponse();
-    }
-
-    // Crear stream para TV en vivo con validación y fallback
-    const stream = await this.#createStreamFromChannel(channel, userConfig);
+    const streams = this.#createStreamsFromMagnets(magnets, type);
     
-    // Aplicar filtros de configuración de usuario
-    const filteredStreams = this.#applyUserFilters([stream], userConfig);
-    
-    return this.#createStreamResponse(filteredStreams);
+    return this.#createStreamResponse(streams);
   }
 
   /**
-   * Valida los argumentos de la petición
+   * Valida los argumentos de la petición.
    * @private
    * @param {Object} args 
    * @throws {Error}
    */
   #validateStreamRequest(args) {
-    if (!args?.type || typeof args.type !== 'string') {
-      throw new Error('Tipo de contenido requerido');
+    if (!args?.type || !['movie', 'series'].includes(args.type)) {
+      throw new Error('Tipo de contenido (movie/series) requerido');
     }
-    if (!args.id || typeof args.id !== 'string') {
-      throw new Error('ID de contenido requerido');
+    if (!args.id || !args.id.startsWith('tt')) {
+      throw new Error('ID de contenido (IMDb) requerido');
     }
   }
 
   /**
-   * Verifica si el tipo es soportado por Stremio TV
+   * Verifica si el tipo es soportado.
    * @private
    * @param {string} type 
    * @returns {boolean}
    */
   #isSupportedType(type) {
-    return type === 'tv';
+    return ['movie', 'series'].includes(type);
   }
 
   /**
-   * Obtiene el canal por ID
+   * Obtiene los magnets por IMDb ID.
    * @private
-   * @param {string} id 
-   * @param {Object} userConfig 
-   * @returns {Promise<Channel|null>}
+   * @param {string} imdbId 
+   * @returns {Promise<import('../../domain/entities/Magnet.js').Magnet[]|null>}
    */
-  async #getChannel(id, userConfig = {}) {
+  async #getMagnets(imdbId) {
     try {
-      // Si el usuario proporcionó una URL M3U personalizada
-      if (userConfig.m3u_url) {
-        const customChannels = await this.#channelService.getChannelsFromCustomM3U(userConfig.m3u_url);
-        const customChannel = customChannels.find(ch => ch.id === id);
-        if (customChannel) {
-          return customChannel;
-        }
-      }
-
-      // Buscar en el repositorio principal
-      return await this.#channelService.getChannelById(id);
-      
+      return await this.#magnetService.getMagnetsByImdbId(imdbId);
     } catch (error) {
-      if (error instanceof ChannelNotFoundError) {
+      if (error instanceof MagnetNotFoundError) {
         return null;
       }
       throw error;
@@ -159,236 +127,43 @@ export class StreamHandler {
   }
 
   /**
-   * Crea un stream desde un canal con validación y fallback
+   * Crea streams de Stremio a partir de objetos Magnet.
    * @private
-   * @param {Channel} channel 
-   * @param {Object} userConfig 
-   * @returns {Promise<Object>}
+   * @param {import('../../domain/entities/Magnet.js').Magnet[]} magnets
+   * @param {string} type
+   * @returns {Object[]}
    */
-  async #createStreamFromChannel(channel, userConfig = {}) {
-    // Obtener configuración de calidad preferida del usuario
-    const preferredQuality = userConfig.preferred_quality || this.#config.streaming.defaultQuality;
-    
-    let streamUrl = channel.streamUrl;
+  #createStreamsFromMagnets(magnets, type) {
+    return magnets.map(magnet => {
+      try {
+        const parsedMagnet = parse(magnet.magnet);
+        const infoHash = parsedMagnet.infoHash;
+        const trackers = parsedMagnet.tr || [];
 
-    // Crear stream base
-    const stream = {
-      name: this.#generateStreamName(channel, preferredQuality),
-      description: this.#generateStreamDescription(channel),
-      url: streamUrl
-    };
-
-    // Configurar hints de comportamiento
-    const behaviorHints = this.#createBehaviorHints(channel, userConfig);
-    if (Object.keys(behaviorHints).length > 0) {
-      stream.behaviorHints = behaviorHints;
-    }
-
-    // Agregar información adicional si está disponible
-    if (channel.logo) {
-      stream.icon = channel.logo;
-    }
-
-    return stream;
-  }
-
-  /**
-   * Genera el nombre del stream
-   * @private
-   * @param {Channel} channel 
-   * @param {string} preferredQuality 
-   * @param {boolean} fallbackUsed 
-   * @returns {string}
-   */
-  #generateStreamName(channel, preferredQuality, fallbackUsed = false) {
-    const qualityInfo = channel.quality.value !== 'Auto' 
-      ? channel.quality.value 
-      : preferredQuality;
-    
-    const fallbackIndicator = fallbackUsed ? ' (Backup)' : '';
-    
-    return `${channel.name} (${qualityInfo})${fallbackIndicator}`;
-  }
-
-  /**
-   * Genera la descripción del stream
-   * @private
-   * @param {Channel} channel 
-   * @returns {string}
-   */
-  #generateStreamDescription(channel) {
-    const parts = [
-      channel.genre,
-      channel.country,
-      channel.language.toUpperCase()
-    ];
-
-    if (channel.quality.isHighDefinition()) {
-      parts.push('HD');
-    }
-
-    return parts.join(' • ');
-  }
-
-
-
-  /**
-   * Crea hints de comportamiento para el stream
-   * @private
-   * @param {Channel} channel 
-   * @param {Object} userConfig 
-   * @returns {Object}
-   */
-  #createBehaviorHints(channel, userConfig) {
-    const hints = {};
-
-    // Para streams RTMP o no-HTTP
-    if (this.#requiresNotWebReady(channel.streamUrl)) {
-      hints.notWebReady = true;
-    }
-
-    // Restricciones geográficas
-    const countryWhitelist = this.#getCountryWhitelist(channel, userConfig);
-    if (countryWhitelist.length > 0) {
-      hints.countryWhitelist = countryWhitelist;
-    }
-
-    // Grupo de binge watching (para canales relacionados)
-    if (channel.genre !== 'General') {
-      hints.bingeGroup = `tv-iptv-${channel.genre.toLowerCase()}`;
-    }
-
-    // Headers de proxy si son necesarios
-    const proxyHeaders = this.#getProxyHeaders(channel);
-    if (proxyHeaders) {
-      hints.proxyHeaders = proxyHeaders;
-      hints.notWebReady = true; // Requerido cuando se usan proxy headers
-    }
-
-    return hints;
-  }
-
-  /**
-   * Determina si el stream requiere notWebReady
-   * @private
-   * @param {string} streamUrl 
-   * @returns {boolean}
-   */
-  #requiresNotWebReady(streamUrl) {
-    return streamUrl.startsWith('rtmp') || 
-           (streamUrl.startsWith('http://') && !streamUrl.startsWith('https://'));
-  }
-
-  /**
-   * Obtiene la lista blanca de países
-   * @private
-   * @param {Channel} channel 
-   * @param {Object} userConfig 
-   * @returns {string[]}
-   */
-  #getCountryWhitelist(channel, userConfig) {
-    const allowedCountries = this.#config.filters.allowedCountries;
-    
-    if (!allowedCountries?.length) return [];
-
-    const countryCodeMap = {
-      'MÉXICO': 'mx', 'MEXICO': 'mx', 'ESPAÑA': 'es', 'SPAIN': 'es',
-      'ARGENTINA': 'ar', 'COLOMBIA': 'co', 'CHILE': 'cl', 'PERÚ': 'pe',
-      'PERU': 'pe', 'ESTADOS UNIDOS': 'us', 'USA': 'us', 'REINO UNIDO': 'gb', 'UK': 'gb'
-    };
-
-    return allowedCountries
-      .map(country => countryCodeMap[country.toUpperCase()] || country.toLowerCase())
-      .filter(code => code.length === 2);
-  }
-
-  /**
-   * Obtiene headers de proxy si son necesarios
-   * @private
-   * @param {Channel} channel 
-   * @returns {Object|null}
-   */
-  #getProxyHeaders(channel) {
-    // Algunos streams requieren headers específicos
-    const streamUrl = channel.streamUrl.toLowerCase();
-    
-    if (streamUrl.includes('youtube') || streamUrl.includes('youtu.be')) {
-      return {
-        request: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        if (!infoHash) {
+          this.#logger.warn(`Magnet sin infoHash, saltando: ${magnet.magnet}`);
+          return null;
         }
-      };
-    }
 
-    return null;
+        return {
+          name: `[${magnet.quality || 'SD'}] ${this.#config.addon.name}`,
+          description: `📁 ${magnet.name}\n💾 ${magnet.size || 'N/A'}`,
+          infoHash: infoHash,
+          sources: trackers.map(t => `tracker:${t}`),
+          type: type,
+          behaviorHints: {
+            bingeGroup: `magnet-${infoHash}`,
+          }
+        };
+      } catch (error) {
+        this.#logger.error(`Error al parsear magnet URI: "${magnet.magnet}"`, error);
+        return null;
+      }
+    }).filter(Boolean); // Eliminar nulos si los hubiera
   }
 
   /**
-   * Aplica filtros de configuración de usuario
-   * @private
-   * @param {Array} streams 
-   * @param {Object} userConfig 
-   * @returns {Array}
-   */
-  #applyUserFilters(streams, userConfig) {
-    let filteredStreams = [...streams];
-
-    if (userConfig.preferred_language) {
-      const preferredLang = userConfig.preferred_language.toLowerCase();
-      filteredStreams = filteredStreams.filter(stream => 
-        stream.description.toLowerCase().includes(preferredLang)
-      );
-    }
-
-    return userConfig.preferred_quality 
-      ? this.#sortStreamsByQuality(filteredStreams, userConfig.preferred_quality)
-      : filteredStreams;
-  }
-
-  /**
-   * Ordena streams por calidad preferida
-   * @private
-   * @param {Array} streams 
-   * @param {string} preferredQuality 
-   * @returns {Array}
-   */
-  #sortStreamsByQuality(streams, preferredQuality) {
-    const qualityPriority = {
-      'HD': 3,
-      'SD': 2,
-      'Auto': 1
-    };
-
-    const preferredPriority = qualityPriority[preferredQuality] || 1;
-
-    return streams.sort((a, b) => {
-      const aPriority = this.#getStreamQualityPriority(a.name);
-      const bPriority = this.#getStreamQualityPriority(b.name);
-      
-      // Priorizar streams que coincidan con la preferencia
-      const aMatchesPreference = Math.abs(aPriority - preferredPriority);
-      const bMatchesPreference = Math.abs(bPriority - preferredPriority);
-      
-      return aMatchesPreference - bMatchesPreference;
-    });
-  }
-
-  /**
-   * Obtiene la prioridad de calidad de un stream
-   * @private
-   * @param {string} streamName 
-   * @returns {number}
-   */
-  #getStreamQualityPriority(streamName) {
-    const name = streamName.toLowerCase();
-    
-    if (name.includes('hd') || name.includes('720') || name.includes('1080')) return 3;
-    if (name.includes('sd') || name.includes('480')) return 2;
-    return 1;
-  }
-
-  /**
-   * Crea respuesta de stream
+   * Crea respuesta de stream.
    * @private
    * @param {Array} streams 
    * @returns {Object}
@@ -396,7 +171,7 @@ export class StreamHandler {
   #createStreamResponse(streams) {
     return {
       streams,
-      // Cache corto para TV en vivo
+      // Cache más largo para magnets, ya que no cambian frecuentemente.
       cacheMaxAge: this.#config.cache.streamCacheMaxAge,
       staleRevalidate: this.#config.cache.streamStaleRevalidate,
       staleError: this.#config.cache.streamStaleError
@@ -404,7 +179,7 @@ export class StreamHandler {
   }
 
   /**
-   * Crea respuesta vacía
+   * Crea respuesta vacía.
    * @private
    * @returns {Object}
    */
@@ -416,15 +191,13 @@ export class StreamHandler {
   }
 
   /**
-   * Crea respuesta de error
+   * Crea respuesta de error.
    * @private
    * @param {Error} error 
    * @returns {Object}
    */
   #createErrorResponse(error) {
-    // No exponer detalles internos del error a Stremio
     this.#logger.error('Error en stream handler:', error);
-    
     return {
       streams: [],
       cacheMaxAge: 60 // Cache corto para errores
