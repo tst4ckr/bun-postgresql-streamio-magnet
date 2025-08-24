@@ -1,6 +1,17 @@
-# 🧲 Stremio Magnet Search Addon
+# 🎬 Stremio Torrent Search Addon
 
-Un addon profesional de Stremio para búsqueda de enlaces magnéticos de películas y series, desarrollado con **Clean Architecture**, **Domain-Driven Design (DDD)** y **Bun** como runtime.
+Addon profesional de Stremio para búsqueda de torrents en múltiples proveedores españoles, desarrollado con Clean Architecture y Domain-Driven Design.
+
+## 🌟 Características
+
+- **🔍 Búsqueda Multi-Proveedor**: Integración con MejorTorrent, Wolfmax4k y Cinecalidad
+- **🎯 Compatible con Stremio**: Formato de respuesta nativo para streams
+- **⚡ Cache Inteligente**: Sistema de cache optimizado para 512MB RAM
+- **🏗️ Clean Architecture**: Separación clara de responsabilidades
+- **🔒 Seguro**: Rate limiting, CORS y headers de seguridad
+- **📊 Monitoreo**: Estadísticas de proveedores y health checks
+- **🌍 Multi-idioma**: Soporte para contenido en español
+- **🚀 Alto Rendimiento**: Búsquedas paralelas y optimizaciones
 
 ## ✨ Características Principales
 
