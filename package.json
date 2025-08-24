@@ -1,0 +1,61 @@
+{
+  "name": "stremio-tv-iptv-addon",
+  "version": "1.0.0",
+  "description": "Addon profesional de Stremio para canales de TV en vivo usando streams IPTV con arquitectura Clean y DDD",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --hot src/index.js",
+    "start": "bun run src/index.js",
+    "start:prod": "NODE_ENV=production bun run src/index.js",
+    "validate-channels": "bun run scripts/validate-channels.js",
+    "update-logos": "bun run scripts/update-logos.js",
+    "deploy": "./scripts/deploy.sh",
+    "test": "bun test",
+    "lint": "eslint src/ --ext .js",
+    "publish-addon": "bun run scripts/publish-addon.js",
+    "build": "bun install --frozen-lockfile",
+    "preview": "bun run start:prod",
+    "beamup-deploy": "bunx beamup-cli deploy"
+  },
+  "keywords": [
+    "stremio",
+    "addon",
+    "tv",
+    "iptv",
+    "streaming",
+    "m3u",
+    "rtmp",
+    "clean-architecture",
+    "ddd"
+  ],
+  "author": "Stremio TV IPTV Addon",
+  "license": "MIT",
+  "dependencies": {
+    "stremio-addon-sdk": "^1.6.8",
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "express-rate-limit": "^7.1.5",
+    "dotenv": "^16.3.1",
+    "csv-parser": "^3.0.0",
+    "axios": "^1.6.2",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "eslint": "^8.55.0",
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "bun": ">=1.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stremio/tv-iptv-addon.git"
+  },
+  "bugs": {
+    "url": "https://github.com/stremio/tv-iptv-addon/issues"
+  },
+  "homepage": "https://github.com/stremio/tv-iptv-addon#readme"
+}
