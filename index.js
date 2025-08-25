@@ -64,7 +64,7 @@ function showUsageInfo() {
   console.log('   - CACHE_ENABLED: Habilitar cache (default: true)');
   console.log('   - CACHE_MAX_MEMORY_MB: Memoria máxima para cache (default: 128)');
   console.log('   - SEARCH_MAX_RESULTS: Resultados máximos por búsqueda (default: 50)');
-  console.log('   - MEJORTORRENT_ENABLED: Habilitar MejorTorrent (default: true)');
+  console.log('   - Todos los proveedores han sido eliminados');
   console.log('');
   
   console.log('✅ Aplicación lista para recibir peticiones!');

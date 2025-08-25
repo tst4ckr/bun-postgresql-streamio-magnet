@@ -5,9 +5,7 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import { createTorrentRoutes, addParameterValidation } from '../http/routes/torrentRoutes.js';
 import { TorrentSearchService } from '../../application/services/TorrentSearchService.js';
-import { MejorTorrentSearchRepository } from '../repositories/MejorTorrentSearchRepository.js';
-import { Wolfmax4kSearchRepository } from '../repositories/Wolfmax4kSearchRepository.js';
-import { CinecalidadSearchRepository } from '../repositories/CinecalidadSearchRepository.js';
+
 import { LightweightCacheService } from '../services/LightweightCacheService.js';
 import { getConfig } from '../config/TorrentSearchConfig.js';
 import axios from 'axios';
@@ -219,38 +217,7 @@ export class TorrentSearchApp {
     
     const repositories = [];
     
-    // MejorTorrent
-    if (this.config.isProviderEnabled('mejortorrent')) {
-      this.repositories.mejortorrent = new MejorTorrentSearchRepository(
-        this.services.httpClient,
-        this.services.cache,
-        this.config
-      );
-      repositories.push(this.repositories.mejortorrent);
-      console.log('✅ Repositorio MejorTorrent inicializado');
-    }
-    
-    // Wolfmax4k
-    if (this.config.isProviderEnabled('wolfmax4k')) {
-      this.repositories.wolfmax4k = new Wolfmax4kSearchRepository(
-        this.services.httpClient,
-        this.services.cache,
-        this.config
-      );
-      repositories.push(this.repositories.wolfmax4k);
-      console.log('✅ Repositorio Wolfmax4k inicializado');
-    }
-    
-    // Cinecalidad
-    if (this.config.isProviderEnabled('cinecalidad')) {
-      this.repositories.cinecalidad = new CinecalidadSearchRepository(
-        this.services.httpClient,
-        this.services.cache,
-        this.config
-      );
-      repositories.push(this.repositories.cinecalidad);
-      console.log('✅ Repositorio Cinecalidad inicializado');
-    }
+    // Todos los repositorios han sido eliminados
     
     // Servicio de búsqueda principal
     this.services.torrentSearch = new TorrentSearchService(

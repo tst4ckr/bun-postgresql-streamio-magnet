@@ -33,21 +33,7 @@ export class TorrentSearchConfig {
 
       // Configuración de proveedores
       providers: {
-        mejortorrent: {
-          enabled: process.env.MEJORTORRENT_ENABLED !== 'false',
-          priority: parseInt(process.env.MEJORTORRENT_PRIORITY) || 1,
-          rateLimit: parseInt(process.env.MEJORTORRENT_RATE_LIMIT) || 10
-        },
-        wolfmax4k: {
-          enabled: process.env.WOLFMAX4K_ENABLED !== 'false',
-          priority: parseInt(process.env.WOLFMAX4K_PRIORITY) || 2,
-          rateLimit: parseInt(process.env.WOLFMAX4K_RATE_LIMIT) || 5
-        },
-        cinecalidad: {
-          enabled: process.env.CINECALIDAD_ENABLED !== 'false',
-          priority: parseInt(process.env.CINECALIDAD_PRIORITY) || 3,
-          rateLimit: parseInt(process.env.CINECALIDAD_RATE_LIMIT) || 8
-        }
+        // Todos los proveedores han sido eliminados
       },
 
       // Configuración de búsqueda
@@ -139,7 +125,7 @@ export class TorrentSearchConfig {
     }
 
     // Validar proveedores
-    const providers = ['mejortorrent', 'wolfmax4k', 'cinecalidad'];
+    const providers = [];
     const enabledProviders = providers.filter(p => this.isProviderEnabled(p));
     if (enabledProviders.length === 0) {
       warnings.push('No hay proveedores habilitados');
@@ -157,7 +143,7 @@ export class TorrentSearchConfig {
    * @returns {Object} Resumen de la configuración
    */
   getSummary() {
-    const providers = ['mejortorrent', 'wolfmax4k', 'cinecalidad'];
+    const providers = [];
     const enabledProviders = providers.filter(p => this.isProviderEnabled(p));
 
     return {

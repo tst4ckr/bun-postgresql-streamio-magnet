@@ -12,7 +12,7 @@ const config = {
     id: process.env.ADDON_ID || 'org.stremio.torrent.search',
     version: process.env.ADDON_VERSION || '1.2.0',
     name: process.env.ADDON_NAME || 'Torrent Search Pro',
-    description: process.env.ADDON_DESCRIPTION || 'Advanced torrent search addon with multiple providers (MejorTorrent, Wolfmax4k, Cinecalidad) for movies and series with high-quality streams.',
+    description: process.env.ADDON_DESCRIPTION || 'Advanced torrent search addon with multiple providers for movies and series with high-quality streams.',
     logo: process.env.ADDON_LOGO || 'https://via.placeholder.com/256x256/1a1a1a/ffffff?text=TS',
     background: process.env.ADDON_BACKGROUND || 'https://via.placeholder.com/1920x1080/1a1a1a/ffffff?text=Torrent+Search',
     resources: [

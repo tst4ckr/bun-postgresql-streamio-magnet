@@ -4,7 +4,7 @@ Addon profesional de Stremio para búsqueda de torrents en múltiples proveedore
 
 ## 🌟 Características
 
-- **🔍 Búsqueda Multi-Proveedor**: Integración con MejorTorrent, Wolfmax4k y Cinecalidad
+- **🔍 Búsqueda Multi-Proveedor**: Sistema preparado para múltiples proveedores
 - **🎯 Compatible con Stremio**: Formato de respuesta nativo para streams
 - **⚡ Cache Inteligente**: Sistema de cache optimizado para 512MB RAM
 - **🏗️ Clean Architecture**: Separación clara de responsabilidades

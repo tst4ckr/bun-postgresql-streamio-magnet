@@ -102,7 +102,7 @@ export function createTorrentRoutes(torrentSearchService, logger = console) {
    * GET /api/providers/:providerId/search
    * Búsqueda en un proveedor específico
    * Parámetros:
-   * - providerId: ID del proveedor (mejortorrent, wolfmax4k, cinecalidad)
+   * - providerId: ID del proveedor (todos los proveedores han sido eliminados)
    * Query params: mismos que /api/search
    */
   router.get('/api/providers/:providerId/search', controller.searchInProvider.bind(controller));
@@ -238,7 +238,7 @@ export function createTorrentRoutes(torrentSearchService, logger = console) {
           <div class="section">
             <h3>ℹ️ Información</h3>
             <p>Este addon permite buscar torrents en múltiples proveedores españoles y convertirlos en streams compatibles con Stremio.</p>
-            <p><strong>Proveedores soportados:</strong> MejorTorrent, Wolfmax4k, Cinecalidad</p>
+            <p><strong>Proveedores soportados:</strong> Todos los proveedores han sido eliminados</p>
             <p><strong>Idiomas:</strong> Español (ES)</p>
             <p><strong>Tipos de contenido:</strong> Películas y Series</p>
           </div>
@@ -324,7 +324,7 @@ export function addParameterValidation(router) {
   });
 
   router.param('providerId', (req, res, next, providerId) => {
-    const validProviders = ['mejortorrent', 'wolfmax4k', 'cinecalidad'];
+    const validProviders = []; // Todos los proveedores han sido eliminados
     if (!validProviders.includes(providerId.toLowerCase())) {
       return res.status(400).json({
         error: 'Proveedor inválido',

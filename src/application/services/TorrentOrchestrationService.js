@@ -20,9 +20,7 @@ export class TorrentOrchestrationService {
       qualityPriority: ['4K', '1080p', '720p', '480p'],
       languagePriority: ['español', 'latino', 'castellano', 'english'],
       providerWeights: {
-        mejortorrent: 1.0,
-        wolfmax4k: 0.8,
-        cinecalidad: 0.6
+        // Todos los proveedores han sido eliminados
       }
     };
   }
