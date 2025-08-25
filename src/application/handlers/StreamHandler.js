@@ -4,7 +4,7 @@
  */
 
 import { MagnetNotFoundError } from '../../domain/repositories/MagnetRepository.js';
-import parse from 'parse-magnet-uri';
+import { parseMagnet } from 'parse-magnet-uri';
 
 /**
  * Handler para peticiones de streams de magnets.
@@ -136,7 +136,7 @@ export class StreamHandler {
   #createStreamsFromMagnets(magnets, type) {
     return magnets.map(magnet => {
       try {
-        const parsedMagnet = parse(magnet.magnet);
+        const parsedMagnet = parseMagnet(magnet.magnet);
         const infoHash = parsedMagnet.infoHash;
         const trackers = parsedMagnet.tr || [];
 
