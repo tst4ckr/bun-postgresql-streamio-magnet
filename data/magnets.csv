@@ -1,8 +1,2 @@
-imdb_id,name,magnet,quality,size
-tt1254207,"Big Buck Bunny 1080p HEVC","magnet:?xt=urn:btih:dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c&dn=Big.Buck.Bunny.2008.1080p.HEVC&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.publicbt.com%3A80%2Fannounce",1080p,355MB
-tt1254207,"Big Buck Bunny 720p H264","magnet:?xt=urn:btih:88594aaacbde40ef3e2510c47374ec0aa396c08e&dn=Big.Buck.Bunny.2008.720p.H264&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80%2Fannounce",720p,200MB
-tt0109830,"Forrest Gump 2160p 4K HDR","magnet:?xt=urn:btih:c9e15763f722f23e98a29decdfae341b98d53056&dn=Forrest.Gump.1994.2160p.4K.HDR&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969%2Fannounce",2160p,8.5GB
-tt0109830,"Forrest Gump 1080p BluRay","magnet:?xt=urn:btih:ed2570d0ec849d65a7b9661e3b4f1b4b7a4d9d3d&dn=Forrest.Gump.1994.1080p.BluRay&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80%2Fannounce",1080p,2.1GB
-tt0109830,"Forrest Gump 720p WEBRip","magnet:?xt=urn:btih:b6d745b0e3ab8f8b9b6c9b1e4b2f1b4b7a4d9d3e&dn=Forrest.Gump.1994.720p.WEBRip&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80%2Fannounce",720p,950MB
-tt0111161,"The Shawshank Redemption 1080p Criterion","magnet:?xt=urn:btih:a4b6c8d0e2f4a6b8c0d2e4f6a8b0c2d4e6f8a0b2&dn=Shawshank.Redemption.1994.1080p.Criterion&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969%2Fannounce",1080p,3.2GB
-tt0111161,"The Shawshank Redemption 720p Directors Cut","magnet:?xt=urn:btih:c4d6e8f0a2b4c6d8e0f2a4b6c8d0e2f4a6b8c0d2&dn=Shawshank.Redemption.1994.720p.Directors.Cut&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80%2Fannounce",720p,1.4GB
+imdb_id,name,magnet,quality,size,source
+tt1254207,"Big Buck Bunny 1080p HEVC","magnet:?xt=urn:btih:dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c&dn=Big.Buck.Bunny.2008.1080p.HEVC&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.publicbt.com%3A80%2Fannounce",1080p,355MB,manual

@@ -201,7 +201,7 @@ export class TorrentioApiService {
       escapeCsv(magnet.magnet),
       escapeCsv(magnet.quality),
       escapeCsv(magnet.size),
-      escapeCsv(magnet.source)
+      escapeCsv(magnet.source || 'torrentio-api')
     ].join(',');
   }
 
