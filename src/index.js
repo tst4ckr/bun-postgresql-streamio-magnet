@@ -116,4 +116,10 @@ async function main() {
   }
 }
 
-main();
+// Exportar para uso externo
+export { MagnetAddon };
+
+// Ejecutar si es el módulo principal
+if (import.meta.main) {
+  main();
+}
