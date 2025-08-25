@@ -5,7 +5,7 @@
 
 import { addonBuilder, serveHTTP } from 'stremio-addon-sdk';
 import { addonConfig, manifest } from './config/addonConfig.js';
-import { MagnetRepositoryFactory } from './infrastructure/factories/MagnetRepositoryFactory.js';
+import { CascadingMagnetRepository } from './infrastructure/repositories/CascadingMagnetRepository.js';
 import { StreamHandler } from './application/handlers/StreamHandler.js';
 
 /**
@@ -29,14 +29,16 @@ class MagnetAddon {
   async initialize() {
     this.#logger.info('Configuración cargada:', this.#config);
 
-    // 1. Inicializar Repositorio
-    this.#magnetRepository = MagnetRepositoryFactory.create(
-      this.#config.repository.csvSource,
+    // 1. Inicializar Repositorio en Cascada
+    this.#magnetRepository = new CascadingMagnetRepository(
+      this.#config.repository.primaryCsvPath,
+      this.#config.repository.secondaryCsvPath,
+      this.#config.repository.torrentioApiUrl,
       this.#logger,
       this.#config.repository.timeout
     );
     await this.#magnetRepository.initialize();
-    this.#logger.info('Repositorio de magnets inicializado.');
+    this.#logger.info('Repositorio de magnets en cascada inicializado.');
 
     // 2. Crear Addon Builder
     this.#addonBuilder = new addonBuilder(manifest);
