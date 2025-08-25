@@ -6,7 +6,6 @@
 import { addonBuilder, serveHTTP } from 'stremio-addon-sdk';
 import { addonConfig, manifest } from './config/addonConfig.js';
 import { MagnetRepositoryFactory } from './infrastructure/factories/MagnetRepositoryFactory.js';
-import { MagnetService } from './application/services/MagnetService.js';
 import { StreamHandler } from './application/handlers/StreamHandler.js';
 
 /**
@@ -16,7 +15,6 @@ class MagnetAddon {
   #config;
   #logger;
   #magnetRepository;
-  #magnetService;
   #addonBuilder;
 
   constructor() {
@@ -40,16 +38,12 @@ class MagnetAddon {
     await this.#magnetRepository.initialize();
     this.#logger.info('Repositorio de magnets inicializado.');
 
-    // 2. Inicializar Servicio
-    this.#magnetService = new MagnetService(this.#magnetRepository, this.#logger);
-    this.#logger.info('Servicio de magnets inicializado.');
-
-    // 3. Crear Addon Builder
+    // 2. Crear Addon Builder
     this.#addonBuilder = new addonBuilder(manifest);
     this.#logger.info(`Addon builder creado: ${manifest.name} v${manifest.version}`);
 
-    // 4. Configurar Handlers
-    const streamHandler = new StreamHandler(this.#magnetService, this.#config, this.#logger);
+    // 3. Configurar Stream Handler
+    const streamHandler = new StreamHandler(this.#magnetRepository, this.#config, this.#logger);
     this.#addonBuilder.defineStreamHandler(streamHandler.createAddonHandler());
     this.#logger.info('Handler de streams configurado.');
   }

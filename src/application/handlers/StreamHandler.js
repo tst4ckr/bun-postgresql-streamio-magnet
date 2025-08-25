@@ -14,17 +14,17 @@ export class StreamHandler {
   /**
    * @private
    */
-  #magnetService;
+  #magnetRepository;
   #config;
   #logger;
 
   /**
-   * @param {Object} magnetService - Servicio de magnets.
+   * @param {Object} magnetRepository - Repositorio de magnets.
    * @param {Object} config - Configuración del addon.
    * @param {Object} logger - Logger para trazabilidad.
    */
-  constructor(magnetService, config, logger = console) {
-    this.#magnetService = magnetService;
+  constructor(magnetRepository, config, logger = console) {
+    this.#magnetRepository = magnetRepository;
     this.#config = config;
     this.#logger = logger;
   }
@@ -117,7 +117,7 @@ export class StreamHandler {
    */
   async #getMagnets(imdbId) {
     try {
-      return await this.#magnetService.getMagnetsByImdbId(imdbId);
+      return await this.#magnetRepository.getMagnetsByImdbId(imdbId);
     } catch (error) {
       if (error instanceof MagnetNotFoundError) {
         return null;

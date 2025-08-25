@@ -5,32 +5,13 @@
 
 export class MagnetRepository {
   /**
-   * Obtiene todos los magnets disponibles
+   * Busca magnets por su IMDb ID
+   * @param {string} imdbId
    * @returns {Promise<Magnet[]>}
-   * @throws {RepositoryError}
-   */
-  async getAllMagnets() {
-    throw new Error('Método getAllMagnets debe ser implementado por la clase derivada');
-  }
-
-  /**
-   * Obtiene magnets por ID de IMDB
-   * @param {string} imdbId - ID de IMDB (formato tt*)
-   * @returns {Promise<Magnet[]>}
-   * @throws {RepositoryError}
+   * @throws {MagnetNotFoundError} Si no se encuentran magnets para el ID
    */
   async getMagnetsByImdbId(imdbId) {
     throw new Error('Método getMagnetsByImdbId debe ser implementado por la clase derivada');
-  }
-
-  /**
-   * Obtiene magnets por calidad
-   * @param {string} quality - Calidad del video (e.g., '720p', '1080p', '4K')
-   * @returns {Promise<Magnet[]>}
-   * @throws {RepositoryError}
-   */
-  async getMagnetsByQuality(quality) {
-    throw new Error('Método getMagnetsByQuality debe ser implementado por la clase derivada');
   }
 }
 
