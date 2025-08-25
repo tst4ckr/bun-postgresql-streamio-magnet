@@ -75,30 +75,42 @@ export class TorrentioApiService {
     
     for (const stream of streams) {
       try {
-        if (!stream.infoHash) continue;
+        if (!stream.infoHash) {
+          this.#logger.debug(`Stream sin infoHash ignorado para ${imdbId}:`, stream);
+          continue;
+        }
         
-        // Extraer información del nombre del stream
-        const name = stream.name || stream.title || `Torrent ${stream.infoHash}`;
-        const quality = this.#extractQuality(name);
-        const size = this.#extractSize(name);
+        // Extraer información del stream según formato real de Torrentio
+        const streamName = stream.name || `Torrent ${stream.infoHash}`;
+        const streamTitle = stream.title || '';
         
-        // Construir magnet URI
-        const magnetUri = this.#buildMagnetUri(stream.infoHash, name, stream.sources);
+        // Combinar name y title para obtener información completa
+        const fullName = this.#buildFullStreamName(streamName, streamTitle);
+        const quality = this.#extractQualityFromStream(stream, streamName, streamTitle);
+        const size = this.#extractSizeFromStream(stream, streamTitle);
+        const filename = this.#extractFilename(stream);
+        
+        // Construir magnet URI con información adicional
+        const magnetUri = this.#buildMagnetUri(stream.infoHash, filename || fullName, stream.sources);
         
         const magnetData = {
           imdb_id: imdbId,
-          name: name,
+          name: fullName,
           magnet: magnetUri,
           quality: quality,
           size: size,
-          source: 'torrentio-api'
+          source: 'torrentio-api',
+          // Información adicional de Torrentio
+          fileIdx: stream.fileIdx,
+          filename: filename,
+          provider: this.#extractProvider(streamTitle)
         };
         
         const magnet = new Magnet(magnetData);
         magnets.push(magnet);
         
       } catch (error) {
-        this.#logger.error(`Error al procesar stream de Torrentio:`, error);
+        this.#logger.error(`Error al procesar stream de Torrentio para ${imdbId}:`, error, stream);
       }
     }
     
@@ -106,37 +118,114 @@ export class TorrentioApiService {
   }
 
   /**
-   * Extrae la calidad del nombre del stream.
+   * Construye el nombre completo del stream combinando name y title.
    * @private
-   * @param {string} name - Nombre del stream
+   * @param {string} streamName - Nombre del stream
+   * @param {string} streamTitle - Título del stream
+   * @returns {string} Nombre completo
+   */
+  #buildFullStreamName(streamName, streamTitle) {
+    if (!streamTitle) return streamName;
+    
+    // Extraer el nombre del archivo del title (primera línea)
+    const titleLines = streamTitle.split('\n');
+    const filename = titleLines[0] || '';
+    
+    return filename || streamName;
+  }
+
+  /**
+   * Extrae la calidad del stream usando múltiples fuentes.
+   * @private
+   * @param {Object} stream - Objeto stream completo
+   * @param {string} streamName - Nombre del stream
+   * @param {string} streamTitle - Título del stream
    * @returns {string} Calidad extraída
    */
-  #extractQuality(name) {
+  #extractQualityFromStream(stream, streamName, streamTitle) {
+    const textToAnalyze = `${streamName} ${streamTitle}`;
+    
     const qualityPatterns = [
-      /\b(4K|2160p)\b/i,
-      /\b(1080p|FHD)\b/i,
-      /\b(720p|HD)\b/i,
-      /\b(480p|SD)\b/i
+      { pattern: /\b(4K|2160p)\b/i, quality: '4K' },
+      { pattern: /\b(1080p|1080P|FHD)\b/i, quality: '1080p' },
+      { pattern: /\b(720p|720P|HD)\b/i, quality: '720p' },
+      { pattern: /\b(480p|480P)\b/i, quality: '480p' },
+      { pattern: /\b(DVDRip|DVDRIP)\b/i, quality: 'DVDRip' },
+      { pattern: /\b(BDRip|BDRIP)\b/i, quality: 'BDRip' },
+      { pattern: /\b(WEBRip|WEBRIP)\b/i, quality: 'WEBRip' },
+      { pattern: /\b(CAM|cam)\b/i, quality: 'CAM' },
+      { pattern: /\b(TS|ts)\b/i, quality: 'TS' }
     ];
     
-    for (const pattern of qualityPatterns) {
-      const match = name.match(pattern);
-      if (match) return match[1].toUpperCase();
+    for (const { pattern, quality } of qualityPatterns) {
+      if (pattern.test(textToAnalyze)) {
+        return quality;
+      }
     }
     
     return 'SD';
   }
 
   /**
-   * Extrae el tamaño del nombre del stream.
+   * Extrae el tamaño del stream desde el title.
    * @private
-   * @param {string} name - Nombre del stream
+   * @param {Object} stream - Objeto stream completo
+   * @param {string} streamTitle - Título del stream
    * @returns {string} Tamaño extraído o 'N/A'
    */
-  #extractSize(name) {
-    const sizePattern = /\b(\d+(?:\.\d+)?\s*(?:GB|MB|TB))\b/i;
-    const match = name.match(sizePattern);
-    return match ? match[1] : 'N/A';
+  #extractSizeFromStream(stream, streamTitle) {
+    if (!streamTitle) return 'N/A';
+    
+    // Buscar patrón de tamaño en el formato de Torrentio: 💾 2.32 GB
+    const sizePatterns = [
+      /💾\s*(\d+(?:\.\d+)?\s*(?:GB|MB|TB|KB))/i,
+      /\b(\d+(?:\.\d+)?\s*(?:GB|MB|TB|KB))\b/i
+    ];
+    
+    for (const pattern of sizePatterns) {
+      const match = streamTitle.match(pattern);
+      if (match) {
+        return match[1].trim();
+      }
+    }
+    
+    return 'N/A';
+  }
+
+  /**
+   * Extrae el nombre del archivo desde behaviorHints.
+   * @private
+   * @param {Object} stream - Objeto stream
+   * @returns {string|null} Nombre del archivo o null
+   */
+  #extractFilename(stream) {
+    return stream.behaviorHints?.filename || null;
+  }
+
+  /**
+   * Extrae el proveedor del stream desde el title.
+   * @private
+   * @param {string} streamTitle - Título del stream
+   * @returns {string} Proveedor extraído
+   */
+  #extractProvider(streamTitle) {
+    if (!streamTitle) return 'unknown';
+    
+    // Buscar patrón de proveedor: ⚙️ Cinecalidad
+    const providerMatch = streamTitle.match(/⚙️\s*([^\n]+)/i);
+    if (providerMatch) {
+      return providerMatch[1].trim();
+    }
+    
+    // Proveedores conocidos como fallback
+    const knownProviders = ['cinecalidad', 'mejortorrent', 'wolfmax4k'];
+    for (const provider of knownProviders) {
+      if (streamTitle.toLowerCase().includes(provider)) {
+        return provider;
+      }
+    }
+    
+    return 'torrentio';
   }
 
   /**
@@ -148,19 +237,62 @@ export class TorrentioApiService {
    * @returns {string} Magnet URI
    */
   #buildMagnetUri(infoHash, name, sources = []) {
-    let magnetUri = `magnet:?xt=urn:btih:${infoHash}&dn=${encodeURIComponent(name)}`;
+    // Validar infoHash
+    if (!infoHash || typeof infoHash !== 'string') {
+      throw new Error('infoHash inválido para construir magnet URI');
+    }
     
-    // Agregar trackers si están disponibles
-    if (sources && sources.length > 0) {
+    // Limpiar y validar el nombre
+    const cleanName = this.#cleanMagnetName(name);
+    let magnetUri = `magnet:?xt=urn:btih:${infoHash.toLowerCase()}&dn=${encodeURIComponent(cleanName)}`;
+    
+    // Agregar trackers predeterminados para mejorar conectividad
+    const defaultTrackers = [
+      'udp://tracker.opentrackr.org:1337/announce',
+      'udp://tracker.openbittorrent.com:6969/announce',
+      'udp://9.rarbg.to:2710/announce',
+      'udp://exodus.desync.com:6969/announce'
+    ];
+    
+    // Agregar trackers de sources si están disponibles
+    if (sources && Array.isArray(sources)) {
       for (const source of sources) {
-        if (source.startsWith('tracker:')) {
-          const tracker = source.replace('tracker:', '');
-          magnetUri += `&tr=${encodeURIComponent(tracker)}`;
+        if (typeof source === 'string') {
+          if (source.startsWith('tracker:')) {
+            const tracker = source.replace('tracker:', '');
+            magnetUri += `&tr=${encodeURIComponent(tracker)}`;
+          } else if (source.startsWith('http') || source.startsWith('udp')) {
+            magnetUri += `&tr=${encodeURIComponent(source)}`;
+          }
         }
       }
     }
     
+    // Agregar trackers predeterminados
+    for (const tracker of defaultTrackers) {
+      magnetUri += `&tr=${encodeURIComponent(tracker)}`;
+    }
+    
     return magnetUri;
+  }
+
+  /**
+   * Limpia el nombre para uso en magnet URI.
+   * @private
+   * @param {string} name - Nombre a limpiar
+   * @returns {string} Nombre limpio
+   */
+  #cleanMagnetName(name) {
+    if (!name || typeof name !== 'string') {
+      return 'Unknown';
+    }
+    
+    // Remover caracteres problemáticos y emojis
+    return name
+      .replace(/[👤💾⚙️🇲🇽]/g, '')
+      .replace(/\n/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   /**
@@ -201,7 +333,10 @@ export class TorrentioApiService {
       escapeCsv(magnet.magnet),
       escapeCsv(magnet.quality),
       escapeCsv(magnet.size),
-      escapeCsv(magnet.source || 'torrentio-api')
+      escapeCsv(magnet.source || 'torrentio-api'),
+      escapeCsv(magnet.fileIdx || ''),
+      escapeCsv(magnet.filename || ''),
+      escapeCsv(magnet.provider || '')
     ].join(',');
   }
 
@@ -211,7 +346,7 @@ export class TorrentioApiService {
    */
   #ensureTorrentioFileExists() {
     if (!existsSync(this.#torrentioFilePath)) {
-      const headers = 'imdb_id,name,magnet,quality,size,source\n';
+      const headers = 'imdb_id,name,magnet,quality,size,source,fileIdx,filename,provider\n';
       writeFileSync(this.#torrentioFilePath, headers, 'utf8');
       this.#logger.info(`Archivo torrentio.csv creado en: ${this.#torrentioFilePath}`);
     }
