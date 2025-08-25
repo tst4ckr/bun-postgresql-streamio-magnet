@@ -1,2 +1,1 @@
-imdb_id,name,magnet,quality,size,source
-tt1254207,"Big Buck Bunny 1080p HEVC","magnet:?xt=urn:btih:dd8255ecdc7ca55fb0bbf81323d87062db1f6d1c&dn=Big.Buck.Bunny.2008.1080p.HEVC&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.publicbt.com%3A80%2Fannounce",1080p,355MB,manual
+imdb_id,name,magnet,quality,size,source,fileIdx,filename,provider
