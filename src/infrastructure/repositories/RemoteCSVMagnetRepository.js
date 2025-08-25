@@ -87,11 +87,6 @@ export class RemoteCSVMagnetRepository extends MagnetRepository {
     }
   }
 
-  async getAllMagnets() {
-    if (!this.#isInitialized) await this.initialize();
-    return this.#magnets;
-  }
-
   async getMagnetsByImdbId(imdbId) {
     if (!this.#isInitialized) await this.initialize();
     const magnets = this.#magnetMap.get(imdbId) || [];
@@ -99,10 +94,5 @@ export class RemoteCSVMagnetRepository extends MagnetRepository {
       throw new MagnetNotFoundError(`No se encontraron magnets para IMDB ID: ${imdbId}`);
     }
     return magnets;
-  }
-
-  async getMagnetsByQuality(quality) {
-    if (!this.#isInitialized) await this.initialize();
-    return this.#magnets.filter(magnet => magnet.quality === quality);
   }
 }

@@ -48,11 +48,6 @@ export class CSVMagnetRepository extends MagnetRepository {
     this.#magnetMap.get(magnet.imdb_id).push(magnet);
   }
 
-  async getAllMagnets() {
-    if (!this.#isInitialized) await this.initialize();
-    return this.#magnets;
-  }
-
   async getMagnetsByImdbId(imdbId) {
     if (!this.#isInitialized) await this.initialize();
     const magnets = this.#magnetMap.get(imdbId) || [];
@@ -60,10 +55,5 @@ export class CSVMagnetRepository extends MagnetRepository {
       throw new MagnetNotFoundError(imdbId);
     }
     return magnets;
-  }
-
-  async getMagnetsByQuality(quality) {
-    if (!this.#isInitialized) await this.initialize();
-    return this.#magnets.filter(magnet => magnet.quality === quality);
   }
 }
