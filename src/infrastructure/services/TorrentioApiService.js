@@ -16,6 +16,9 @@ export class TorrentioApiService {
   #timeout;
   #logger;
   #torrentioFilePath;
+  #providerConfigs;
+  #manifestCache;
+  #manifestCacheExpiry;
 
   /**
    * @param {string} baseUrl - URL base de la API de Torrentio
@@ -28,14 +31,19 @@ export class TorrentioApiService {
     this.#torrentioFilePath = torrentioFilePath;
     this.#logger = logger;
     this.#timeout = timeout;
+    this.#providerConfigs = this.#initializeProviderConfigs();
+    this.#manifestCache = new Map();
+    this.#manifestCacheExpiry = 24 * 60 * 60 * 1000; // 24 horas en milisegundos
     this.#ensureTorrentioFileExists();
   }
 
   /**
    * Busca magnets por ID de IMDb usando la API de Torrentio
-   * Soporta películas, series y anime con detección específica de proveedores
-   * @param {string} imdbId - ID de IMDb (ej: 'tt1234567')
-   * @param {string} type - Tipo de contenido ('movie', 'series', 'anime')
+   * Soporta películas, series y anime con detección automática de tipo
+   * @param {string} imdbId - ID de IMDb (ej: 'tt1234567') o Kitsu ID (ej: 'kitsu:12345')
+   * @param {string} type - Tipo de contenido ('movie', 'series', 'anime', 'auto' para detección automática)
+   * @param {number} season - Temporada (requerido para series/anime)
+   * @param {number} episode - Episodio (requerido para series/anime)
    * @returns {Promise<Array>} - Array de objetos magnet con las siguientes propiedades:
    *   - magnetUri: URI del magnet
    *   - title: Título del archivo
@@ -47,27 +55,36 @@ export class TorrentioApiService {
    *   - season: Temporada (solo para series/anime)
    *   - episode: Episodio (solo para series/anime)
    */
-  async searchMagnetsByImdbId(imdbId, type = 'movie') {
+  async searchMagnetsByImdbId(imdbId, type = 'auto', season = null, episode = null) {
     try {
-      this.#logger.info(`Buscando magnets en API Torrentio para: ${imdbId} (${type})`);
+      // Detectar tipo automáticamente si es necesario
+      const detectedType = type === 'auto' ? this.#detectContentType(imdbId, season, episode) : type;
+      this.#logger.info(`Buscando magnets en API Torrentio para: ${imdbId} (${detectedType})`);
       
-      // Construir URL según el tipo de contenido
-      // Anime usa la misma URL que series en Torrentio (proveedores específicos como NyaaSi, HorribleSubs)
-      const contentType = (type === 'series' || type === 'anime') ? 'series' : 'movie';
-      const streamUrl = `${this.#baseUrl}/stream/${contentType}/${imdbId}.json`;
+      // Construir ID según el tipo de contenido
+      let streamId = imdbId;
+      if ((detectedType === 'series' || detectedType === 'anime') && season !== null && episode !== null) {
+        streamId = `${imdbId}:${season}:${episode}`;
+        this.#logger.info(`Formato de serie/anime: ${streamId}`);
+      }
+      
+      // Construir URL según el tipo de contenido con proveedores optimizados
+      const contentType = (detectedType === 'series' || detectedType === 'anime') ? 'series' : 'movie';
+      const optimizedBaseUrl = this.#getOptimizedBaseUrl(detectedType);
+      const streamUrl = `${optimizedBaseUrl}/stream/${contentType}/${streamId}.json`;
       const response = await this.#fetchWithTimeout(streamUrl);
       
       if (!response.ok) {
-        this.#logger.warn(`API Torrentio respondió con status ${response.status} para ${imdbId}`);
+        this.#logger.warn(`API Torrentio respondió con status ${response.status} para ${streamId}`);
         return [];
       }
       
       const data = await response.json();
-      const magnets = this.#parseStreamsToMagnets(data.streams || [], imdbId, type);
+      const magnets = this.#parseStreamsToMagnets(data.streams || [], imdbId, detectedType, season, episode);
       
       if (magnets.length > 0) {
         await this.#saveMagnetsToFile(magnets);
-        this.#logger.info(`Guardados ${magnets.length} magnets de API Torrentio para ${imdbId}`);
+        this.#logger.info(`Guardados ${magnets.length} magnets de API Torrentio para ${streamId}`);
       }
       
       return magnets;
@@ -84,9 +101,11 @@ export class TorrentioApiService {
    * @param {Array} streams - Streams de la respuesta de Torrentio
    * @param {string} imdbId - ID de IMDb
    * @param {string} type - Tipo de contenido
+   * @param {number} season - Temporada (para series/anime)
+   * @param {number} episode - Episodio (para series/anime)
    * @returns {Magnet[]} Array de magnets
    */
-  #parseStreamsToMagnets(streams, imdbId, type) {
+  #parseStreamsToMagnets(streams, imdbId, type, season = null, episode = null) {
     const magnets = [];
     
     for (const stream of streams) {
@@ -105,11 +124,15 @@ export class TorrentioApiService {
         const quality = this.#extractQualityFromStream(stream, streamName, streamTitle);
         const size = this.#extractSizeFromStream(stream, streamTitle);
         const filename = this.#extractFilename(stream);
+        const seedersInfo = this.#extractSeedersAndPeers(streamTitle);
         
         // Construir magnet URI con información adicional
         const magnetUri = this.#buildMagnetUri(stream.infoHash, filename || fullName, stream.sources);
         
-        const episodeInfo = this.#extractEpisodeInfo(streamTitle, type);
+        // Usar información de episodio proporcionada o extraída
+        const episodeInfo = season !== null && episode !== null 
+          ? { season, episode }
+          : this.#extractEpisodeInfo(streamTitle, type);
         
         const magnetData = {
           imdb_id: imdbId,
@@ -122,6 +145,8 @@ export class TorrentioApiService {
           fileIdx: stream.fileIdx,
           filename: filename,
           provider: this.#extractProvider(streamTitle),
+          seeders: seedersInfo.seeders,
+          peers: seedersInfo.peers,
           ...episodeInfo
         };
         
@@ -216,6 +241,30 @@ export class TorrentioApiService {
     }
     
     return 'N/A';
+  }
+
+  /**
+   * Extrae información de seeders y peers desde el título del stream.
+   * @private
+   * @param {string} streamTitle - Título del stream
+   * @returns {Object} Objeto con seeders y peers
+   */
+  #extractSeedersAndPeers(streamTitle) {
+    const result = { seeders: 0, peers: 0 };
+    
+    if (!streamTitle) return result;
+    
+    // Buscar patrón de seeders en el formato de Torrentio: 👤 21
+    const seedersMatch = streamTitle.match(/👤\s*(\d+)/i);
+    if (seedersMatch) {
+      result.seeders = parseInt(seedersMatch[1], 10);
+    }
+    
+    // Para peers, Torrentio no los muestra directamente, pero podemos estimarlos
+    // basándose en patrones comunes o usar seeders como aproximación
+    result.peers = result.seeders > 0 ? Math.floor(result.seeders * 0.3) : 0;
+    
+    return result;
   }
 
   /**
@@ -435,8 +484,92 @@ export class TorrentioApiService {
       escapeCsv(magnet.source || 'torrentio-api'),
       escapeCsv(magnet.fileIdx || ''),
       escapeCsv(magnet.filename || ''),
-      escapeCsv(magnet.provider || '')
+      escapeCsv(magnet.provider || ''),
+      escapeCsv(magnet.seeders || 0),
+      escapeCsv(magnet.peers || 0),
+      escapeCsv(magnet.season || ''),
+      escapeCsv(magnet.episode || '')
     ].join(',');
+  }
+
+  /**
+   * Detecta automáticamente el tipo de contenido basándose en el ID y parámetros.
+   * @private
+   * @param {string} id - ID del contenido
+   * @param {number} season - Temporada
+   * @param {number} episode - Episodio
+   * @returns {string} Tipo detectado ('movie', 'series', 'anime')
+   */
+  #detectContentType(id, season, episode) {
+    // Si tiene temporada y episodio, es serie o anime
+    if (season !== null && episode !== null) {
+      // Detectar anime por prefijo kitsu o patrones específicos
+      if (id.startsWith('kitsu:')) {
+        return 'anime';
+      }
+      
+      // Para IMDb IDs, usar heurísticas adicionales
+      // Por ahora, defaultear a 'series' si tiene season/episode
+      return 'series';
+    }
+    
+    // Si es un ID de Kitsu sin season/episode, probablemente es anime movie
+    if (id.startsWith('kitsu:')) {
+      return 'anime';
+    }
+    
+    // Por defecto, asumir que es película
+    return 'movie';
+  }
+
+  /**
+   * Inicializa las configuraciones de proveedores optimizadas por tipo de contenido.
+   * @private
+   * @returns {Object} Configuraciones de proveedores
+   */
+  #initializeProviderConfigs() {
+    return {
+      movie: {
+        providers: 'cinecalidad,mejortorrent,wolfmax4k,yts,eztv',
+        sort: 'seeders',
+        qualityFilter: 'scr,cam,unknown',
+        limit: 5
+      },
+      series: {
+        providers: 'eztv,mejortorrent,wolfmax4k,cinecalidad',
+        sort: 'seeders',
+        qualityFilter: 'scr,cam,unknown',
+        limit: 3
+      },
+      anime: {
+        providers: 'nyaasi,horriblesubs,tokyotosho,anidex',
+        sort: 'seeders',
+        qualityFilter: 'unknown',
+        limit: 5
+      }
+    };
+  }
+
+  /**
+   * Obtiene la URL base optimizada según el tipo de contenido.
+   * @private
+   * @param {string} type - Tipo de contenido
+   * @returns {string} URL base optimizada
+   */
+  #getOptimizedBaseUrl(type) {
+    const config = this.#providerConfigs[type] || this.#providerConfigs.movie;
+    const params = new URLSearchParams({
+      providers: config.providers,
+      sort: config.sort,
+      qualityfilter: config.qualityFilter,
+      limit: config.limit.toString()
+    });
+    
+    // Extraer la URL base sin parámetros
+    const baseUrlParts = this.#baseUrl.split('/');
+    const cleanBaseUrl = baseUrlParts.slice(0, 3).join('/');
+    
+    return `${cleanBaseUrl}/${params.toString()}`;
   }
 
   /**
@@ -452,17 +585,69 @@ export class TorrentioApiService {
         this.#logger.info(`Directorio creado: ${dir}`);
       }
       
-      const headers = 'imdb_id,name,magnet,quality,size,source,fileIdx,filename,provider\n';
+      const headers = 'imdb_id,name,magnet,quality,size,source,fileIdx,filename,provider,seeders,peers,season,episode\n';
       writeFileSync(this.#torrentioFilePath, headers, 'utf8');
       this.#logger.info(`Archivo torrentio.csv creado en: ${this.#torrentioFilePath}`);
     }
   }
 
   /**
-   * Realiza petición HTTP con timeout.
+   * Obtiene el manifest de Torrentio con cache.
+   * @private
+   * @param {string} baseUrl - URL base con configuración de proveedores
+   * @returns {Promise<Object>} - Manifest de Torrentio
+   */
+  async #getCachedManifest(baseUrl) {
+    const manifestUrl = `${baseUrl}/manifest.json`;
+    const cacheKey = baseUrl;
+    
+    // Verificar cache
+    const cached = this.#manifestCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < this.#manifestCacheExpiry) {
+      this.#logger.debug('Usando manifest desde cache');
+      return cached.data;
+    }
+    
+    // Obtener manifest fresco
+    this.#logger.debug('Obteniendo manifest fresco desde API');
+    const response = await this.#fetchWithTimeout(manifestUrl);
+    
+    if (!response.ok) {
+      throw new Error(`Error al obtener manifest: ${response.status} ${response.statusText}`);
+    }
+    
+    const manifest = await response.json();
+    
+    // Guardar en cache
+    this.#manifestCache.set(cacheKey, {
+      data: manifest,
+      timestamp: Date.now()
+    });
+    
+    // Limpiar cache expirado
+    this.#cleanExpiredCache();
+    
+    return manifest;
+  }
+
+  /**
+   * Limpia entradas expiradas del cache.
+   * @private
+   */
+  #cleanExpiredCache() {
+    const now = Date.now();
+    for (const [key, value] of this.#manifestCache.entries()) {
+      if ((now - value.timestamp) >= this.#manifestCacheExpiry) {
+        this.#manifestCache.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Realiza una petición HTTP con timeout configurable.
    * @private
    * @param {string} url - URL a consultar
-   * @returns {Promise<Response>} Respuesta HTTP
+   * @returns {Promise<Response>} - Respuesta HTTP
    */
   async #fetchWithTimeout(url) {
     const controller = new AbortController();
@@ -479,11 +664,10 @@ export class TorrentioApiService {
       
       clearTimeout(timeoutId);
       return response;
-      
     } catch (error) {
       clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
-        throw new Error(`Timeout al consultar API Torrentio: ${url}`);
+        throw new Error(`Timeout de ${this.#timeout}ms excedido para: ${url}`);
       }
       throw error;
     }
