@@ -89,9 +89,10 @@ export class CascadingMagnetRepository extends MagnetRepository {
   /**
    * Busca magnets por IMDb ID con estrategia de cascada.
    * @param {string} imdbId - ID de IMDb
+   * @param {string} type - Tipo de contenido ('movie' o 'series')
    * @returns {Promise<Magnet[]>} Array de magnets encontrados
    */
-  async getMagnetsByImdbId(imdbId) {
+  async getMagnetsByImdbId(imdbId, type = 'movie') {
     if (!this.#isInitialized) {
       await this.initialize();
     }
@@ -123,8 +124,8 @@ export class CascadingMagnetRepository extends MagnetRepository {
     }
     
     // Paso 3: Buscar en API de Torrentio
-    this.#logger.info(`No se encontraron magnets locales, consultando API Torrentio para ${imdbId}`);
-    const apiResults = await this.#torrentioApiService.searchMagnetsByImdbId(imdbId);
+    this.#logger.info(`No se encontraron magnets locales, consultando API Torrentio para ${imdbId} (${type})`);
+    const apiResults = await this.#torrentioApiService.searchMagnetsByImdbId(imdbId, type);
     
     if (apiResults.length > 0) {
       this.#logger.info(`Encontrados ${apiResults.length} magnets en API Torrentio para ${imdbId}`);

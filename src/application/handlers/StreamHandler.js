@@ -72,7 +72,7 @@ export class StreamHandler {
       return this.#createEmptyResponse();
     }
 
-    const magnets = await this.#getMagnets(id);
+    const magnets = await this.#getMagnets(id, type);
     
     if (!magnets || magnets.length === 0) {
       this.#logger.warn(`No se encontraron magnets para: ${id}`);
@@ -91,8 +91,8 @@ export class StreamHandler {
    * @throws {Error}
    */
   #validateStreamRequest(args) {
-    if (!args?.type || !['movie', 'series'].includes(args.type)) {
-      throw new Error('Tipo de contenido (movie/series) requerido');
+    if (!args?.type || !['movie', 'series', 'anime'].includes(args.type)) {
+      throw new Error('Tipo de contenido (movie/series/anime) requerido');
     }
     if (!args.id || !args.id.startsWith('tt')) {
       throw new Error('ID de contenido (IMDb) requerido');
@@ -106,18 +106,19 @@ export class StreamHandler {
    * @returns {boolean}
    */
   #isSupportedType(type) {
-    return ['movie', 'series'].includes(type);
+    return ['movie', 'series', 'anime'].includes(type);
   }
 
   /**
    * Obtiene los magnets por IMDb ID.
    * @private
    * @param {string} imdbId 
+   * @param {string} type - Tipo de contenido ('movie' o 'series')
    * @returns {Promise<import('../../domain/entities/Magnet.js').Magnet[]|null>}
    */
-  async #getMagnets(imdbId) {
+  async #getMagnets(imdbId, type = 'movie') {
     try {
-      return await this.#magnetRepository.getMagnetsByImdbId(imdbId);
+      return await this.#magnetRepository.getMagnetsByImdbId(imdbId, type);
     } catch (error) {
       if (error instanceof MagnetNotFoundError) {
         return null;

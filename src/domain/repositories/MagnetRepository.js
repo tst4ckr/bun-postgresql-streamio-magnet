@@ -5,12 +5,12 @@
 
 export class MagnetRepository {
   /**
-   * Busca magnets por su IMDb ID
-   * @param {string} imdbId
-   * @returns {Promise<Magnet[]>}
-   * @throws {MagnetNotFoundError} Si no se encuentran magnets para el ID
+   * Busca magnets por IMDb ID.
+   * @param {string} imdbId - ID de IMDb
+   * @param {string} type - Tipo de contenido ('movie' o 'series')
+   * @returns {Promise<Magnet[]>} Array de magnets encontrados
    */
-  async getMagnetsByImdbId(imdbId) {
+  async getMagnetsByImdbId(imdbId, type = 'movie') {
     throw new Error('Método getMagnetsByImdbId debe ser implementado por la clase derivada');
   }
 }

@@ -34,13 +34,17 @@ export class TorrentioApiService {
   /**
    * Busca magnets por IMDb ID en la API de Torrentio.
    * @param {string} imdbId - ID de IMDb (ej: 'tt1234567')
+   * @param {string} type - Tipo de contenido ('movie', 'series' o 'anime')
    * @returns {Promise<Magnet[]>} Array de magnets encontrados
    */
-  async searchMagnetsByImdbId(imdbId) {
+  async searchMagnetsByImdbId(imdbId, type = 'movie') {
     try {
-      this.#logger.info(`Buscando magnets en API Torrentio para: ${imdbId}`);
+      this.#logger.info(`Buscando magnets en API Torrentio para: ${imdbId} (${type})`);
       
-      const streamUrl = `${this.#baseUrl}/stream/movie/${imdbId}.json`;
+      // Construir URL según el tipo de contenido
+      // Anime usa la misma URL que series en Torrentio (proveedores específicos como NyaaSi, HorribleSubs)
+      const contentType = (type === 'series' || type === 'anime') ? 'series' : 'movie';
+      const streamUrl = `${this.#baseUrl}/stream/${contentType}/${imdbId}.json`;
       const response = await this.#fetchWithTimeout(streamUrl);
       
       if (!response.ok) {

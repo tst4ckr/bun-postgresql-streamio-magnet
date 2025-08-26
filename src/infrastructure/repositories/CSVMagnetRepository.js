@@ -48,7 +48,14 @@ export class CSVMagnetRepository extends MagnetRepository {
     this.#magnetMap.get(magnet.imdb_id).push(magnet);
   }
 
-  async getMagnetsByImdbId(imdbId) {
+  /**
+   * Busca magnets por IMDb ID.
+   * @param {string} imdbId - ID de IMDb
+   * @param {string} type - Tipo de contenido ('movie' o 'series') - no usado en CSV local
+   * @returns {Promise<Magnet[]>} Array de magnets encontrados
+   * @throws {MagnetNotFoundError} Si no se encuentran magnets
+   */
+  async getMagnetsByImdbId(imdbId, type = 'movie') {
     if (!this.#isInitialized) await this.initialize();
     const magnets = this.#magnetMap.get(imdbId) || [];
     if (magnets.length === 0) {
