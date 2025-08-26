@@ -32,10 +32,20 @@ export class TorrentioApiService {
   }
 
   /**
-   * Busca magnets por IMDb ID en la API de Torrentio.
+   * Busca magnets por ID de IMDb usando la API de Torrentio
+   * Soporta películas, series y anime con detección específica de proveedores
    * @param {string} imdbId - ID de IMDb (ej: 'tt1234567')
-   * @param {string} type - Tipo de contenido ('movie', 'series' o 'anime')
-   * @returns {Promise<Magnet[]>} Array de magnets encontrados
+   * @param {string} type - Tipo de contenido ('movie', 'series', 'anime')
+   * @returns {Promise<Array>} - Array de objetos magnet con las siguientes propiedades:
+   *   - magnetUri: URI del magnet
+   *   - title: Título del archivo
+   *   - quality: Calidad del video (incluye formatos específicos de anime)
+   *   - size: Tamaño del archivo
+   *   - provider: Proveedor (español: cinecalidad, mejortorrent, wolfmax4k; anime: nyaasi, horriblesubs, TokyoTosho, AniDex)
+   *   - seeders: Número de seeders
+   *   - peers: Número de peers
+   *   - season: Temporada (solo para series/anime)
+   *   - episode: Episodio (solo para series/anime)
    */
   async searchMagnetsByImdbId(imdbId, type = 'movie') {
     try {
@@ -98,6 +108,8 @@ export class TorrentioApiService {
         // Construir magnet URI con información adicional
         const magnetUri = this.#buildMagnetUri(stream.infoHash, filename || fullName, stream.sources);
         
+        const episodeInfo = this.#extractEpisodeInfo(streamTitle, type);
+        
         const magnetData = {
           imdb_id: imdbId,
           name: fullName,
@@ -108,7 +120,8 @@ export class TorrentioApiService {
           // Información adicional de Torrentio
           fileIdx: stream.fileIdx,
           filename: filename,
-          provider: this.#extractProvider(streamTitle)
+          provider: this.#extractProvider(streamTitle),
+          ...episodeInfo
         };
         
         const magnet = new Magnet(magnetData);
@@ -141,6 +154,7 @@ export class TorrentioApiService {
 
   /**
    * Extrae la calidad del stream usando múltiples fuentes.
+   * Incluye patrones específicos para contenido de anime.
    * @private
    * @param {Object} stream - Objeto stream completo
    * @param {string} streamName - Nombre del stream
@@ -159,7 +173,13 @@ export class TorrentioApiService {
       { pattern: /\b(BDRip|BDRIP)\b/i, quality: 'BDRip' },
       { pattern: /\b(WEBRip|WEBRIP)\b/i, quality: 'WEBRip' },
       { pattern: /\b(CAM|cam)\b/i, quality: 'CAM' },
-      { pattern: /\b(TS|ts)\b/i, quality: 'TS' }
+      { pattern: /\b(TS|ts)\b/i, quality: 'TS' },
+      // Patrones específicos de anime
+      { pattern: /\b(BD|Blu-?ray)\b/i, quality: 'BluRay' },
+      { pattern: /\bWEB-?DL\b/i, quality: 'WEB-DL' },
+      { pattern: /\bATVP\b/i, quality: 'ATVP' },
+      { pattern: /\bCR\b/i, quality: 'CR' }, // Crunchyroll
+      { pattern: /\bFUNi\b/i, quality: 'FUNi' } // Funimation
     ];
     
     for (const { pattern, quality } of qualityPatterns) {
@@ -199,16 +219,26 @@ export class TorrentioApiService {
 
   /**
    * Extrae el nombre del archivo desde behaviorHints.
+   * Incluye manejo específico para episodios de anime y series
    * @private
    * @param {Object} stream - Objeto stream
    * @returns {string|null} Nombre del archivo o null
    */
   #extractFilename(stream) {
-    return stream.behaviorHints?.filename || null;
+    const filename = stream.behaviorHints?.filename;
+    if (filename) {
+      // Limpiar información de calidad y formato para episodios
+      return filename
+        .replace(/\s*\[(HS|TT|CR|FUNi)\]\s*/gi, '') // Remover tags de grupos de anime
+        .replace(/\s*\b(BD|Blu-?ray|WEB-?DL)\b\s*/gi, '') // Remover formato específico de anime
+        .trim();
+    }
+    return null;
   }
 
   /**
    * Extrae el proveedor del stream desde el title.
+   * Incluye detección mejorada para proveedores de anime.
    * @private
    * @param {string} streamTitle - Título del stream
    * @returns {string} Proveedor extraído
@@ -222,10 +252,30 @@ export class TorrentioApiService {
       return providerMatch[1].trim();
     }
     
-    // Proveedores conocidos como fallback
+    // Proveedores específicos con patrones mejorados
+    const providerPatterns = {
+      // Proveedores en español
+      'cinecalidad': /\b(cinecalidad|cine\s*calidad)\b/i,
+      'mejortorrent': /\b(mejortorrent|mejor\s*torrent)\b/i,
+      'wolfmax4k': /\b(wolfmax4k|wolf\s*max)\b/i,
+      // Proveedores de anime con patrones específicos
+      'nyaasi': /\b(nyaa\.si|nyaasi|nyaa)\b/i,
+      'horriblesubs': /\b(horriblesubs|horrible\s*subs|\[HS\])\b/i,
+      'TokyoTosho': /\b(tokyotosho|tokyo\s*tosho|\[TT\])\b/i,
+      'AniDex': /\b(anidex|ani\s*dex)\b/i
+    };
+    
+    // Buscar usando patrones específicos
+    for (const [provider, pattern] of Object.entries(providerPatterns)) {
+      if (pattern.test(streamTitle)) {
+        return provider;
+      }
+    }
+    
+    // Fallback: búsqueda simple por nombre
     const knownProviders = ['cinecalidad', 'mejortorrent', 'wolfmax4k', 'nyaasi', 'horriblesubs', 'TokyoTosho', 'AniDex'];
     for (const provider of knownProviders) {
-      if (streamTitle.toLowerCase().includes(provider)) {
+      if (streamTitle.toLowerCase().includes(provider.toLowerCase())) {
         return provider;
       }
     }
@@ -279,6 +329,49 @@ export class TorrentioApiService {
     }
     
     return magnetUri;
+  }
+
+  /**
+   * Extrae información de episodio para series y anime.
+   * @private
+   * @param {string} streamTitle - Título del stream
+   * @param {string} contentType - Tipo de contenido
+   * @returns {Object} Información de episodio
+   */
+  #extractEpisodeInfo(streamTitle, contentType) {
+    if (contentType !== 'series' && contentType !== 'anime') {
+      return {};
+    }
+    
+    const episodeInfo = {};
+    
+    // Patrones para extraer temporada y episodio
+    const seasonEpisodePatterns = [
+      /S(\d+)E(\d+)/i,
+      /Season\s*(\d+)\s*Episode\s*(\d+)/i,
+      /T(\d+)\s*E(\d+)/i, // Formato español
+      /\b(\d+)x(\d+)\b/i
+    ];
+    
+    for (const pattern of seasonEpisodePatterns) {
+      const match = streamTitle.match(pattern);
+      if (match) {
+        episodeInfo.season = parseInt(match[1]);
+        episodeInfo.episode = parseInt(match[2]);
+        break;
+      }
+    }
+    
+    // Para anime, también buscar patrones específicos
+    if (contentType === 'anime') {
+      const animeEpisodePattern = /\s+(\d+)\s*$/;
+      const match = streamTitle.match(animeEpisodePattern);
+      if (match && !episodeInfo.episode) {
+        episodeInfo.episode = parseInt(match[1]);
+      }
+    }
+    
+    return episodeInfo;
   }
 
   /**
