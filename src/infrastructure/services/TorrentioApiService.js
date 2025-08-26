@@ -3,7 +3,8 @@
  * Maneja consultas externas y persistencia de resultados en torrentio.csv.
  */
 
-import { writeFileSync, appendFileSync, existsSync } from 'fs';
+import { writeFileSync, appendFileSync, existsSync, mkdirSync } from 'fs';
+import { dirname } from 'path';
 import { Magnet } from '../../domain/entities/Magnet.js';
 
 /**
@@ -346,6 +347,13 @@ export class TorrentioApiService {
    */
   #ensureTorrentioFileExists() {
     if (!existsSync(this.#torrentioFilePath)) {
+      // Asegurar que el directorio padre existe
+      const dir = dirname(this.#torrentioFilePath);
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+        this.#logger.info(`Directorio creado: ${dir}`);
+      }
+      
       const headers = 'imdb_id,name,magnet,quality,size,source,fileIdx,filename,provider\n';
       writeFileSync(this.#torrentioFilePath, headers, 'utf8');
       this.#logger.info(`Archivo torrentio.csv creado en: ${this.#torrentioFilePath}`);
