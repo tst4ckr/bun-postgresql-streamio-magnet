@@ -34,7 +34,8 @@
     "csv-parser": "^3.0.0",
     "dotenv": "^17.2.1",
     "parse-magnet-uri": "^4.0.0",
-    "stremio-addon-sdk": "^1.6.8"
+    "stremio-addon-sdk": "^1.6.8",
+    "zod": "^4.1.3"
   },
   "devDependencies": {
     "eslint": "^8.55.0",
