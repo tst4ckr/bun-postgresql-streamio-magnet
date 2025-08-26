@@ -60,7 +60,7 @@ const config = {
   repository: {
     primaryCsvPath: process.env.PRIMARY_CSV_PATH || resolvePath('data/magnets.csv'),
     secondaryCsvPath: process.env.SECONDARY_CSV_PATH || resolvePath('data/torrentio.csv'),
-    torrentioApiUrl: process.env.TORRENTIO_API_URL || 'https://torrentio.strem.fun/providers=mejortorrent,wolfmax4k,cinecalidad%7Csort=seeders%7Cqualityfilter=scr,cam,unknown%7Climit=2%7Csizefilter=12GB',
+    torrentioApiUrl: process.env.TORRENTIO_API_URL || 'https://torrentio.strem.fun/providers=mejortorrent,wolfmax4k,cinecalidad,horriblesubs,nyaasi,tokyotosho,anidex%7Csort=seeders%7Cqualityfilter=scr,cam,unknown%7Climit=5%7Csizefilter=12GB',
     timeout: parseInt(process.env.CSV_TIMEOUT) || 30000
   }
 };

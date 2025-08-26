@@ -63,7 +63,7 @@ export class TorrentioApiService {
       }
       
       const data = await response.json();
-      const magnets = this.#parseStreamsToMagnets(data.streams || [], imdbId);
+      const magnets = this.#parseStreamsToMagnets(data.streams || [], imdbId, type);
       
       if (magnets.length > 0) {
         await this.#saveMagnetsToFile(magnets);
@@ -83,9 +83,10 @@ export class TorrentioApiService {
    * @private
    * @param {Array} streams - Streams de la respuesta de Torrentio
    * @param {string} imdbId - ID de IMDb
+   * @param {string} type - Tipo de contenido
    * @returns {Magnet[]} Array de magnets
    */
-  #parseStreamsToMagnets(streams, imdbId) {
+  #parseStreamsToMagnets(streams, imdbId, type) {
     const magnets = [];
     
     for (const stream of streams) {
