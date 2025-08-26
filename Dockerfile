@@ -12,6 +12,7 @@ COPY . .
 # Variables de entorno por defecto seguras para contenedores
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
+ENV CONTAINER_ENV=true
 
 # El addon expone por defecto el puerto 7000 (usará $PORT si está definido en el entorno)
 EXPOSE 7000

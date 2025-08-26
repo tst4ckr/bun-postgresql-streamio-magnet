@@ -4,8 +4,28 @@
  */
 
 import dotenv from 'dotenv';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
+
+// Detectar si estamos en un contenedor
+const isContainer = process.env.NODE_ENV === 'production' && process.env.CONTAINER_ENV === 'true';
+
+// Obtener directorio del proyecto
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const projectRoot = join(__dirname, '..', '..');
+
+// Función para resolver rutas según el entorno
+function resolvePath(relativePath) {
+  if (isContainer) {
+    // En contenedor, usar rutas relativas desde /app
+    return join('/app', relativePath);
+  }
+  // En desarrollo local, usar rutas relativas desde el proyecto
+  return join(projectRoot, relativePath);
+}
 
 const config = {
   addon: {
@@ -38,8 +58,8 @@ const config = {
     logLevel: process.env.LOG_LEVEL || 'info', // 'debug', 'info', 'warn', 'error'
   },
   repository: {
-    primaryCsvPath: process.env.PRIMARY_CSV_PATH || 'C:/Users/Ankel/Documents/HAZ-BUN-TV-PROD/bun-postgresql-streamio-magnet/data/magnets.csv',
-    secondaryCsvPath: process.env.SECONDARY_CSV_PATH || 'C:/Users/Ankel/Documents/HAZ-BUN-TV-PROD/bun-postgresql-streamio-magnet/data/torrentio.csv',
+    primaryCsvPath: process.env.PRIMARY_CSV_PATH || resolvePath('data/magnets.csv'),
+    secondaryCsvPath: process.env.SECONDARY_CSV_PATH || resolvePath('data/torrentio.csv'),
     torrentioApiUrl: process.env.TORRENTIO_API_URL || 'https://torrentio.strem.fun/providers=mejortorrent,wolfmax4k,cinecalidad%7Csort=seeders%7Cqualityfilter=scr,cam,unknown%7Climit=2%7Csizefilter=12GB',
     timeout: parseInt(process.env.CSV_TIMEOUT) || 30000
   }
