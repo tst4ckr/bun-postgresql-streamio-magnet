@@ -223,7 +223,7 @@ export class TorrentioApiService {
     }
     
     // Proveedores conocidos como fallback
-    const knownProviders = ['cinecalidad', 'mejortorrent', 'wolfmax4k'];
+    const knownProviders = ['cinecalidad', 'mejortorrent', 'wolfmax4k', 'nyaasi', 'horriblesubs', 'TokyoTosho', 'AniDex'];
     for (const provider of knownProviders) {
       if (streamTitle.toLowerCase().includes(provider)) {
         return provider;
