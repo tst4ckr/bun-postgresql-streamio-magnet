@@ -146,9 +146,12 @@ export class StreamHandler {
           return null;
         }
 
+        const streamTitle = this.#formatStreamTitle(magnet, type);
+        const streamDescription = this.#formatStreamDescription(magnet, type);
+
         return {
-          name: `[${magnet.quality || 'SD'}] ${this.#config.addon.name}`,
-          description: `📁 ${magnet.name}\n💾 ${magnet.size || 'N/A'}`,
+          name: streamTitle,
+          description: streamDescription,
           infoHash: infoHash,
           sources: trackers.map(t => `tracker:${t}`),
           type: type,
@@ -161,6 +164,83 @@ export class StreamHandler {
         return null;
       }
     }).filter(Boolean); // Eliminar nulos si los hubiera
+  }
+
+  /**
+   * Formatea el título del stream de manera compacta.
+   * @private
+   * @param {import('../../domain/entities/Magnet.js').Magnet} magnet
+   * @param {string} type
+   * @returns {string}
+   */
+  #formatStreamTitle(magnet, type) {
+    const quality = magnet.quality || 'SD';
+    const provider = magnet.provider || 'Unknown';
+    
+    // Formato esencial: Resolución | Proveedor
+    let title = `${quality} | ${provider}`;
+    
+    // Agregar información de seeders si está disponible
+    if (magnet.seeders && magnet.seeders > 0) {
+      title += ` (${magnet.seeders}S)`;
+    }
+    
+    return title;
+  }
+
+  /**
+   * Formatea la descripción del stream con información detallada pero compacta.
+   * @private
+   * @param {import('../../domain/entities/Magnet.js').Magnet} magnet
+   * @param {string} type
+   * @returns {string}
+   */
+  #formatStreamDescription(magnet, type) {
+    const parts = [];
+    
+    // Nombre del archivo (primera línea)
+    if (magnet.name) {
+      const truncatedName = magnet.name.length > 60 
+        ? magnet.name.substring(0, 57) + '...'
+        : magnet.name;
+      parts.push(truncatedName);
+    }
+    
+    // Información técnica en líneas separadas
+    const techInfo = [];
+    
+    if (magnet.quality && magnet.quality !== 'SD') {
+      techInfo.push(`Calidad: ${magnet.quality}`);
+    }
+    
+    if (magnet.size && magnet.size !== 'N/A') {
+      techInfo.push(`Tamaño: ${magnet.size}`);
+    }
+    
+    if (magnet.provider && magnet.provider !== 'Unknown') {
+      techInfo.push(`Proveedor: ${magnet.provider}`);
+    }
+    
+    // Información de seeders/peers
+    if (magnet.seeders && magnet.seeders > 0) {
+      const seedersInfo = `Seeders: ${magnet.seeders}`;
+      if (magnet.peers && magnet.peers > 0) {
+        techInfo.push(`${seedersInfo} | Peers: ${magnet.peers}`);
+      } else {
+        techInfo.push(seedersInfo);
+      }
+    }
+    
+    // Información de episodio para series/anime
+    if ((type === 'series' || type === 'anime') && magnet.season && magnet.episode) {
+      techInfo.push(`T${magnet.season}E${magnet.episode}`);
+    }
+    
+    if (techInfo.length > 0) {
+      parts.push(techInfo.join(' | '));
+    }
+    
+    return parts.join('\n');
   }
 
   /**
