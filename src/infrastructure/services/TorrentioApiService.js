@@ -524,28 +524,29 @@ export class TorrentioApiService {
 
   /**
    * Inicializa las configuraciones de proveedores optimizadas por tipo de contenido.
+   * Prioriza contenido en español mexicano con máximo seeders.
    * @private
    * @returns {Object} Configuraciones de proveedores
    */
   #initializeProviderConfigs() {
     return {
       movie: {
-        providers: 'cinecalidad,mejortorrent,wolfmax4k,yts,eztv',
+        providers: 'cinecalidad,mejortorrent,wolfmax4k,yts',
         sort: 'seeders',
         qualityFilter: 'scr,cam,unknown',
-        limit: 5
+        limit: 2
       },
       series: {
-        providers: 'eztv,mejortorrent,wolfmax4k,cinecalidad',
+        providers: 'mejortorrent,cinecalidad,wolfmax4k,eztv',
         sort: 'seeders',
         qualityFilter: 'scr,cam,unknown',
-        limit: 3
+        limit: 2
       },
       anime: {
-        providers: 'nyaasi,horriblesubs,tokyotosho,anidex',
+        providers: 'mejortorrent,cinecalidad,nyaasi,horriblesubs',
         sort: 'seeders',
         qualityFilter: 'unknown',
-        limit: 5
+        limit: 2
       }
     };
   }
