@@ -559,18 +559,16 @@ export class TorrentioApiService {
    */
   #getOptimizedBaseUrl(type) {
     const config = this.#providerConfigs[type] || this.#providerConfigs.movie;
-    const params = new URLSearchParams({
-      providers: config.providers,
-      sort: config.sort,
-      qualityfilter: config.qualityFilter,
-      limit: config.limit.toString()
-    });
     
-    // Extraer la URL base sin parámetros
-    const baseUrlParts = this.#baseUrl.split('/');
-    const cleanBaseUrl = baseUrlParts.slice(0, 3).join('/');
+    // Construir parámetros en formato Torrentio (separados por |)
+    const params = [
+      `providers=${config.providers}`,
+      `sort=${config.sort}`,
+      `qualityfilter=${config.qualityFilter}`,
+      `limit=${config.limit}`
+    ].join('|');
     
-    return `${cleanBaseUrl}/${params.toString()}`;
+    return `${this.#baseUrl}/${params}`;
   }
 
   /**
