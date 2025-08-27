@@ -87,6 +87,7 @@ export class TorrentioApiService {
       }
       
       const streamUrl = `${optimizedBaseUrl}/stream/${urlContentType}/${streamId}.json`;
+      this.#logger.info(`URL construida: ${streamUrl}`);
       const response = await this.#fetchWithTimeout(streamUrl);
       
       if (!response.ok) {
@@ -149,8 +150,11 @@ export class TorrentioApiService {
           ? { season, episode }
           : this.#extractEpisodeInfo(streamTitle, type);
         
+        // Extraer solo el ID base de IMDb (sin temporada:episodio)
+        const baseImdbId = imdbId.split(':')[0];
+        
         const magnetData = {
-          imdb_id: imdbId,
+          imdb_id: baseImdbId,
           name: fullName,
           magnet: magnetUri,
           quality: quality,
@@ -575,6 +579,9 @@ export class TorrentioApiService {
   #getOptimizedBaseUrl(type) {
     const config = this.#providerConfigs[type] || this.#providerConfigs.movie;
     
+    // Extraer solo la URL base sin parámetros
+    const cleanBaseUrl = this.#baseUrl.split('/providers=')[0];
+    
     // Construir parámetros en formato Torrentio (separados por |)
     const params = [
       `providers=${config.providers}`,
@@ -583,7 +590,7 @@ export class TorrentioApiService {
       `limit=${config.limit}`
     ].join('|');
     
-    return `${this.#baseUrl}/${params}`;
+    return `${cleanBaseUrl}/${params}`;
   }
 
   /**
