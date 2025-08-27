@@ -550,19 +550,19 @@ export class TorrentioApiService {
   #initializeProviderConfigs() {
     return {
       movie: {
-        providers: 'cinecalidad,mejortorrent,wolfmax4k,yts',
+        providers: 'mejortorrent,wolfmax4k,cinecalidad',
         sort: 'seeders',
         qualityFilter: 'scr,cam,unknown',
         limit: 2
       },
       series: {
-        providers: 'mejortorrent,cinecalidad,wolfmax4k,eztv',
+        providers: 'horriblesubs,nyaasi,tokyotosho,anidex,mejortorrent,wolfmax4k,cinecalidad,eztv',
         sort: 'seeders',
         qualityFilter: 'scr,cam,unknown',
         limit: 2
       },
       anime: {
-        providers: 'mejortorrent,cinecalidad,nyaasi,horriblesubs',
+        providers: 'horriblesubs,nyaasi,tokyotosho,anidex,mejortorrent,wolfmax4k,cinecalidad',
         sort: 'seeders',
         qualityFilter: 'unknown',
         limit: 2
