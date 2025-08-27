@@ -69,9 +69,24 @@ export class TorrentioApiService {
       }
       
       // Construir URL según el tipo de contenido con proveedores optimizados
-      const contentType = (detectedType === 'series' || detectedType === 'anime') ? 'series' : 'movie';
       const optimizedBaseUrl = this.#getOptimizedBaseUrl(detectedType);
-      const streamUrl = `${optimizedBaseUrl}/stream/${contentType}/${streamId}.json`;
+      
+      // Mapear tipo de contenido para la URL de Torrentio
+      let urlContentType;
+      switch (detectedType) {
+        case 'anime':
+          urlContentType = 'series'; // Torrentio trata anime como series
+          break;
+        case 'series':
+          urlContentType = 'series';
+          break;
+        case 'movie':
+        default:
+          urlContentType = 'movie';
+          break;
+      }
+      
+      const streamUrl = `${optimizedBaseUrl}/stream/${urlContentType}/${streamId}.json`;
       const response = await this.#fetchWithTimeout(streamUrl);
       
       if (!response.ok) {
