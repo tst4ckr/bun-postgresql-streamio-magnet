@@ -556,7 +556,7 @@ export class TorrentioApiService {
         limit: 2
       },
       series: {
-        providers: 'horriblesubs,nyaasi,tokyotosho,anidex,mejortorrent,wolfmax4k,cinecalidad,eztv',
+        providers: 'horriblesubs,nyaasi,tokyotosho,anidex,mejortorrent,wolfmax4k,cinecalidad',
         sort: 'seeders',
         qualityFilter: 'scr,cam,unknown',
         limit: 2
