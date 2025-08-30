@@ -180,7 +180,7 @@ export class UnifiedIdService {
   }
 
   /**
-   * Convierte ID de anime (MAL, AniList, AniDB) a IMDb usando mapeo directo
+   * Convierte ID de anime (MAL, AniList, AniDB) a IMDb usando mapeo unificado
    * @param {string} animeId - ID numérico del servicio de anime
    * @param {string} sourceType - Tipo de servicio (mal, anilist, anidb)
    * @returns {Promise<Object>} Resultado de conversión
@@ -201,58 +201,33 @@ export class UnifiedIdService {
       };
     }
     
-    // Intentar mapeo directo con el servicio unificado
+    // Usar el servicio unificado de mapeo para conversión directa
     const imdbId = this.fallbackService.getImdbIdFromAny(fullId);
     if (imdbId) {
       const result = {
         success: true,
         convertedId: imdbId,
-        method: 'direct_mapping',
-        metadata: { source: 'Mapeo unificado', originalId: fullId }
+        method: 'unified_mapping',
+        metadata: { 
+          source: 'Servicio de mapeo unificado',
+          originalId: fullId,
+          sourceType: sourceType
+        }
       };
       this.#setCachedConversion(cacheKey, imdbId, result.metadata);
       return result;
     }
 
-    try {
-      // Por ahora, usamos mapeo directo a IMDb como fallback
-      // En futuras implementaciones, podríamos usar APIs de conversión cruzada
-      const directMapping = await this.#getDirectImdbMapping(animeId, sourceType);
-      
-      if (directMapping) {
-        const result = {
-          success: true,
-          convertedId: directMapping,
-          method: `${sourceType}_direct_mapping`,
-          metadata: { 
-            source: `Mapeo directo ${sourceType.toUpperCase()}→IMDb`,
-            originalType: sourceType
-          }
-        };
-        this.#setCachedConversion(cacheKey, directMapping, result.metadata);
-        return result;
+    // No se encontró mapeo
+    return {
+      success: false,
+      convertedId: null,
+      method: 'none',
+      metadata: { 
+        error: `No se encontró mapeo ${sourceType.toUpperCase()}→IMDb`,
+        note: 'Verificar mapeos disponibles en el servicio unificado'
       }
-
-      // No se encontró mapeo
-      return {
-        success: false,
-        convertedId: null,
-        method: 'none',
-        metadata: { 
-          error: `No se encontró mapeo ${sourceType.toUpperCase()}→IMDb`,
-          note: 'Conversión cruzada requiere implementación adicional'
-        }
-      };
-
-    } catch (error) {
-      console.error(`Error convirtiendo ${sourceType.toUpperCase()} ID ${animeId}:`, error);
-      return {
-        success: false,
-        convertedId: null,
-        method: 'error',
-        metadata: { error: error.message }
-      };
-    }
+    };
   }
 
   /**
