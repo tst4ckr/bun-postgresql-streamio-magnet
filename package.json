@@ -16,7 +16,9 @@
     "test": "bun test",
     "lint": "eslint src/ --ext .js",
     "publish-addon": "bun run scripts/publish-addon.js",
-    "build": "bun install --frozen-lockfile",
+    "build": "bun install",
+    "docker:build": "bun install && docker build -t stremio-magnet-addon .",
+    "docker:run": "docker run -p 7000:7000 stremio-magnet-addon",
     "preview": "bun run start:prod",
     "beamup-deploy": "bunx beamup-cli deploy"
   },

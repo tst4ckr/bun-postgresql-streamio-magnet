@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Instalar dependencias primero (aprovecha la caché de capas)
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Copiar el resto del proyecto
 COPY . .
