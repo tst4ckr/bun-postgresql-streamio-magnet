@@ -23,6 +23,14 @@ export class DynamicValidationService {
           this.#validateImdbBusinessRules.bind(this)
         ]
       }],
+      ['imdb_series', {
+        minLength: 11, // tt + dígitos + :season:episode
+        maxLength: 25,
+        allowedChars: /^tt\d+:\d+:\d+$/,
+        businessRules: [
+          this.#validateImdbSeriesBusinessRules.bind(this)
+        ]
+      }],
       ['kitsu', {
         minLength: 1,
         maxLength: 10,
@@ -61,19 +69,19 @@ export class DynamicValidationService {
     this.validationContexts = new Map([
       ['stream_request', {
         description: 'Validación para peticiones de stream',
-        requiredTypes: ['imdb', 'kitsu', 'mal', 'anilist', 'anidb'],
+        requiredTypes: ['imdb', 'imdb_series', 'kitsu', 'mal', 'anilist', 'anidb'],
         allowConversion: true,
         strictMode: false
       }],
       ['api_endpoint', {
         description: 'Validación para endpoints de API',
-        requiredTypes: ['imdb', 'kitsu', 'mal', 'anilist', 'anidb'],
+        requiredTypes: ['imdb', 'imdb_series', 'kitsu', 'mal', 'anilist', 'anidb'],
         allowConversion: false,
         strictMode: true
       }],
       ['diagnostic', {
         description: 'Validación para herramientas de diagnóstico',
-        requiredTypes: ['imdb', 'kitsu', 'mal', 'anilist', 'anidb'],
+        requiredTypes: ['imdb', 'imdb_series', 'kitsu', 'mal', 'anilist', 'anidb'],
         allowConversion: true,
         strictMode: false
       }]
@@ -368,6 +376,62 @@ export class DynamicValidationService {
    * @param {Object} context - Contexto
    * @returns {Array} Recomendaciones
    */
+  /**
+   * Reglas de negocio para IDs de IMDb series
+   * @param {Object} detection - Detección
+   * @param {Object} context - Contexto
+   * @param {Object} options - Opciones
+   * @returns {Promise<Object>} Resultado de validación
+   */
+  async #validateImdbSeriesBusinessRules(detection, context, options) {
+    const parts = detection.id.split(':');
+    if (parts.length !== 3) {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'Formato de ID de serie inválido',
+        expected: 'ttXXXXXXX:season:episode',
+        actual: detection.id
+      });
+    }
+
+    const [imdbPart, seasonPart, episodePart] = parts;
+    const numericImdb = imdbPart.slice(2);
+    const season = parseInt(seasonPart);
+    const episode = parseInt(episodePart);
+
+    // Validar formato IMDb
+    if (!/^\d+$/.test(numericImdb)) {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'Formato IMDb inválido en ID de serie',
+        imdbPart
+      });
+    }
+
+    // Validar rango de temporada y episodio
+    if (season < 1 || season > 100) {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'Número de temporada inválido',
+        season,
+        validRange: '1-100'
+      });
+    }
+
+    if (episode < 1 || episode > 999) {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'Número de episodio inválido',
+        episode,
+        validRange: '1-999'
+      });
+    }
+
+    return this.#createValidationResult(true, detection.id, {
+      businessRule: 'imdb_series_format',
+      imdbId: imdbPart,
+      season,
+      episode,
+      context: context.description
+    });
+  }
+
   #generateRecommendations(detection, context) {
     const recommendations = [];
 

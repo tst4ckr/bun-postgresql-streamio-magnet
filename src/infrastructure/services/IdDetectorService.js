@@ -13,6 +13,12 @@ export class IdDetectorService {
         description: 'IMDb ID format (tt followed by digits)',
         validator: (id) => this.#validateImdbFormat(id)
       }],
+      ['imdb_series', {
+        pattern: /^tt\d+:\d+:\d+$/,
+        prefix: 'tt',
+        description: 'IMDb series episode format (tt:season:episode)',
+        validator: (id) => this.#validateImdbSeriesFormat(id)
+      }],
       ['kitsu', {
         pattern: /^(kitsu:)?\d+$/,
         prefix: 'kitsu:',
@@ -76,6 +82,8 @@ export class IdDetectorService {
     switch (type) {
       case 'imdb':
         return id; // IMDb IDs mantienen el prefijo 'tt'
+      case 'imdb_series':
+        return id; // Series IMDb mantienen formato completo ttXXXXXXX:season:episode
       case 'kitsu':
         return id.replace(/^kitsu:/, ''); // Remover prefijo 'kitsu:' si existe
       case 'mal':
@@ -98,6 +106,29 @@ export class IdDetectorService {
     if (!id.startsWith('tt')) return false;
     const numericPart = id.slice(2);
     return /^\d+$/.test(numericPart) && numericPart.length >= 7;
+  }
+
+  /**
+   * Valida formato de ID de IMDb para episodios de series
+   * @param {string} id - ID a validar (formato ttXXXXXXX:season:episode)
+   * @returns {boolean} True si es válido
+   */
+  #validateImdbSeriesFormat(id) {
+    const parts = id.split(':');
+    if (parts.length !== 3) return false;
+    
+    const [imdbPart, seasonPart, episodePart] = parts;
+    
+    // Validar parte IMDb
+    if (!imdbPart.startsWith('tt') || !/^\d+$/.test(imdbPart.slice(2))) {
+      return false;
+    }
+    
+    // Validar temporada y episodio
+    const season = parseInt(seasonPart);
+    const episode = parseInt(episodePart);
+    
+    return !isNaN(season) && season >= 1 && !isNaN(episode) && episode >= 1;
   }
 
   /**
