@@ -83,9 +83,9 @@ export class KitsuApiService {
   }
 
   /**
-   * Obtiene mapeo de ID externo (IMDb, MAL, etc.) a Kitsu ID
-   * @param {string} externalId - ID externo (ej: tt1234567)
-   * @param {string} externalSite - Sitio externo (imdb, myanimelist, etc.)
+   * Obtiene mapeo de ID externo (IMDb, MAL, AniList, AniDB) a Kitsu ID
+   * @param {string} externalId - ID externo (ej: tt1234567, 12345, etc.)
+   * @param {string} externalSite - Sitio externo (imdb, myanimelist, anilist, anidb)
    * @returns {Promise<string|null>} Kitsu ID o null si no se encuentra
    */
   async getKitsuIdFromExternal(externalId, externalSite = 'imdb') {
@@ -94,11 +94,17 @@ export class KitsuApiService {
       const cached = this.#getCachedData(cacheKey);
       if (cached) return cached;
 
+      // Normalizar ID según el tipo de servicio
+      let normalizedId = externalId;
+      if (externalSite === 'imdb') {
+        normalizedId = externalId.replace('tt', ''); // Remover prefijo tt para IMDb
+      }
+
       const response = await this.api.get('mappings', {
         params: {
           filter: {
             externalSite,
-            externalId: externalId.replace('tt', '') // Remover prefijo tt para IMDb
+            externalId: normalizedId
           },
           include: 'item'
         }

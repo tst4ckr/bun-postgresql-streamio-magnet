@@ -18,6 +18,24 @@ export class IdDetectorService {
         prefix: 'kitsu:',
         description: 'Kitsu ID format (optional kitsu: prefix followed by digits)',
         validator: (id) => this.#validateKitsuFormat(id)
+      }],
+      ['mal', {
+        pattern: /^(mal:)?\d+$/,
+        prefix: 'mal:',
+        description: 'MyAnimeList ID format (optional mal: prefix followed by digits)',
+        validator: (id) => this.#validateNumericFormat(id, 'mal')
+      }],
+      ['anilist', {
+        pattern: /^(anilist:)?\d+$/,
+        prefix: 'anilist:',
+        description: 'AniList ID format (optional anilist: prefix followed by digits)',
+        validator: (id) => this.#validateNumericFormat(id, 'anilist')
+      }],
+      ['anidb', {
+        pattern: /^(anidb:)?\d+$/,
+        prefix: 'anidb:',
+        description: 'AniDB ID format (optional anidb: prefix followed by digits)',
+        validator: (id) => this.#validateNumericFormat(id, 'anidb')
       }]
     ]);
   }
@@ -60,6 +78,12 @@ export class IdDetectorService {
         return id; // IMDb IDs mantienen el prefijo 'tt'
       case 'kitsu':
         return id.replace(/^kitsu:/, ''); // Remover prefijo 'kitsu:' si existe
+      case 'mal':
+        return id.replace(/^mal:/, ''); // Remover prefijo 'mal:' si existe
+      case 'anilist':
+        return id.replace(/^anilist:/, ''); // Remover prefijo 'anilist:' si existe
+      case 'anidb':
+        return id.replace(/^anidb:/, ''); // Remover prefijo 'anidb:' si existe
       default:
         return id;
     }
@@ -83,6 +107,17 @@ export class IdDetectorService {
    */
   #validateKitsuFormat(id) {
     const cleanId = id.replace(/^kitsu:/, '');
+    return /^\d+$/.test(cleanId) && parseInt(cleanId) > 0;
+  }
+
+  /**
+   * Valida formato numérico genérico para IDs de anime
+   * @param {string} id - ID a validar
+   * @param {string} prefix - Prefijo esperado (mal, anilist, anidb)
+   * @returns {boolean} True si es válido
+   */
+  #validateNumericFormat(id, prefix) {
+    const cleanId = id.replace(new RegExp(`^${prefix}:`), '');
     return /^\d+$/.test(cleanId) && parseInt(cleanId) > 0;
   }
 
@@ -124,6 +159,36 @@ export class IdDetectorService {
   isKitsuId(contentId) {
     const result = this.detectIdType(contentId);
     return result.type === 'kitsu' && result.isValid;
+  }
+
+  /**
+   * Verifica si un ID es de tipo MyAnimeList
+   * @param {string} contentId - ID a verificar
+   * @returns {boolean} True si es MyAnimeList
+   */
+  isMalId(contentId) {
+    const result = this.detectIdType(contentId);
+    return result.type === 'mal' && result.isValid;
+  }
+
+  /**
+   * Verifica si un ID es de tipo AniList
+   * @param {string} contentId - ID a verificar
+   * @returns {boolean} True si es AniList
+   */
+  isAnilistId(contentId) {
+    const result = this.detectIdType(contentId);
+    return result.type === 'anilist' && result.isValid;
+  }
+
+  /**
+   * Verifica si un ID es de tipo AniDB
+   * @param {string} contentId - ID a verificar
+   * @returns {boolean} True si es AniDB
+   */
+  isAnidbId(contentId) {
+    const result = this.detectIdType(contentId);
+    return result.type === 'anidb' && result.isValid;
   }
 
   /**

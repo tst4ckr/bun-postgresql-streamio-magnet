@@ -30,6 +30,30 @@ export class DynamicValidationService {
         businessRules: [
           this.#validateKitsuBusinessRules.bind(this)
         ]
+      }],
+      ['mal', {
+        minLength: 1,
+        maxLength: 10,
+        allowedChars: /^(mal:)?\d+$/,
+        businessRules: [
+          this.#validateAnimeIdBusinessRules.bind(this, 'mal')
+        ]
+      }],
+      ['anilist', {
+        minLength: 1,
+        maxLength: 10,
+        allowedChars: /^(anilist:)?\d+$/,
+        businessRules: [
+          this.#validateAnimeIdBusinessRules.bind(this, 'anilist')
+        ]
+      }],
+      ['anidb', {
+        minLength: 1,
+        maxLength: 10,
+        allowedChars: /^(anidb:)?\d+$/,
+        businessRules: [
+          this.#validateAnimeIdBusinessRules.bind(this, 'anidb')
+        ]
       }]
     ]);
     
@@ -37,19 +61,19 @@ export class DynamicValidationService {
     this.validationContexts = new Map([
       ['stream_request', {
         description: 'Validación para peticiones de stream',
-        requiredTypes: ['imdb', 'kitsu'],
+        requiredTypes: ['imdb', 'kitsu', 'mal', 'anilist', 'anidb'],
         allowConversion: true,
         strictMode: false
       }],
       ['api_endpoint', {
         description: 'Validación para endpoints de API',
-        requiredTypes: ['imdb', 'kitsu'],
+        requiredTypes: ['imdb', 'kitsu', 'mal', 'anilist', 'anidb'],
         allowConversion: false,
         strictMode: true
       }],
       ['diagnostic', {
         description: 'Validación para herramientas de diagnóstico',
-        requiredTypes: ['imdb', 'kitsu'],
+        requiredTypes: ['imdb', 'kitsu', 'mal', 'anilist', 'anidb'],
         allowConversion: true,
         strictMode: false
       }]
@@ -284,6 +308,57 @@ export class DynamicValidationService {
       businessRule: 'kitsu_format',
       numericValue,
       cleanId
+    });
+  }
+
+  /**
+   * Reglas de negocio genéricas para IDs de anime (MAL, AniList, AniDB)
+   * @param {string} type - Tipo de anime ID (mal, anilist, anidb)
+   * @param {Object} detection - Detección
+   * @param {Object} context - Contexto
+   * @param {Object} options - Opciones
+   * @returns {Promise<Object>} Resultado de validación
+   */
+  async #validateAnimeIdBusinessRules(type, detection, context, options) {
+    const prefixMap = {
+      mal: 'mal:',
+      anilist: 'anilist:',
+      anidb: 'anidb:'
+    };
+    
+    const cleanId = detection.id.replace(new RegExp(`^${prefixMap[type]}`), '');
+    const numericValue = parseInt(cleanId);
+    
+    if (numericValue < 1) {
+      return this.#createValidationResult(false, detection.id, {
+        error: `ID numérico de ${type.toUpperCase()} debe ser mayor a 0`,
+        numericPart: cleanId,
+        numericValue,
+        type
+      });
+    }
+
+    // Rangos razonables según el servicio
+    const maxRanges = {
+      mal: 60000,
+      anilist: 200000,
+      anidb: 30000
+    };
+
+    if (context.strictMode && numericValue > maxRanges[type]) {
+      return this.#createValidationResult(false, detection.id, {
+        error: `En modo estricto, ${type.toUpperCase()} ID debe ser razonable`,
+        actualValue: numericValue,
+        maxExpected: maxRanges[type],
+        type
+      });
+    }
+
+    return this.#createValidationResult(true, detection.id, {
+      businessRule: `${type}_format`,
+      numericValue,
+      type,
+      strictMode: context.strictMode
     });
   }
 

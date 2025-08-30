@@ -157,6 +157,10 @@ export class UnifiedIdService {
       return await this.convertKitsuToImdb(sourceId);
     }
     
+    if ((sourceType === 'mal' || sourceType === 'anilist' || sourceType === 'anidb') && targetType === 'imdb') {
+      return await this.convertAnimeIdToImdb(sourceId, sourceType);
+    }
+    
     if (sourceType === 'imdb' && targetType === 'kitsu') {
       // Conversión IMDb->Kitsu no implementada actualmente
       return {
@@ -173,6 +177,115 @@ export class UnifiedIdService {
       method: 'invalid_conversion',
       metadata: { error: `Conversión ${sourceType}->${targetType} no válida` }
     };
+  }
+
+  /**
+   * Convierte ID de anime (MAL, AniList, AniDB) a IMDb usando mapeo indirecto
+   * @param {string} animeId - ID numérico del servicio de anime
+   * @param {string} sourceType - Tipo de servicio (mal, anilist, anidb)
+   * @returns {Promise<Object>} Resultado de conversión
+   */
+  async convertAnimeIdToImdb(animeId, sourceType) {
+    const cacheKey = `${sourceType}:${animeId}->imdb`;
+    
+    // Verificar cache
+    const cached = this.#getCachedConversion(cacheKey);
+    if (cached) {
+      return {
+        success: true,
+        convertedId: cached.id,
+        method: 'cache',
+        metadata: cached.metadata
+      };
+    }
+
+    try {
+      // Por ahora, usamos mapeo directo a IMDb como fallback
+      // En futuras implementaciones, podríamos usar APIs de conversión cruzada
+      const directMapping = await this.#getDirectImdbMapping(animeId, sourceType);
+      
+      if (directMapping) {
+        const result = {
+          success: true,
+          convertedId: directMapping,
+          method: `${sourceType}_direct_mapping`,
+          metadata: { 
+            source: `Mapeo directo ${sourceType.toUpperCase()}→IMDb`,
+            originalType: sourceType
+          }
+        };
+        this.#setCachedConversion(cacheKey, directMapping, result.metadata);
+        return result;
+      }
+
+      // No se encontró mapeo
+      return {
+        success: false,
+        convertedId: null,
+        method: 'none',
+        metadata: { 
+          error: `No se encontró mapeo ${sourceType.toUpperCase()}→IMDb`,
+          note: 'Conversión cruzada requiere implementación adicional'
+        }
+      };
+
+    } catch (error) {
+      console.error(`Error convirtiendo ${sourceType.toUpperCase()} ID ${animeId}:`, error);
+      return {
+        success: false,
+        convertedId: null,
+        method: 'error',
+        metadata: { error: error.message }
+      };
+    }
+  }
+
+  /**
+   * Obtiene mapeo directo a IMDb para servicios de anime usando conversión cruzada
+   * @param {string} animeId - ID del servicio de anime
+   * @param {string} sourceType - Tipo de servicio (mal, anilist, anidb)
+   * @returns {Promise<string|null>} IMDb ID o null
+   */
+  async #getDirectImdbMapping(animeId, sourceType) {
+    try {
+      // Mapeo de tipos de servicio a sitios externos en Kitsu
+      const siteMapping = {
+        'mal': 'myanimelist',
+        'anilist': 'anilist',
+        'anidb': 'anidb'
+      };
+
+      const externalSite = siteMapping[sourceType];
+      if (!externalSite) {
+        console.warn(`Tipo de servicio no soportado: ${sourceType}`);
+        return null;
+      }
+
+      console.info(`Buscando mapeo ${sourceType.toUpperCase()}→Kitsu→IMDb para ID: ${animeId}`);
+      
+      // Obtener Kitsu ID desde el servicio externo
+      const kitsuId = await this.kitsuApiService.getKitsuIdFromExternal(animeId, externalSite);
+      if (!kitsuId) {
+        console.warn(`No se encontró Kitsu ID para ${sourceType}:${animeId}`);
+        return null;
+      }
+
+      console.info(`Encontrado mapeo ${sourceType}:${animeId} → ${kitsuId}`);
+      
+      // Obtener IMDb ID desde Kitsu ID
+      const imdbId = await this.kitsuApiService.getImdbIdFromKitsu(kitsuId);
+      if (!imdbId) {
+        console.warn(`No se encontró IMDb ID para ${kitsuId}`);
+        return null;
+      }
+
+      console.info(`Conversión exitosa: ${sourceType}:${animeId} → ${kitsuId} → ${imdbId}`);
+      return imdbId;
+
+    } catch (error) {
+      console.error(`Error en mapeo ${sourceType.toUpperCase()}→IMDb para ${animeId}:`, error.message);
+      return null;
+    }
   }
 
   /**
