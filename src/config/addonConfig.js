@@ -65,12 +65,24 @@ const config = {
   }
 };
 
+// Cache para el manifest generado
+let manifestCache = null;
+let manifestCacheTimestamp = null;
+const MANIFEST_CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutos
+
 /**
- * Genera el manifiesto del addon a partir de la configuración.
+ * Genera el manifiesto del addon a partir de la configuración con cache.
  * @returns {Object} Manifiesto de Stremio optimizado.
  */
 function generateManifest() {
-  return {
+  // Verificar cache
+  const now = Date.now();
+  if (manifestCache && manifestCacheTimestamp && (now - manifestCacheTimestamp) < MANIFEST_CACHE_EXPIRY) {
+    return manifestCache;
+  }
+
+  // Generar manifest fresco
+  const manifest = {
     id: config.addon.id,
     version: config.addon.version,
     name: config.addon.name,
@@ -88,7 +100,22 @@ function generateManifest() {
       p2p: true
     }
   };
+
+  // Actualizar cache
+  manifestCache = manifest;
+  manifestCacheTimestamp = now;
+
+  return manifest;
+}
+
+/**
+ * Limpia el cache del manifest (útil para testing o actualizaciones).
+ */
+function clearManifestCache() {
+  manifestCache = null;
+  manifestCacheTimestamp = null;
 }
 
 export const addonConfig = Object.freeze(config);
 export const manifest = Object.freeze(generateManifest());
+export { clearManifestCache };
