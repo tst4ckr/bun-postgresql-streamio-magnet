@@ -228,6 +228,15 @@ export class DynamicValidationService {
       });
     }
 
+    // Si no hay servicio de conversión, permitir validación sin conversión
+    if (!this.unifiedService) {
+      return this.#createValidationResult(true, detection.id, {
+        conversionRequired: false,
+        reason: 'Servicio de conversión no disponible',
+        note: 'Validación continúa sin conversión'
+      });
+    }
+
     // Probar conversión si es necesaria
     try {
       const conversionResult = await this.unifiedService.processContentId(
