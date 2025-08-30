@@ -21,6 +21,24 @@ export class TorrentioApiService {
   #manifestCacheExpiry;
 
   /**
+   * Método auxiliar para logging seguro
+   * @param {string} level - Nivel de log (info, warn, error, debug)
+   * @param {string} message - Mensaje a loggear
+   * @param {any} data - Datos adicionales
+   */
+  #log(level, message, data = null) {
+    if (this.#logger && typeof this.#logger[level] === 'function') {
+      this.#logger[level](message, data);
+    } else {
+      if (data) {
+        console[level](message, data);
+      } else {
+        console[level](message);
+      }
+    }
+  }
+
+  /**
    * @param {string} baseUrl - URL base de la API de Torrentio
    * @param {string} torrentioFilePath - Ruta del archivo torrentio.csv
    * @param {Object} logger - Logger para trazabilidad
@@ -60,19 +78,19 @@ export class TorrentioApiService {
     try {
       // Validar que sea un IMDb ID válido (Kitsu IDs deben ser mapeados previamente)
       if (!imdbId || !imdbId.startsWith('tt')) {
-        this.#logger.warn(`ID inválido para Torrentio API: ${imdbId}. Se requiere IMDb ID.`);
+        this.#log('warn', `ID inválido para Torrentio API: ${imdbId}. Se requiere IMDb ID.`);
         return [];
       }
       
       // Detectar tipo automáticamente si es necesario
       const detectedType = type === 'auto' ? this.#detectContentType(imdbId, season, episode) : type;
-      this.#logger.info(`Buscando magnets en API Torrentio para: ${imdbId} (${detectedType})`);
+      this.#log('info', `Buscando magnets en API Torrentio para: ${imdbId} (${detectedType})`);
       
       // Construir ID según el tipo de contenido
       let streamId = imdbId;
       if ((detectedType === 'series' || detectedType === 'anime') && season !== null && episode !== null) {
         streamId = `${imdbId}:${season}:${episode}`;
-        this.#logger.info(`Formato de serie/anime: ${streamId}`);
+        this.#log('info', `Formato de serie/anime: ${streamId}`);
       }
       
       // Construir URL según el tipo de contenido con proveedores optimizados
@@ -94,7 +112,7 @@ export class TorrentioApiService {
       }
       
       const streamUrl = `${optimizedBaseUrl}/stream/${urlContentType}/${streamId}.json`;
-      this.#logger.info(`URL construida: ${streamUrl}`);
+      this.#log('info', `URL construida: ${streamUrl}`);
       const response = await this.#fetchWithTimeout(streamUrl);
       
       if (!response.ok) {

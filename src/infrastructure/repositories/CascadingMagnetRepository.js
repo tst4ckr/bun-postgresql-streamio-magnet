@@ -24,6 +24,24 @@ export class CascadingMagnetRepository extends MagnetRepository {
   #idService;
 
   /**
+   * Método auxiliar para logging seguro
+   * @param {string} level - Nivel de log (info, warn, error)
+   * @param {string} message - Mensaje a loggear
+   * @param {any} data - Datos adicionales
+   */
+  #log(level, message, data = null) {
+    if (this.#logger && typeof this.#logger[level] === 'function') {
+      this.#logger[level](message, data);
+    } else {
+      if (data) {
+        console[level](message, data);
+      } else {
+        console[level](message);
+      }
+    }
+  }
+
+  /**
    * @param {string} primaryCsvPath - Ruta del archivo magnets.csv principal
    * @param {string} secondaryCsvPath - Ruta del archivo torrentio.csv secundario
    * @param {string} animeCsvPath - Ruta del archivo anime.csv para contenido de anime
@@ -63,7 +81,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
     if (this.#isInitialized) return;
     
     try {
-      this.#logger.info('Inicializando repositorios en cascada...');
+      this.#log('info', 'Inicializando repositorios en cascada...');
       
       // Inicializar repositorio principal
       await this.#initializeRepository(this.#primaryRepository, 'magnets.csv');
@@ -75,10 +93,10 @@ export class CascadingMagnetRepository extends MagnetRepository {
       await this.#initializeRepository(this.#animeRepository, 'anime.csv');
       
       this.#isInitialized = true;
-      this.#logger.info('Repositorios en cascada inicializados correctamente');
+      this.#log('info', 'Repositorios en cascada inicializados correctamente');
       
     } catch (error) {
-      this.#logger.error('Error al inicializar repositorios en cascada:', error);
+      this.#log('error', 'Error al inicializar repositorios en cascada:', error);
       throw error;
     }
   }
@@ -92,9 +110,9 @@ export class CascadingMagnetRepository extends MagnetRepository {
   async #initializeRepository(repository, name) {
     try {
       await repository.initialize();
-      this.#logger.info(`Repositorio ${name} inicializado correctamente`);
+      this.#log('info', `Repositorio ${name} inicializado correctamente`);
     } catch (error) {
-      this.#logger.warn(`Advertencia: No se pudo inicializar ${name}:`, error.message);
+      this.#log('warn', `Advertencia: No se pudo inicializar ${name}:`, error.message);
       // No lanzamos error para permitir que otros repositorios funcionen
     }
   }
@@ -110,7 +128,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       await this.initialize();
     }
     
-    this.#logger.info(`Iniciando búsqueda en cascada para: ${imdbId}`);
+    this.#log('info', `Iniciando búsqueda en cascada para: ${imdbId}`);
     
     // Paso 1: Buscar en magnets.csv (repositorio principal)
     const primaryResults = await this.#searchInRepository(
@@ -120,7 +138,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
     );
     
     if (primaryResults.length > 0) {
-      this.#logger.info(`Encontrados ${primaryResults.length} magnets en magnets.csv para ${imdbId}`);
+      this.#log('info', `Encontrados ${primaryResults.length} magnets en magnets.csv para ${imdbId}`);
       return primaryResults;
     }
     
@@ -132,7 +150,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
     );
     
     if (secondaryResults.length > 0) {
-      this.#logger.info(`Encontrados ${secondaryResults.length} magnets en torrentio.csv para ${imdbId}`);
+      this.#log('info', `Encontrados ${secondaryResults.length} magnets en torrentio.csv para ${imdbId}`);
       return secondaryResults;
     }
     
@@ -144,16 +162,16 @@ export class CascadingMagnetRepository extends MagnetRepository {
     );
     
     if (animeResults.length > 0) {
-      this.#logger.info(`Encontrados ${animeResults.length} magnets en anime.csv para ${imdbId}`);
+      this.#log('info', `Encontrados ${animeResults.length} magnets en anime.csv para ${imdbId}`);
       return animeResults;
     }
     
     // Paso 4: Buscar en API de Torrentio
-    this.#logger.info(`No se encontraron magnets locales, consultando API Torrentio para ${imdbId} (${type})`);
+    this.#log('info', `No se encontraron magnets locales, consultando API Torrentio para ${imdbId} (${type})`);
     const apiResults = await this.#torrentioApiService.searchMagnetsByImdbId(imdbId, type);
     
     if (apiResults.length > 0) {
-      this.#logger.info(`Encontrados ${apiResults.length} magnets en API Torrentio para ${imdbId}`);
+      this.#log('info', `Encontrados ${apiResults.length} magnets en API Torrentio para ${imdbId}`);
       
       // Reinicializar repositorio secundario para incluir nuevos datos
       await this.#reinitializeSecondaryRepository();
@@ -162,7 +180,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
     }
     
     // No se encontraron magnets en ninguna fuente
-    this.#logger.warn(`No se encontraron magnets para ${imdbId} en ninguna fuente`);
+    this.#log('warn', `No se encontraron magnets para ${imdbId} en ninguna fuente`);
     throw new MagnetNotFoundError(`No se encontraron magnets para IMDB ID: ${imdbId}`);
   }
 
@@ -179,14 +197,14 @@ export class CascadingMagnetRepository extends MagnetRepository {
       await this.initialize();
     }
     
-    this.#logger.info(`Búsqueda unificada iniciada para ID: ${contentId}`);
+    this.#log('info', `Búsqueda unificada iniciada para ID: ${contentId}`);
     
     try {
       // Procesar ID usando el servicio unificado
       const processingResult = await this.#idService.processContentId(contentId, 'imdb');
       
       if (!processingResult.success) {
-        this.#logger.error(`Error procesando ID ${contentId}: ${processingResult.error || processingResult.details}`);
+        this.#log('error', `Error procesando ID ${contentId}: ${processingResult.error || processingResult.details}`);
         throw new MagnetNotFoundError(contentId);
       }
 
@@ -194,9 +212,9 @@ export class CascadingMagnetRepository extends MagnetRepository {
       
       // Log de conversión si fue necesaria
       if (processingResult.conversionRequired) {
-        this.#logger.info(`Conversión exitosa: ${contentId} → ${imdbId} (método: ${processingResult.conversionMethod})`);
+        this.#log('info', `Conversión exitosa: ${contentId} → ${imdbId} (método: ${processingResult.conversionMethod})`);
       } else {
-        this.#logger.info(`ID ya en formato IMDb: ${imdbId}`);
+        this.#log('info', `ID ya en formato IMDb: ${imdbId}`);
       }
       
       // Delegar a la búsqueda por IMDb ID
@@ -207,7 +225,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
         throw error;
       }
       
-      this.#logger.error(`Error en búsqueda unificada para ${contentId}:`, error);
+      this.#log('error', `Error en búsqueda unificada para ${contentId}:`, error);
       throw new RepositoryError(`Error buscando magnets para ${contentId}`, error);
     }
   }
@@ -225,11 +243,11 @@ export class CascadingMagnetRepository extends MagnetRepository {
       return await repository.getMagnetsByImdbId(imdbId);
     } catch (error) {
       if (error instanceof MagnetNotFoundError) {
-        this.#logger.info(`No se encontraron magnets en ${sourceName} para ${imdbId}`);  
+        this.#log('info', `No se encontraron magnets en ${sourceName} para ${imdbId}`);  
         return [];
       }
       
-      this.#logger.error(`Error al buscar en ${sourceName} para ${imdbId}:`, error);
+      this.#log('error', `Error al buscar en ${sourceName} para ${imdbId}:`, error);
       return [];
     }
   }
@@ -247,10 +265,10 @@ export class CascadingMagnetRepository extends MagnetRepository {
       );
       
       await this.#secondaryRepository.initialize();
-      this.#logger.debug('Repositorio secundario reinicializado');
+      this.#log('debug', 'Repositorio secundario reinicializado');
       
     } catch (error) {
-      this.#logger.error('Error al reinicializar repositorio secundario:', error);
+      this.#log('error', 'Error al reinicializar repositorio secundario:', error);
     }
   }
 
