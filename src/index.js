@@ -16,6 +16,7 @@ class MagnetAddon {
   #logger;
   #magnetRepository;
   #addonBuilder;
+  #streamHandler;
 
   constructor() {
     this.#config = addonConfig;
@@ -58,43 +59,9 @@ class MagnetAddon {
    * @param {StreamHandler} streamHandler - Handler de streams
    */
   #setupLanguageRoutes(streamHandler) {
-    // Ruta para configurar idioma prioritario
-    this.#addonBuilder.defineResourceHandler('configure', async (args) => {
-      const { action, language } = args;
-      
-      if (action === 'set-language' && language) {
-        try {
-          streamHandler.setPriorityLanguage(language);
-          this.#logger.info(`Idioma prioritario configurado: ${language}`);
-          return {
-            success: true,
-            message: `Idioma prioritario configurado a: ${language}`,
-            currentLanguage: language
-          };
-        } catch (error) {
-          this.#logger.error(`Error al configurar idioma: ${error.message}`);
-          return {
-            success: false,
-            error: error.message
-          };
-        }
-      }
-      
-      if (action === 'get-language') {
-        const currentLanguage = streamHandler.getPriorityLanguage();
-        return {
-          success: true,
-          currentLanguage: currentLanguage || 'none'
-        };
-      }
-      
-      return {
-        success: false,
-        error: 'Acción no válida. Use: set-language o get-language'
-      };
-    });
-    
-    this.#logger.info('Rutas de configuración de idioma configuradas.');
+    // Almacenar referencia al streamHandler para uso en rutas personalizadas
+    this.#streamHandler = streamHandler;
+    this.#logger.info('Configuración de idioma disponible mediante métodos del StreamHandler.');
   }
 
   /**
@@ -111,8 +78,8 @@ class MagnetAddon {
     const baseUrl = `http://127.0.0.1:${port}`;
     this.#logger.info(`✅ Addon iniciado en: ${baseUrl}`);
     this.#logger.info(`🔗 Manifiesto: ${baseUrl}/manifest.json`);
-    this.#logger.info(`🌐 Configurar idioma: ${baseUrl}/configure/set-language/spanish`);
-    this.#logger.info(`🔍 Ver idioma actual: ${baseUrl}/configure/get-language`);
+    this.#logger.info(`🌐 Configuración de idioma: Disponible mediante StreamHandler`);
+    this.#logger.info(`📝 Idioma actual: ${this.#streamHandler.getPriorityLanguage() || 'spanish (por defecto)'}`);
   }
 
   /**
