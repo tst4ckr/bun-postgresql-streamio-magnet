@@ -40,7 +40,8 @@ export class TorrentioApiService {
   /**
    * Busca magnets por ID de IMDb usando la API de Torrentio
    * Soporta películas, series y anime con detección automática de tipo
-   * @param {string} imdbId - ID de IMDb (ej: 'tt1234567') o Kitsu ID (ej: 'kitsu:12345')
+   * Incluye soporte mejorado para IDs de Kitsu con mapeo automático
+   * @param {string} imdbId - ID de IMDb (ej: 'tt1234567') - Kitsu IDs deben ser mapeados previamente
    * @param {string} type - Tipo de contenido ('movie', 'series', 'anime', 'auto' para detección automática)
    * @param {number} season - Temporada (requerido para series/anime)
    * @param {number} episode - Episodio (requerido para series/anime)
@@ -57,6 +58,12 @@ export class TorrentioApiService {
    */
   async searchMagnetsByImdbId(imdbId, type = 'auto', season = null, episode = null) {
     try {
+      // Validar que sea un IMDb ID válido (Kitsu IDs deben ser mapeados previamente)
+      if (!imdbId || !imdbId.startsWith('tt')) {
+        this.#logger.warn(`ID inválido para Torrentio API: ${imdbId}. Se requiere IMDb ID.`);
+        return [];
+      }
+      
       // Detectar tipo automáticamente si es necesario
       const detectedType = type === 'auto' ? this.#detectContentType(imdbId, season, episode) : type;
       this.#logger.info(`Buscando magnets en API Torrentio para: ${imdbId} (${detectedType})`);
@@ -512,7 +519,8 @@ export class TorrentioApiService {
   }
 
   /**
-   * Detecta automáticamente el tipo de contenido basándose en el ID y parámetros.
+   * Detecta automáticamente el tipo de contenido basado en parámetros.
+   * Incluye detección mejorada de anime usando múltiples heurísticas.
    * @private
    * @param {string} id - ID del contenido
    * @param {number} season - Temporada
@@ -520,25 +528,58 @@ export class TorrentioApiService {
    * @returns {string} Tipo detectado ('movie', 'series', 'anime')
    */
   #detectContentType(id, season, episode) {
+    // Detectar anime por ID de Kitsu (siempre anime si viene de Kitsu)
+    if (this.#isKitsuDerivedContent(id)) {
+      return 'anime';
+    }
+    
     // Si tiene temporada y episodio, es serie o anime
     if (season !== null && episode !== null) {
-      // Detectar anime por prefijo kitsu o patrones específicos
-      if (id.startsWith('kitsu:')) {
+      // Usar heurísticas adicionales para detectar anime en IMDb IDs
+      if (this.#isLikelyAnimeContent(id, season, episode)) {
         return 'anime';
       }
       
-      // Para IMDb IDs, usar heurísticas adicionales
-      // Por ahora, defaultear a 'series' si tiene season/episode
       return 'series';
-    }
-    
-    // Si es un ID de Kitsu sin season/episode, probablemente es anime movie
-    if (id.startsWith('kitsu:')) {
-      return 'anime';
     }
     
     // Por defecto, asumir que es película
     return 'movie';
+  }
+
+  /**
+   * Verifica si el contenido proviene de Kitsu o tiene indicadores de anime.
+   * @private
+   * @param {string} id - ID del contenido
+   * @returns {boolean} True si es contenido derivado de Kitsu
+   */
+  #isKitsuDerivedContent(id) {
+    // Verificar si el ID original era de Kitsu (puede estar en metadatos)
+    return id && (id.includes('kitsu') || id.includes('anime'));
+  }
+
+  /**
+   * Aplica heurísticas para detectar contenido anime en IMDb IDs.
+   * @private
+   * @param {string} id - ID del contenido
+   * @param {number} season - Temporada
+   * @param {number} episode - Episodio
+   * @returns {boolean} True si probablemente es anime
+   */
+  #isLikelyAnimeContent(id, season, episode) {
+    // Heurísticas para detectar anime:
+    // 1. Temporadas con muchos episodios (típico de anime)
+    if (episode > 24) {
+      return true;
+    }
+    
+    // 2. Patrones de temporadas típicos de anime (1-4 temporadas, 12-26 episodios)
+    if (season <= 4 && episode >= 12 && episode <= 26) {
+      return true;
+    }
+    
+    // Por defecto, no es anime
+    return false;
   }
 
   /**

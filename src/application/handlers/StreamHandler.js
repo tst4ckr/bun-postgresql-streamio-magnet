@@ -5,6 +5,7 @@
 
 import { MagnetNotFoundError } from '../../domain/repositories/MagnetRepository.js';
 import { parseMagnet } from 'parse-magnet-uri';
+import { kitsuApiService } from '../../infrastructure/services/KitsuApiService.js';
 
 /**
  * Handler para peticiones de streams de magnets.
@@ -94,8 +95,8 @@ export class StreamHandler {
     if (!args?.type || !['movie', 'series', 'anime'].includes(args.type)) {
       throw new Error('Tipo de contenido (movie/series/anime) requerido');
     }
-    if (!args.id || !args.id.startsWith('tt')) {
-      throw new Error('ID de contenido (IMDb) requerido');
+    if (!args.id || (!args.id.startsWith('tt') && !kitsuApiService.isKitsuId(args.id))) {
+      throw new Error('ID de contenido (IMDb o Kitsu) requerido');
     }
   }
 
@@ -110,14 +111,27 @@ export class StreamHandler {
   }
 
   /**
-   * Obtiene los magnets por IMDb ID.
+   * Obtiene los magnets por contenido ID.
    * @private
-   * @param {string} imdbId 
+   * @param {string} contentId - ID de contenido (IMDb o Kitsu)
    * @param {string} type - Tipo de contenido ('movie' o 'series')
    * @returns {Promise<import('../../domain/entities/Magnet.js').Magnet[]|null>}
    */
-  async #getMagnets(imdbId, type = 'movie') {
+  async #getMagnets(contentId, type = 'movie') {
     try {
+      let imdbId = contentId;
+      
+      // Si es Kitsu ID, convertir a IMDb ID
+      if (kitsuApiService.isKitsuId(contentId)) {
+        const mappedImdbId = await kitsuApiService.getImdbIdFromKitsu(contentId);
+        if (!mappedImdbId) {
+          this.#logger.warn(`No se encontró mapeo IMDb para Kitsu ID: ${contentId}`);
+          return null;
+        }
+        imdbId = mappedImdbId;
+        this.#logger.info(`Mapeado ${contentId} → ${imdbId}`);
+      }
+      
       return await this.#magnetRepository.getMagnetsByImdbId(imdbId, type);
     } catch (error) {
       if (error instanceof MagnetNotFoundError) {

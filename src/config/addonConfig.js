@@ -39,12 +39,12 @@ const config = {
       {
         name: 'stream',
         types: ['movie', 'series', 'anime'],
-        idPrefixes: ['tt']
+        idPrefixes: ['tt', 'kitsu:']
       }
     ],
     types: ['movie', 'series', 'anime'],
     catalogs: [],
-    idPrefixes: ['tt']
+    idPrefixes: ['tt', 'kitsu:']
   },
   server: {
     port: process.env.PORT || 7000,
