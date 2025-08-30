@@ -6,6 +6,7 @@
 import { MagnetRepository, MagnetNotFoundError } from '../../domain/repositories/MagnetRepository.js';
 import { CSVMagnetRepository } from './CSVMagnetRepository.js';
 import { TorrentioApiService } from '../services/TorrentioApiService.js';
+import { unifiedIdService } from '../services/UnifiedIdService.js';
 
 /**
  * Repositorio que implementa búsqueda en cascada con fallback automático.
@@ -18,6 +19,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
   #logger;
   #isInitialized = false;
   #secondaryCsvPath;
+  #idService;
 
   /**
    * @param {string} primaryCsvPath - Ruta del archivo magnets.csv principal
@@ -26,10 +28,11 @@ export class CascadingMagnetRepository extends MagnetRepository {
    * @param {Object} logger - Logger para trazabilidad
    * @param {number} timeout - Timeout para operaciones remotas
    */
-  constructor(primaryCsvPath, secondaryCsvPath, torrentioApiUrl, logger = console, timeout = 30000) {
+  constructor(primaryCsvPath, secondaryCsvPath, torrentioApiUrl, logger = console, timeout = 30000, idService = unifiedIdService) {
     super();
     this.#logger = logger;
     this.#secondaryCsvPath = secondaryCsvPath;
+    this.#idService = idService;
     
     // Repositorio principal (magnets.csv)
     this.#primaryRepository = new CSVMagnetRepository(primaryCsvPath, logger);
@@ -139,6 +142,52 @@ export class CascadingMagnetRepository extends MagnetRepository {
     // No se encontraron magnets en ninguna fuente
     this.#logger.warn(`No se encontraron magnets para ${imdbId} en ninguna fuente`);
     throw new MagnetNotFoundError(`No se encontraron magnets para IMDB ID: ${imdbId}`);
+  }
+
+  /**
+   * Busca magnets por cualquier tipo de ID de contenido (IMDb o Kitsu).
+   * Utiliza el servicio unificado de IDs para detectar y convertir automáticamente.
+   * @param {string} contentId - ID de contenido (IMDb o Kitsu)
+   * @param {string} type - Tipo de contenido ('movie', 'series', 'anime')
+   * @param {Object} options - Opciones adicionales para la búsqueda
+   * @returns {Promise<Magnet[]>} Array de magnets encontrados
+   */
+  async getMagnetsByContentId(contentId, type = 'movie', options = {}) {
+    if (!this.#isInitialized) {
+      await this.initialize();
+    }
+    
+    this.#logger.info(`Búsqueda unificada iniciada para ID: ${contentId}`);
+    
+    try {
+      // Procesar ID usando el servicio unificado
+      const processingResult = await this.#idService.processContentId(contentId, 'imdb');
+      
+      if (!processingResult.success) {
+        this.#logger.error(`Error procesando ID ${contentId}: ${processingResult.error || processingResult.details}`);
+        throw new MagnetNotFoundError(contentId);
+      }
+
+      const imdbId = processingResult.processedId;
+      
+      // Log de conversión si fue necesaria
+      if (processingResult.conversionRequired) {
+        this.#logger.info(`Conversión exitosa: ${contentId} → ${imdbId} (método: ${processingResult.conversionMethod})`);
+      } else {
+        this.#logger.debug(`ID ya en formato IMDb: ${imdbId}`);
+      }
+      
+      // Delegar a la búsqueda por IMDb ID
+      return await this.getMagnetsByImdbId(imdbId, type);
+      
+    } catch (error) {
+      if (error instanceof MagnetNotFoundError) {
+        throw error;
+      }
+      
+      this.#logger.error(`Error en búsqueda unificada para ${contentId}:`, error);
+      throw new RepositoryError(`Error buscando magnets para ${contentId}`, error);
+    }
   }
 
   /**

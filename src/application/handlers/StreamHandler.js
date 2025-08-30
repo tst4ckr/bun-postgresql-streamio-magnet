@@ -5,7 +5,8 @@
 
 import { MagnetNotFoundError } from '../../domain/repositories/MagnetRepository.js';
 import { parseMagnet } from 'parse-magnet-uri';
-import { kitsuApiService } from '../../infrastructure/services/KitsuApiService.js';
+import { unifiedIdService } from '../../infrastructure/services/UnifiedIdService.js';
+import { dynamicValidationService } from '../../infrastructure/services/DynamicValidationService.js';
 
 /**
  * Handler para peticiones de streams de magnets.
@@ -18,16 +19,21 @@ export class StreamHandler {
   #magnetRepository;
   #config;
   #logger;
+  #idService;
+  #validationService;
 
   /**
    * @param {Object} magnetRepository - Repositorio de magnets.
    * @param {Object} config - Configuración del addon.
    * @param {Object} logger - Logger para trazabilidad.
+   * @param {Object} idService - Servicio unificado de IDs (opcional, usa singleton por defecto).
    */
-  constructor(magnetRepository, config, logger = console) {
+  constructor(magnetRepository, config, logger = console, idService = unifiedIdService, validationService = dynamicValidationService) {
     this.#magnetRepository = magnetRepository;
     this.#config = config;
     this.#logger = logger;
+    this.#idService = idService;
+    this.#validationService = validationService;
   }
 
   /**
@@ -92,7 +98,8 @@ export class StreamHandler {
   async #handleStreamRequest(args) {
     const { type, id } = args;
     
-    this.#validateStreamRequest(args);
+    // Validación asíncrona con servicio dinámico
+    const validationResult = await this.#validateStreamRequest(args);
     
     if (!this.#isSupportedType(type)) {
       this.#logger.warn(`Tipo no soportado: ${type}`);
@@ -108,6 +115,11 @@ export class StreamHandler {
 
     const streams = this.#createStreamsFromMagnets(magnets, type);
     
+    // Log de información de validación para diagnóstico
+    if (validationResult?.details?.detection) {
+      this.#logger.info(`Stream generado para ${id} (${validationResult.details.detection.type}): ${streams.length} streams encontrados`);
+    }
+    
     return this.#createStreamResponse(streams);
   }
 
@@ -117,13 +129,34 @@ export class StreamHandler {
    * @param {Object} args 
    * @throws {Error}
    */
-  #validateStreamRequest(args) {
+  async #validateStreamRequest(args) {
     if (!args?.type || !['movie', 'series', 'anime'].includes(args.type)) {
       throw new Error('Tipo de contenido (movie/series/anime) requerido');
     }
-    if (!args.id || (!args.id.startsWith('tt') && !kitsuApiService.isKitsuId(args.id))) {
-      throw new Error('ID de contenido (IMDb o Kitsu) requerido');
+    
+    if (!args.id) {
+      throw new Error('ID de contenido requerido');
     }
+
+    // Usar validación dinámica para verificar el ID
+    const validationResult = await this.#validationService.validateContentId(
+      args.id, 
+      'stream_request',
+      { targetFormat: 'imdb', strictMode: false }
+    );
+    
+    if (!validationResult.isValid) {
+      const errorMsg = validationResult.details?.error || 'ID de contenido inválido';
+      this.#logger.warn(`Validación falló para ID ${args.id}: ${errorMsg}`);
+      throw new Error(`ID de contenido inválido: ${errorMsg}`);
+    }
+
+    this.#logger.debug(`Validación exitosa para ID ${args.id}:`, {
+      type: validationResult.details?.detection?.type,
+      confidence: validationResult.details?.detection?.confidence
+    });
+    
+    return validationResult;
   }
 
   /**
@@ -137,7 +170,7 @@ export class StreamHandler {
   }
 
   /**
-   * Obtiene los magnets por contenido ID.
+   * Obtiene los magnets por contenido ID de forma unificada.
    * @private
    * @param {string} contentId - ID de contenido (IMDb o Kitsu)
    * @param {string} type - Tipo de contenido ('movie' o 'series')
@@ -145,24 +178,13 @@ export class StreamHandler {
    */
   async #getMagnets(contentId, type = 'movie') {
     try {
-      let imdbId = contentId;
-      
-      // Si es Kitsu ID, convertir a IMDb ID
-      if (kitsuApiService.isKitsuId(contentId)) {
-        const mappedImdbId = await kitsuApiService.getImdbIdFromKitsu(contentId);
-        if (!mappedImdbId) {
-          this.#logger.warn(`No se encontró mapeo IMDb para Kitsu ID: ${contentId}`);
-          return null;
-        }
-        imdbId = mappedImdbId;
-        this.#logger.info(`Mapeado ${contentId} → ${imdbId}`);
-      }
-      
-      return await this.#magnetRepository.getMagnetsByImdbId(imdbId, type);
+      // Usar el método unificado del repositorio para manejar cualquier tipo de ID
+      return await this.#magnetRepository.getMagnetsByContentId(contentId, type);
     } catch (error) {
       if (error instanceof MagnetNotFoundError) {
         return null;
       }
+      this.#logger.error(`Error obteniendo magnets para ${contentId}:`, error);
       throw error;
     }
   }

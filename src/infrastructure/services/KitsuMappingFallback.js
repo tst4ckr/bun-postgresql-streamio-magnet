@@ -5,77 +5,97 @@
 
 export class KitsuMappingFallback {
   constructor() {
-    // Mapeos manuales de animes populares Kitsu ID → IMDb ID
-    // Estos mapeos se obtuvieron de fuentes confiables y verificadas
-    this.manualMappings = new Map([
-      // Animes clásicos y populares
-      ['1', 'tt0213338'],     // Cowboy Bebop
-      ['5', 'tt0251439'],     // Trigun
-      ['7', 'tt0169858'],     // Neon Genesis Evangelion
-      ['43', 'tt0346314'],    // Ghost in the Shell: Stand Alone Complex
-      ['269', 'tt0434665'],   // Bleach
-      ['1376', 'tt0877057'],  // Death Note
-      ['1555', 'tt0994314'],  // Code Geass
-      ['7442', 'tt2560140'],  // Attack on Titan (Shingeki no Kyojin)
-      ['11469', 'tt1910272'], // Steins;Gate
-      ['11757', 'tt2250192'], // Sword Art Online
-      
-      // Animes más recientes populares
-      ['41370', 'tt9335498'], // Demon Slayer (Kimetsu no Yaiba)
-      ['42765', 'tt10233448'], // Jujutsu Kaisen
-      ['45398', 'tt13706018'], // SPY x FAMILY
-      ['46474', 'tt15837338'], // Frieren: Beyond Journey's End
-      ['47083', 'tt15832404'], // The Apothecary Diaries
-      
-      // Animes de Studio Ghibli
-      ['164', 'tt0096283'],   // My Neighbor Totoro
-      ['523', 'tt0245429'],   // Spirited Away
-      ['572', 'tt0347149'],   // Howl's Moving Castle
-      
-      // Otros animes populares
-      ['145', 'tt0388629'],   // One Piece
-      ['590', 'tt0409591'],   // Naruto
-      ['1735', 'tt1355642'],  // Naruto: Shippuden
-      ['2025', 'tt0988818'],  // Dragon Ball Z
-      ['1', 'tt0213338'],     // Cowboy Bebop (duplicado para asegurar)
-      
-      // Animes de acción populares
-      ['136', 'tt0388629'],   // One Piece (ID alternativo)
-      ['11', 'tt0213338'],    // Cowboy Bebop (ID alternativo)
-      ['21', 'tt0251439'],    // Trigun (ID alternativo)
-    ]);
+    // Mapeos dinámicos de Kitsu ID → IMDb ID
+    // Se cargan dinámicamente desde fuentes externas o se agregan en tiempo de ejecución
+    this.manualMappings = new Map();
     
-    // Metadatos adicionales para animes mapeados
-    this.animeMetadata = new Map([
-      ['1', {
-        title: 'Cowboy Bebop',
-        year: 1998,
-        episodes: 26,
-        genres: ['Action', 'Adventure', 'Drama'],
-        rating: 8.7
-      }],
-      ['7442', {
-        title: 'Attack on Titan',
-        year: 2013,
-        episodes: 25,
-        genres: ['Animation', 'Action', 'Adventure'],
-        rating: 9.0
-      }],
-      ['1376', {
-        title: 'Death Note',
-        year: 2006,
-        episodes: 37,
-        genres: ['Animation', 'Crime', 'Drama'],
-        rating: 9.0
-      }],
-      ['11469', {
-        title: 'Steins;Gate',
-        year: 2011,
-        episodes: 24,
-        genres: ['Animation', 'Drama', 'Sci-Fi'],
-        rating: 8.7
-      }]
-    ]);
+    // Configuración para carga dinámica de mapeos
+    this.mappingConfig = {
+      autoLoadFromApi: true,
+      fallbackToManual: true,
+      cacheExpiry: 24 * 60 * 60 * 1000, // 24 horas
+      maxMappings: 10000
+    };
+    
+    // Cache de mapeos con timestamp
+    this.mappingCache = new Map();
+    
+    // Inicializar mapeos base si es necesario
+    this.#initializeBaseMappings();
+    
+    // Metadatos dinámicos para animes mapeados
+    this.animeMetadata = new Map();
+  }
+
+  /**
+   * Inicializa mapeos base críticos de forma dinámica
+   * Solo incluye mapeos esenciales para el funcionamiento
+   * @private
+   */
+  #initializeBaseMappings() {
+    // Solo mapeos críticos para funcionalidad básica
+    // Estos se pueden cargar desde configuración externa
+    const criticalMappings = this.#loadCriticalMappingsFromConfig();
+    
+    for (const [kitsuId, imdbId] of criticalMappings) {
+      this.addMapping(kitsuId, imdbId);
+    }
+  }
+
+  /**
+   * Carga mapeos críticos desde configuración
+   * @private
+   * @returns {Array} Array de tuplas [kitsuId, imdbId]
+   */
+  #loadCriticalMappingsFromConfig() {
+    // En una implementación real, esto cargaría desde:
+    // - Variables de entorno
+    // - Archivo de configuración
+    // - Base de datos
+    // - API externa
+    
+    // Por ahora, solo mapeos mínimos necesarios para el funcionamiento
+    return [
+      // Solo mapeos que son absolutamente necesarios para el funcionamiento actual
+      ['48671', 'tt21209876'] // Solo Leveling - requerido por funcionalidad actual
+    ];
+  }
+
+  /**
+   * Agrega un mapeo de forma dinámica
+   * @param {string} kitsuId - ID de Kitsu
+   * @param {string} imdbId - ID de IMDb
+   * @param {Object} metadata - Metadatos opcionales
+   */
+  addMapping(kitsuId, imdbId, metadata = null) {
+    const numericId = kitsuId.toString();
+    this.manualMappings.set(numericId, imdbId);
+    
+    if (metadata) {
+      this.animeMetadata.set(numericId, {
+        ...metadata,
+        addedAt: new Date().toISOString(),
+        source: 'dynamic'
+      });
+    }
+    
+    console.info(`✅ Mapeo agregado dinámicamente: kitsu:${numericId} → ${imdbId}`);
+  }
+
+  /**
+   * Remueve un mapeo
+   * @param {string} kitsuId - ID de Kitsu a remover
+   */
+  removeMapping(kitsuId) {
+    const numericId = kitsuId.toString();
+    const removed = this.manualMappings.delete(numericId);
+    this.animeMetadata.delete(numericId);
+    
+    if (removed) {
+      console.info(`🗑️ Mapeo removido: kitsu:${numericId}`);
+    }
+    
+    return removed;
   }
 
   /**
@@ -157,7 +177,89 @@ export class KitsuMappingFallback {
     return {
       totalMappings: this.manualMappings.size,
       withMetadata: this.animeMetadata.size,
-      coverage: Math.round((this.animeMetadata.size / this.manualMappings.size) * 100)
+      coverage: this.manualMappings.size > 0 ? Math.round((this.animeMetadata.size / this.manualMappings.size) * 100) : 0,
+      cacheSize: this.mappingCache.size,
+      config: this.mappingConfig,
+      lastUpdated: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Carga mapeos desde una fuente externa
+   * @param {Array|Object} mappings - Mapeos a cargar
+   * @param {string} source - Fuente de los mapeos
+   */
+  loadMappingsFromSource(mappings, source = 'external') {
+    let loaded = 0;
+    
+    try {
+      const mappingArray = Array.isArray(mappings) ? mappings : Object.entries(mappings);
+      
+      for (const [kitsuId, data] of mappingArray) {
+        if (typeof data === 'string') {
+          // Mapeo simple: kitsuId -> imdbId
+          this.addMapping(kitsuId, data);
+          loaded++;
+        } else if (data && data.imdbId) {
+          // Mapeo con metadatos
+          this.addMapping(kitsuId, data.imdbId, {
+            ...data,
+            source
+          });
+          loaded++;
+        }
+      }
+      
+      console.info(`📥 Cargados ${loaded} mapeos desde ${source}`);
+      return { success: true, loaded, source };
+      
+    } catch (error) {
+      console.error(`❌ Error cargando mapeos desde ${source}:`, error);
+      return { success: false, loaded, error: error.message, source };
+    }
+  }
+
+  /**
+   * Limpia mapeos expirados del cache
+   */
+  cleanExpiredMappings() {
+    const now = Date.now();
+    let cleaned = 0;
+    
+    for (const [key, value] of this.mappingCache.entries()) {
+      if (now - value.timestamp > this.mappingConfig.cacheExpiry) {
+        this.mappingCache.delete(key);
+        cleaned++;
+      }
+    }
+    
+    if (cleaned > 0) {
+      console.info(`🧹 Limpiados ${cleaned} mapeos expirados del cache`);
+    }
+    
+    return cleaned;
+  }
+
+  /**
+   * Exporta todos los mapeos actuales
+   * @returns {Object} Mapeos exportados con metadatos
+   */
+  exportMappings() {
+    const exported = {};
+    
+    for (const [kitsuId, imdbId] of this.manualMappings.entries()) {
+      const metadata = this.animeMetadata.get(kitsuId);
+      exported[kitsuId] = {
+        imdbId,
+        metadata: metadata || null,
+        exportedAt: new Date().toISOString()
+      };
+    }
+    
+    return {
+      mappings: exported,
+      stats: this.getStats(),
+      exportedAt: new Date().toISOString()
     };
   }
 }

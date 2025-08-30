@@ -1,0 +1,374 @@
+/**
+ * Servicio de validación dinámica de IDs de contenido
+ * Se adapta automáticamente al tipo de ID detectado
+ * Implementa validación contextual y reglas de negocio flexibles
+ */
+
+import { idDetectorService } from './IdDetectorService.js';
+import { unifiedIdService } from './UnifiedIdService.js';
+
+export class DynamicValidationService {
+  constructor(detectorService, unifiedService) {
+    this.detectorService = detectorService;
+    this.unifiedService = unifiedService;
+    
+    // Reglas de validación configurables por tipo
+    this.validationRules = new Map([
+      ['imdb', {
+        minLength: 9, // tt + 7 dígitos mínimo
+        maxLength: 15,
+        requiredPrefix: 'tt',
+        allowedChars: /^tt\d+$/,
+        businessRules: [
+          this.#validateImdbBusinessRules.bind(this)
+        ]
+      }],
+      ['kitsu', {
+        minLength: 1,
+        maxLength: 10,
+        allowedChars: /^(kitsu:)?\d+$/,
+        businessRules: [
+          this.#validateKitsuBusinessRules.bind(this)
+        ]
+      }]
+    ]);
+    
+    // Contextos de validación
+    this.validationContexts = new Map([
+      ['stream_request', {
+        description: 'Validación para peticiones de stream',
+        requiredTypes: ['imdb', 'kitsu'],
+        allowConversion: true,
+        strictMode: false
+      }],
+      ['api_endpoint', {
+        description: 'Validación para endpoints de API',
+        requiredTypes: ['imdb', 'kitsu'],
+        allowConversion: false,
+        strictMode: true
+      }],
+      ['diagnostic', {
+        description: 'Validación para herramientas de diagnóstico',
+        requiredTypes: ['imdb', 'kitsu'],
+        allowConversion: true,
+        strictMode: false
+      }]
+    ]);
+  }
+
+  /**
+   * Valida un ID de contenido de forma dinámica
+   * @param {string} contentId - ID a validar
+   * @param {string} context - Contexto de validación
+   * @param {Object} options - Opciones adicionales
+   * @returns {Promise<Object>} Resultado de validación
+   */
+  async validateContentId(contentId, context = 'stream_request', options = {}) {
+    try {
+      // Obtener contexto de validación
+      const validationContext = this.validationContexts.get(context);
+      if (!validationContext) {
+        return this.#createValidationResult(false, contentId, {
+          error: `Contexto de validación '${context}' no reconocido`,
+          availableContexts: Array.from(this.validationContexts.keys())
+        });
+      }
+
+      // Detectar tipo de ID
+      const detection = this.detectorService.detectIdType(contentId);
+      if (!detection.isValid) {
+        return this.#createValidationResult(false, contentId, {
+          error: 'Formato de ID inválido',
+          detection,
+          context: validationContext.description
+        });
+      }
+
+      // Verificar si el tipo es soportado en este contexto
+      if (!validationContext.requiredTypes.includes(detection.type)) {
+        return this.#createValidationResult(false, contentId, {
+          error: `Tipo '${detection.type}' no soportado en contexto '${context}'`,
+          supportedTypes: validationContext.requiredTypes,
+          detectedType: detection.type
+        });
+      }
+
+      // Aplicar reglas de validación específicas del tipo
+      const typeValidation = await this.#validateByType(detection, validationContext, options);
+      if (!typeValidation.isValid) {
+        return typeValidation;
+      }
+
+      // Validar conversión si es necesaria y permitida
+      const conversionValidation = await this.#validateConversion(
+        detection, 
+        validationContext, 
+        options
+      );
+      if (!conversionValidation.isValid) {
+        return conversionValidation;
+      }
+
+      return this.#createValidationResult(true, contentId, {
+        detection,
+        context: validationContext.description,
+        typeValidation: typeValidation.details,
+        conversionValidation: conversionValidation.details,
+        recommendations: this.#generateRecommendations(detection, validationContext)
+      });
+
+    } catch (error) {
+      return this.#createValidationResult(false, contentId, {
+        error: 'Error interno durante validación',
+        details: error.message,
+        context
+      });
+    }
+  }
+
+  /**
+   * Valida según el tipo detectado
+   * @param {Object} detection - Resultado de detección
+   * @param {Object} context - Contexto de validación
+   * @param {Object} options - Opciones
+   * @returns {Promise<Object>} Resultado de validación por tipo
+   */
+  async #validateByType(detection, context, options) {
+    const rules = this.validationRules.get(detection.type);
+    if (!rules) {
+      return this.#createValidationResult(false, detection.id, {
+        error: `No hay reglas de validación para tipo '${detection.type}'`
+      });
+    }
+
+    // Validar longitud
+    if (detection.id.length < rules.minLength || detection.id.length > rules.maxLength) {
+      return this.#createValidationResult(false, detection.id, {
+        error: `Longitud inválida para ${detection.type}`,
+        expected: `${rules.minLength}-${rules.maxLength} caracteres`,
+        actual: detection.id.length
+      });
+    }
+
+    // Validar caracteres permitidos
+    if (!rules.allowedChars.test(detection.id)) {
+      return this.#createValidationResult(false, detection.id, {
+        error: `Formato de caracteres inválido para ${detection.type}`,
+        pattern: rules.allowedChars.source
+      });
+    }
+
+    // Aplicar reglas de negocio específicas
+    for (const businessRule of rules.businessRules) {
+      const ruleResult = await businessRule(detection, context, options);
+      if (!ruleResult.isValid) {
+        return ruleResult;
+      }
+    }
+
+    return this.#createValidationResult(true, detection.id, {
+      type: detection.type,
+      rulesApplied: rules.businessRules.length
+    });
+  }
+
+  /**
+   * Valida capacidad de conversión
+   * @param {Object} detection - Resultado de detección
+   * @param {Object} context - Contexto de validación
+   * @param {Object} options - Opciones
+   * @returns {Promise<Object>} Resultado de validación de conversión
+   */
+  async #validateConversion(detection, context, options) {
+    if (!context.allowConversion) {
+      return this.#createValidationResult(true, detection.id, {
+        conversionRequired: false,
+        reason: 'Conversión no requerida en este contexto'
+      });
+    }
+
+    // Verificar si se puede procesar para conversión
+    const targetFormat = options.targetFormat || 'imdb';
+    if (detection.type === targetFormat) {
+      return this.#createValidationResult(true, detection.id, {
+        conversionRequired: false,
+        reason: 'ID ya está en formato objetivo'
+      });
+    }
+
+    // Probar conversión si es necesaria
+    try {
+      const conversionResult = await this.unifiedService.processContentId(
+        detection.originalId, 
+        targetFormat
+      );
+      
+      return this.#createValidationResult(conversionResult.success, detection.id, {
+        conversionRequired: true,
+        conversionPossible: conversionResult.success,
+        conversionMethod: conversionResult.conversionMethod,
+        targetFormat
+      });
+    } catch (error) {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'Error validando conversión',
+        details: error.message
+      });
+    }
+  }
+
+  /**
+   * Reglas de negocio para IDs de IMDb
+   * @param {Object} detection - Detección
+   * @param {Object} context - Contexto
+   * @param {Object} options - Opciones
+   * @returns {Promise<Object>} Resultado de validación
+   */
+  async #validateImdbBusinessRules(detection, context, options) {
+    // Verificar que el ID numérico sea válido
+    const numericPart = detection.id.slice(2);
+    const numericValue = parseInt(numericPart);
+    
+    if (numericValue < 1) {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'ID numérico de IMDb debe ser mayor a 0',
+        numericPart,
+        numericValue
+      });
+    }
+
+    // En modo estricto, verificar formato estándar
+    if (context.strictMode && numericPart.length < 7) {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'En modo estricto, IMDb ID debe tener al menos 7 dígitos',
+        actualDigits: numericPart.length
+      });
+    }
+
+    return this.#createValidationResult(true, detection.id, {
+      businessRule: 'imdb_format',
+      numericValue,
+      strictMode: context.strictMode
+    });
+  }
+
+  /**
+   * Reglas de negocio para IDs de Kitsu
+   * @param {Object} detection - Detección
+   * @param {Object} context - Contexto
+   * @param {Object} options - Opciones
+   * @returns {Promise<Object>} Resultado de validación
+   */
+  async #validateKitsuBusinessRules(detection, context, options) {
+    const cleanId = detection.id.replace(/^kitsu:/, '');
+    const numericValue = parseInt(cleanId);
+    
+    if (numericValue < 1) {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'ID numérico de Kitsu debe ser mayor a 0',
+        cleanId,
+        numericValue
+      });
+    }
+
+    // Verificar rango razonable para IDs de Kitsu
+    if (numericValue > 1000000) {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'ID de Kitsu fuera del rango esperado',
+        numericValue,
+        maxExpected: 1000000
+      });
+    }
+
+    return this.#createValidationResult(true, detection.id, {
+      businessRule: 'kitsu_format',
+      numericValue,
+      cleanId
+    });
+  }
+
+  /**
+   * Genera recomendaciones basadas en la validación
+   * @param {Object} detection - Detección
+   * @param {Object} context - Contexto
+   * @returns {Array} Recomendaciones
+   */
+  #generateRecommendations(detection, context) {
+    const recommendations = [];
+
+    if (detection.type === 'kitsu' && context.allowConversion) {
+      recommendations.push({
+        type: 'conversion',
+        message: 'Considere convertir a IMDb ID para mejor compatibilidad',
+        action: 'convert_to_imdb'
+      });
+    }
+
+    if (context.strictMode && detection.confidence < 1.0) {
+      recommendations.push({
+        type: 'confidence',
+        message: 'Confianza de detección baja en modo estricto',
+        action: 'verify_format'
+      });
+    }
+
+    return recommendations;
+  }
+
+  /**
+   * Crea resultado de validación estandarizado
+   * @param {boolean} isValid - Si la validación fue exitosa
+   * @param {string} id - ID validado
+   * @param {Object} details - Detalles adicionales
+   * @returns {Object} Resultado de validación
+   */
+  #createValidationResult(isValid, id, details = {}) {
+    return {
+      isValid,
+      id,
+      timestamp: new Date().toISOString(),
+      details,
+      ...details
+    };
+  }
+
+  /**
+   * Agrega una nueva regla de validación
+   * @param {string} type - Tipo de ID
+   * @param {Object} rules - Reglas de validación
+   */
+  addValidationRules(type, rules) {
+    this.validationRules.set(type, {
+      ...this.validationRules.get(type),
+      ...rules
+    });
+  }
+
+  /**
+   * Agrega un nuevo contexto de validación
+   * @param {string} name - Nombre del contexto
+   * @param {Object} config - Configuración del contexto
+   */
+  addValidationContext(name, config) {
+    this.validationContexts.set(name, config);
+  }
+
+  /**
+   * Obtiene estadísticas de validación
+   * @returns {Object} Estadísticas
+   */
+  getValidationStats() {
+    return {
+      supportedTypes: Array.from(this.validationRules.keys()),
+      availableContexts: Array.from(this.validationContexts.keys()),
+      rulesCount: this.validationRules.size,
+      contextsCount: this.validationContexts.size
+    };
+  }
+}
+
+// Instancia singleton
+export const dynamicValidationService = new DynamicValidationService(
+  idDetectorService,
+  unifiedIdService
+);
