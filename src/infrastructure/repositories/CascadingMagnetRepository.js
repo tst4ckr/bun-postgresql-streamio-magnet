@@ -3,7 +3,7 @@
  * Implementa búsqueda secuencial: magnets.csv → torrentio.csv → API Torrentio.
  */
 
-import { MagnetRepository, MagnetNotFoundError } from '../../domain/repositories/MagnetRepository.js';
+import { MagnetRepository, MagnetNotFoundError, RepositoryError } from '../../domain/repositories/MagnetRepository.js';
 import { CSVMagnetRepository } from './CSVMagnetRepository.js';
 import { TorrentioApiService } from '../services/TorrentioApiService.js';
 import { unifiedIdService } from '../services/UnifiedIdService.js';
@@ -174,7 +174,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       if (processingResult.conversionRequired) {
         this.#logger.info(`Conversión exitosa: ${contentId} → ${imdbId} (método: ${processingResult.conversionMethod})`);
       } else {
-        this.#logger.debug(`ID ya en formato IMDb: ${imdbId}`);
+        this.#logger.info(`ID ya en formato IMDb: ${imdbId}`);
       }
       
       // Delegar a la búsqueda por IMDb ID
@@ -203,7 +203,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       return await repository.getMagnetsByImdbId(imdbId);
     } catch (error) {
       if (error instanceof MagnetNotFoundError) {
-        this.#logger.debug(`No se encontraron magnets en ${sourceName} para ${imdbId}`);
+        this.#logger.info(`No se encontraron magnets en ${sourceName} para ${imdbId}`);  
         return [];
       }
       

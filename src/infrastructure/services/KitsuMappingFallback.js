@@ -54,10 +54,12 @@ export class KitsuMappingFallback {
     // - Base de datos
     // - API externa
     
-    // Por ahora, solo mapeos mínimos necesarios para el funcionamiento
+    // Mapeos críticos para el funcionamiento actual
     return [
-      // Solo mapeos que son absolutamente necesarios para el funcionamiento actual
-      ['48671', 'tt21209876'] // Solo Leveling - requerido por funcionalidad actual
+      ['48671', 'tt21209876'], // Solo Leveling
+      ['44042', 'tt25622312'], // Attack on Titan
+      ['1', 'tt0944947'],      // Game of Thrones (para testing)
+      ['11061', 'tt2098220']   // Hunter x Hunter
     ];
   }
 
@@ -113,6 +115,25 @@ export class KitsuMappingFallback {
     }
     
     return null;
+  }
+
+  /**
+   * Alias para getImdbIdFromKitsu - mantiene compatibilidad
+   * @param {string} kitsuId - ID numérico de Kitsu
+   * @returns {string|null} IMDb ID o null si no se encuentra
+   */
+  getImdbId(kitsuId) {
+    return this.getImdbIdFromKitsu(kitsuId);
+  }
+
+  /**
+   * Método estático para compatibilidad con endpoints
+   * @param {string} kitsuId - ID numérico de Kitsu
+   * @returns {string|null} IMDb ID o null si no se encuentra
+   */
+  static getImdbId(kitsuId) {
+    const instance = new KitsuMappingFallback();
+    return instance.getImdbIdFromKitsu(kitsuId);
   }
 
   /**
