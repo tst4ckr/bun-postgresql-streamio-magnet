@@ -5,8 +5,7 @@
 
 export class KitsuMappingFallback {
   constructor() {
-    // Mapeos dinámicos de Kitsu ID → IMDb ID
-    // Se cargan dinámicamente desde fuentes externas o se agregan en tiempo de ejecución
+    // Mapeos unificados de todos los servicios → IMDb ID
     this.manualMappings = new Map();
     
     // Configuración para carga dinámica de mapeos
@@ -20,7 +19,7 @@ export class KitsuMappingFallback {
     // Cache de mapeos con timestamp
     this.mappingCache = new Map();
     
-    // Inicializar mapeos base si es necesario
+    // Inicializar mapeos base
     this.#initializeBaseMappings();
     
     // Metadatos dinámicos para animes mapeados
@@ -29,37 +28,64 @@ export class KitsuMappingFallback {
 
   /**
    * Inicializa mapeos base críticos de forma dinámica
-   * Solo incluye mapeos esenciales para el funcionamiento
+   * Incluye mapeos para todos los servicios de anime
    * @private
    */
   #initializeBaseMappings() {
-    // Solo mapeos críticos para funcionalidad básica
-    // Estos se pueden cargar desde configuración externa
-    const criticalMappings = this.#loadCriticalMappingsFromConfig();
+    // Mapeos completos de todos los servicios a IMDb
+    const allMappings = this.#loadCompleteMappings();
     
-    for (const [kitsuId, imdbId] of criticalMappings) {
-      this.addMapping(kitsuId, imdbId);
+    for (const [serviceId, imdbId] of allMappings) {
+      this.addMapping(serviceId, imdbId);
     }
   }
 
   /**
-   * Carga mapeos críticos desde configuración
+   * Carga mapeos completos desde todos los servicios a IMDb
    * @private
-   * @returns {Array} Array de tuplas [kitsuId, imdbId]
+   * @returns {Array} Array de tuplas [serviceId, imdbId]
    */
-  #loadCriticalMappingsFromConfig() {
-    // En una implementación real, esto cargaría desde:
-    // - Variables de entorno
-    // - Archivo de configuración
-    // - Base de datos
-    // - API externa
-    
-    // Mapeos críticos para el funcionamiento actual
+  #loadCompleteMappings() {
+    // Mapeos completos de anime populares
     return [
+      // Kitsu → IMDb
       ['48671', 'tt21209876'], // Solo Leveling
       ['44042', 'tt25622312'], // Attack on Titan
-      ['1', 'tt0944947'],      // Game of Thrones (para testing)
-      ['11061', 'tt2098220']   // Hunter x Hunter
+      ['11061', 'tt2098220'],  // Hunter x Hunter
+      ['42929', 'tt9335498'],  // Demon Slayer
+      ['39026', 'tt8176034'],  // Jujutsu Kaisen
+      ['12', 'tt0388629'],     // One Piece
+      ['21', 'tt0112123'],     // Dragon Ball Z
+      ['9969', 'tt3398540'],   // My Hero Academia
+      ['11319', 'tt11073666'], // Spy x Family
+      ['11111', 'tt6741278'],  // Vinland Saga
+      ['11419', 'tt9208876'],  // Chainsaw Man
+      
+      // MyAnimeList → IMDb
+      ['mal:5114', 'tt25622312'], // Attack on Titan
+      ['mal:38000', 'tt9335498'], // Demon Slayer
+      ['mal:40748', 'tt8176034'], // Jujutsu Kaisen
+      ['mal:21', 'tt0388629'],    // One Piece
+      ['mal:19', 'tt0112123'],    // Dragon Ball Z
+      ['mal:35062', 'tt9208876'], // Chainsaw Man
+      ['mal:37510', 'tt21209876'],// Solo Leveling
+      
+      // AniList → IMDb
+      ['anilist:5114', 'tt25622312'], // Attack on Titan
+      ['anilist:101922', 'tt9335498'], // Demon Slayer
+      ['anilist:113415', 'tt8176034'], // Jujutsu Kaisen
+      ['anilist:108632', 'tt21209876'],// Solo Leveling
+      
+      // AniDB → IMDb
+      ['anidb:4563', 'tt25622312'], // Attack on Titan
+      ['anidb:13679', 'tt9335498'], // Demon Slayer
+      ['anidb:15225', 'tt8176034'], // Jujutsu Kaisen
+      
+      // IMDb directo (sin prefijo)
+      ['tt25622312', 'tt25622312'], // Attack on Titan
+      ['tt9335498', 'tt9335498'],   // Demon Slayer
+      ['tt8176034', 'tt8176034'],   // Jujutsu Kaisen
+      ['tt21209876', 'tt21209876']  // Solo Leveling
     ];
   }
 
@@ -101,20 +127,48 @@ export class KitsuMappingFallback {
   }
 
   /**
-   * Obtiene mapeo IMDb desde Kitsu ID usando mapeos manuales
-   * @param {string} kitsuId - ID numérico de Kitsu (sin prefijo 'kitsu:')
+   * Obtiene mapeo IMDb desde cualquier tipo de ID de anime
+   * @param {string} animeId - ID de anime con prefijo (mal:5114, kitsu:48671, etc.)
    * @returns {string|null} IMDb ID o null si no se encuentra
    */
-  getImdbIdFromKitsu(kitsuId) {
-    const numericId = kitsuId.toString();
-    const imdbId = this.manualMappings.get(numericId);
+  getImdbIdFromAny(animeId) {
+    if (!animeId) return null;
     
+    // Normalizar el ID
+    const normalizedId = animeId.toString().trim();
+    
+    // Buscar directamente en mapeos
+    const imdbId = this.manualMappings.get(normalizedId);
     if (imdbId) {
-      console.info(`🎯 Mapeo manual encontrado: kitsu:${numericId} → ${imdbId}`);
+      console.info(`🎯 Mapeo encontrado: ${normalizedId} → ${imdbId}`);
       return imdbId;
     }
     
+    // Si es un ID numérico sin prefijo, intentar como kitsu
+    if (/^\d+$/.test(normalizedId)) {
+      const kitsuImdbId = this.manualMappings.get(normalizedId);
+      if (kitsuImdbId) {
+        console.info(`🎯 Mapeo kitsu encontrado: ${normalizedId} → ${kitsuImdbId}`);
+        return kitsuImdbId;
+      }
+    }
+    
+    // Si es tt... asumir que es IMDb directo
+    if (normalizedId.startsWith('tt')) {
+      return normalizedId;
+    }
+    
+    console.warn(`⚠️ No se encontró mapeo para: ${normalizedId}`);
     return null;
+  }
+
+  /**
+   * Método legacy - mantiene compatibilidad
+   * @param {string} kitsuId - ID numérico de Kitsu
+   * @returns {string|null} IMDb ID o null si no se encuentra
+   */
+  getImdbIdFromKitsu(kitsuId) {
+    return this.getImdbIdFromAny(kitsuId);
   }
 
   /**

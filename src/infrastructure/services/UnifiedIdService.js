@@ -180,13 +180,15 @@ export class UnifiedIdService {
   }
 
   /**
-   * Convierte ID de anime (MAL, AniList, AniDB) a IMDb usando mapeo indirecto
+   * Convierte ID de anime (MAL, AniList, AniDB) a IMDb usando mapeo directo
    * @param {string} animeId - ID numérico del servicio de anime
    * @param {string} sourceType - Tipo de servicio (mal, anilist, anidb)
    * @returns {Promise<Object>} Resultado de conversión
    */
   async convertAnimeIdToImdb(animeId, sourceType) {
-    const cacheKey = `${sourceType}:${animeId}->imdb`;
+    // Construir ID completo con prefijo
+    const fullId = `${sourceType}:${animeId}`;
+    const cacheKey = `${fullId}->imdb`;
     
     // Verificar cache
     const cached = this.#getCachedConversion(cacheKey);
@@ -197,6 +199,19 @@ export class UnifiedIdService {
         method: 'cache',
         metadata: cached.metadata
       };
+    }
+    
+    // Intentar mapeo directo con el servicio unificado
+    const imdbId = this.fallbackService.getImdbIdFromAny(fullId);
+    if (imdbId) {
+      const result = {
+        success: true,
+        convertedId: imdbId,
+        method: 'direct_mapping',
+        metadata: { source: 'Mapeo unificado', originalId: fullId }
+      };
+      this.#setCachedConversion(cacheKey, imdbId, result.metadata);
+      return result;
     }
 
     try {
