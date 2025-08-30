@@ -134,21 +134,30 @@ export class KitsuMappingFallback {
   getImdbIdFromAny(animeId) {
     if (!animeId) return null;
     
-    // Normalizar el ID
     const normalizedId = animeId.toString().trim();
     
-    // Buscar directamente en mapeos
-    const imdbId = this.manualMappings.get(normalizedId);
-    if (imdbId) {
-      console.info(`🎯 Mapeo encontrado: ${normalizedId} → ${imdbId}`);
-      return imdbId;
+    // Buscar directamente el ID completo (con prefijo)
+    const directImdbId = this.manualMappings.get(normalizedId);
+    if (directImdbId) {
+      console.info(`🎯 Mapeo directo encontrado: ${normalizedId} → ${directImdbId}`);
+      return directImdbId;
     }
     
-    // Si es un ID numérico sin prefijo, intentar como kitsu
+    // Buscar sin prefijo kitsu: para IDs numéricos
+    if (normalizedId.startsWith('kitsu:')) {
+      const kitsuId = normalizedId.replace('kitsu:', '');
+      const kitsuImdbId = this.manualMappings.get(kitsuId);
+      if (kitsuImdbId) {
+        console.info(`🎯 Mapeo kitsu encontrado: ${kitsuId} → ${kitsuImdbId}`);
+        return kitsuImdbId;
+      }
+    }
+    
+    // Para IDs numéricos sin prefijo, asumir Kitsu
     if (/^\d+$/.test(normalizedId)) {
       const kitsuImdbId = this.manualMappings.get(normalizedId);
       if (kitsuImdbId) {
-        console.info(`🎯 Mapeo kitsu encontrado: ${normalizedId} → ${kitsuImdbId}`);
+        console.info(`🎯 Mapeo kitsu numérico encontrado: ${normalizedId} → ${kitsuImdbId}`);
         return kitsuImdbId;
       }
     }
