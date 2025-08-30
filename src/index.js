@@ -7,6 +7,7 @@ import { addonBuilder, serveHTTP } from 'stremio-addon-sdk';
 import { addonConfig, manifest } from './config/addonConfig.js';
 import { CascadingMagnetRepository } from './infrastructure/repositories/CascadingMagnetRepository.js';
 import { StreamHandler } from './application/handlers/StreamHandler.js';
+import { kitsuMappingFallback } from './infrastructure/services/KitsuMappingFallback.js';
 
 /**
  * Clase principal que encapsula la lógica del addon.
@@ -52,6 +53,9 @@ class MagnetAddon {
 
     // 4. Configurar rutas personalizadas para configuración de idioma
     this.#setupLanguageRoutes(streamHandler);
+    
+    // 5. Configurar rutas de diagnóstico (comentario informativo)
+    this.#setupDiagnosticRoutes();
   }
 
   /**
@@ -62,6 +66,15 @@ class MagnetAddon {
     // Almacenar referencia al streamHandler para uso en rutas personalizadas
     this.#streamHandler = streamHandler;
     this.#logger.info('Configuración de idioma disponible mediante métodos del StreamHandler.');
+  }
+
+  /**
+   * Configura rutas de diagnóstico simples
+   */
+  #setupDiagnosticRoutes() {
+    // Diagnóstico disponible en servidor independiente (puerto 3004)
+    // Usar: bun run scripts/diagnostic-server.js
+    this.#logger.info('Diagnóstico disponible en servidor independiente.');
   }
 
   /**

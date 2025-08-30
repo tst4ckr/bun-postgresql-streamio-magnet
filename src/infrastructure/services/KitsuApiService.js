@@ -1,5 +1,6 @@
 import Kitsu from 'kitsu';
 import { addonConfig } from '../../config/addonConfig.js';
+import { kitsuMappingFallback } from './KitsuMappingFallback.js';
 
 /**
  * Servicio para integración con la API de Kitsu
@@ -129,12 +130,19 @@ export class KitsuApiService {
   async getImdbIdFromKitsu(kitsuId) {
     try {
       const numericId = this.#extractNumericId(kitsuId);
-      if (!numericId) return null;
+      if (!numericId) {
+        console.warn(`ID de Kitsu inválido: ${kitsuId}`);
+        return null;
+      }
 
       const cacheKey = `imdb_${numericId}`;
       const cached = this.#getCachedData(cacheKey);
-      if (cached) return cached;
+      if (cached) {
+        console.info(`Mapeo IMDb encontrado en cache para ${kitsuId}: ${cached}`);
+        return cached;
+      }
 
+      console.info(`Consultando API de Kitsu para mapeo IMDb de ${kitsuId} (ID numérico: ${numericId})`);
       const response = await this.api.get(`anime/${numericId}/mappings`, {
         params: {
           filter: {
@@ -143,18 +151,44 @@ export class KitsuApiService {
         }
       });
 
-      if (!response?.data?.length) return null;
+      console.info(`Respuesta de API Kitsu para ${kitsuId}:`, {
+        hasData: !!response?.data,
+        dataLength: response?.data?.length || 0,
+        data: response?.data
+      });
+
+      if (!response?.data?.length) {
+        console.warn(`No se encontraron mapeos IMDb para ${kitsuId} en la API de Kitsu`);
+        
+        // Intentar mapeo manual de respaldo
+        const fallbackImdbId = kitsuMappingFallback.getImdbIdFromKitsu(numericId);
+        if (fallbackImdbId) {
+          console.info(`✅ Usando mapeo manual de respaldo: ${kitsuId} → ${fallbackImdbId}`);
+          this.#setCachedData(cacheKey, fallbackImdbId);
+          return fallbackImdbId;
+        }
+        
+        return null;
+      }
 
       const mapping = response.data[0];
       const imdbId = mapping.externalId ? `tt${mapping.externalId}` : null;
       
       if (imdbId) {
+        console.info(`Mapeo exitoso: ${kitsuId} → ${imdbId}`);
         this.#setCachedData(cacheKey, imdbId);
+      } else {
+        console.warn(`Mapeo encontrado pero sin externalId válido para ${kitsuId}:`, mapping);
       }
 
       return imdbId;
     } catch (error) {
-      console.warn(`Error obteniendo IMDb ID para ${kitsuId}:`, error.message);
+      console.error(`Error obteniendo IMDb ID para ${kitsuId}:`, {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      });
       return null;
     }
   }
