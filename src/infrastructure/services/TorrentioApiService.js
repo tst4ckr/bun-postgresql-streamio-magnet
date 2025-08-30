@@ -594,19 +594,22 @@ export class TorrentioApiService {
         providers: 'mejortorrent,wolfmax4k,cinecalidad',
         sort: 'seeders',
         qualityFilter: 'scr,cam,unknown',
-        limit: 2
+        limit: 2,
+        priorityLanguage: 'spanish' // Priorizar contenido en español
       },
       series: {
         providers: 'horriblesubs,nyaasi,tokyotosho,anidex,mejortorrent,wolfmax4k,cinecalidad',
         sort: 'seeders',
         qualityFilter: 'scr,cam,unknown',
-        limit: 2
+        limit: 2,
+        priorityLanguage: 'spanish' // Priorizar contenido en español
       },
       anime: {
         providers: 'horriblesubs,nyaasi,tokyotosho,anidex,mejortorrent,wolfmax4k,cinecalidad',
         sort: 'seeders',
         qualityFilter: 'unknown',
-        limit: 2
+        limit: 2,
+        priorityLanguage: 'spanish' // Priorizar contenido en español
       }
     };
   }
@@ -629,9 +632,44 @@ export class TorrentioApiService {
       `sort=${config.sort}`,
       `qualityfilter=${config.qualityFilter}`,
       `limit=${config.limit}`
-    ].join('|');
+    ];
     
-    return `${cleanBaseUrl}/${params}`;
+    // Agregar idioma prioritario si está configurado
+    if (config.priorityLanguage) {
+      params.push(`lang=${config.priorityLanguage}`);
+    }
+    
+    return `${cleanBaseUrl}/${params.join('|')}`;
+  }
+
+  /**
+   * Configura el idioma prioritario para todos los tipos de contenido.
+   * @param {string} language - Código de idioma (spanish, latino, english, etc.)
+   * @public
+   */
+  setPriorityLanguage(language) {
+    const validLanguages = ['spanish', 'latino', 'english', 'french', 'portuguese', 'russian', 'japanese', 'korean', 'chinese', 'german', 'italian', 'dutch'];
+    
+    if (!validLanguages.includes(language.toLowerCase())) {
+      this.#logger.warn(`Idioma no válido: ${language}. Idiomas soportados: ${validLanguages.join(', ')}`);
+      return;
+    }
+    
+    // Actualizar configuración para todos los tipos de contenido
+    Object.keys(this.#providerConfigs).forEach(type => {
+      this.#providerConfigs[type].priorityLanguage = language.toLowerCase();
+    });
+    
+    this.#logger.info(`Idioma prioritario configurado a: ${language}`);
+  }
+
+  /**
+   * Obtiene el idioma prioritario actual.
+   * @returns {string|null} Idioma prioritario configurado
+   * @public
+   */
+  getPriorityLanguage() {
+    return this.#providerConfigs.movie?.priorityLanguage || null;
   }
 
   /**

@@ -48,6 +48,53 @@ class MagnetAddon {
     const streamHandler = new StreamHandler(this.#magnetRepository, this.#config, this.#logger);
     this.#addonBuilder.defineStreamHandler(streamHandler.createAddonHandler());
     this.#logger.info('Handler de streams configurado.');
+
+    // 4. Configurar rutas personalizadas para configuración de idioma
+    this.#setupLanguageRoutes(streamHandler);
+  }
+
+  /**
+   * Configura rutas personalizadas para configuración de idioma.
+   * @param {StreamHandler} streamHandler - Handler de streams
+   */
+  #setupLanguageRoutes(streamHandler) {
+    // Ruta para configurar idioma prioritario
+    this.#addonBuilder.defineResourceHandler('configure', async (args) => {
+      const { action, language } = args;
+      
+      if (action === 'set-language' && language) {
+        try {
+          streamHandler.setPriorityLanguage(language);
+          this.#logger.info(`Idioma prioritario configurado: ${language}`);
+          return {
+            success: true,
+            message: `Idioma prioritario configurado a: ${language}`,
+            currentLanguage: language
+          };
+        } catch (error) {
+          this.#logger.error(`Error al configurar idioma: ${error.message}`);
+          return {
+            success: false,
+            error: error.message
+          };
+        }
+      }
+      
+      if (action === 'get-language') {
+        const currentLanguage = streamHandler.getPriorityLanguage();
+        return {
+          success: true,
+          currentLanguage: currentLanguage || 'none'
+        };
+      }
+      
+      return {
+        success: false,
+        error: 'Acción no válida. Use: set-language o get-language'
+      };
+    });
+    
+    this.#logger.info('Rutas de configuración de idioma configuradas.');
   }
 
   /**
@@ -64,6 +111,8 @@ class MagnetAddon {
     const baseUrl = `http://127.0.0.1:${port}`;
     this.#logger.info(`✅ Addon iniciado en: ${baseUrl}`);
     this.#logger.info(`🔗 Manifiesto: ${baseUrl}/manifest.json`);
+    this.#logger.info(`🌐 Configurar idioma: ${baseUrl}/configure/set-language/spanish`);
+    this.#logger.info(`🔍 Ver idioma actual: ${baseUrl}/configure/get-language`);
   }
 
   /**

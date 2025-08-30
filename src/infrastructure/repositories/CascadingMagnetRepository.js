@@ -184,6 +184,22 @@ export class CascadingMagnetRepository extends MagnetRepository {
   }
 
   /**
+   * Configura el idioma prioritario para búsquedas de torrents.
+   * @param {string} language - Idioma a configurar (ej: 'spanish', 'english')
+   */
+  setPriorityLanguage(language) {
+    this.#torrentioApiService.setPriorityLanguage(language);
+  }
+
+  /**
+   * Obtiene el idioma prioritario configurado.
+   * @returns {string} Idioma prioritario actual
+   */
+  getPriorityLanguage() {
+    return this.#torrentioApiService.getPriorityLanguage();
+  }
+
+  /**
    * Obtiene estadísticas de los repositorios.
    * @returns {Promise<Object>} Estadísticas de cada fuente
    */

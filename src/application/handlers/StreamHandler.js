@@ -31,6 +31,32 @@ export class StreamHandler {
   }
 
   /**
+   * Configura el idioma prioritario para las búsquedas de torrents.
+   * @param {string} language - Código de idioma (spanish, latino, english, etc.)
+   * @public
+   */
+  setPriorityLanguage(language) {
+    if (this.#magnetRepository && typeof this.#magnetRepository.setPriorityLanguage === 'function') {
+      this.#magnetRepository.setPriorityLanguage(language);
+      this.#logger.info(`Idioma prioritario configurado en StreamHandler: ${language}`);
+    } else {
+      this.#logger.warn('El repositorio no soporta configuración de idioma prioritario');
+    }
+  }
+
+  /**
+   * Obtiene el idioma prioritario actual.
+   * @returns {string|null} Idioma prioritario configurado
+   * @public
+   */
+  getPriorityLanguage() {
+    if (this.#magnetRepository && typeof this.#magnetRepository.getPriorityLanguage === 'function') {
+      return this.#magnetRepository.getPriorityLanguage();
+    }
+    return null;
+  }
+
+  /**
    * Crea el handler para el addon de Stremio.
    * @returns {Function} Handler function para defineStreamHandler.
    */

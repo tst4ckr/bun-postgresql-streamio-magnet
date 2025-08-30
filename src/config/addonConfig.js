@@ -40,6 +40,10 @@ const config = {
         name: 'stream',
         types: ['movie', 'series', 'anime'],
         idPrefixes: ['tt', 'kitsu:']
+      },
+      {
+        name: 'configure',
+        types: ['other']
       }
     ],
     types: ['movie', 'series', 'anime'],
