@@ -109,24 +109,7 @@ export class UnifiedIdService {
         return result;
       }
 
-      // Estrategia 2: Mapeo manual de fallback
-      const fallbackResult = this.fallbackService.getImdbIdFromKitsu(kitsuId);
-      if (fallbackResult) {
-        const metadata = this.fallbackService.getAnimeMetadata(kitsuId);
-        const result = {
-          success: true,
-          convertedId: fallbackResult,
-          method: 'manual_mapping',
-          metadata: { 
-            source: 'Mapeo manual verificado',
-            animeData: metadata
-          }
-        };
-        this.#setCachedConversion(cacheKey, fallbackResult, result.metadata);
-        return result;
-      }
-
-      // No se encontró mapeo
+      // No se encontró mapeo en la API
       return {
         success: false,
         convertedId: null,

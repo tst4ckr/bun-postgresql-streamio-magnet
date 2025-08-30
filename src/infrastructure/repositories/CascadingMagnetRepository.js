@@ -15,23 +15,27 @@ import { unifiedIdService } from '../services/UnifiedIdService.js';
 export class CascadingMagnetRepository extends MagnetRepository {
   #primaryRepository;
   #secondaryRepository;
+  #animeRepository;
   #torrentioApiService;
   #logger;
   #isInitialized = false;
   #secondaryCsvPath;
+  #animeCsvPath;
   #idService;
 
   /**
    * @param {string} primaryCsvPath - Ruta del archivo magnets.csv principal
    * @param {string} secondaryCsvPath - Ruta del archivo torrentio.csv secundario
+   * @param {string} animeCsvPath - Ruta del archivo anime.csv para contenido de anime
    * @param {string} torrentioApiUrl - URL base de la API de Torrentio
    * @param {Object} logger - Logger para trazabilidad
    * @param {number} timeout - Timeout para operaciones remotas
    */
-  constructor(primaryCsvPath, secondaryCsvPath, torrentioApiUrl, logger = console, timeout = 30000, idService = unifiedIdService) {
+  constructor(primaryCsvPath, secondaryCsvPath, animeCsvPath, torrentioApiUrl, logger = console, timeout = 30000, idService = unifiedIdService) {
     super();
     this.#logger = logger;
     this.#secondaryCsvPath = secondaryCsvPath;
+    this.#animeCsvPath = animeCsvPath;
     this.#idService = idService;
     
     // Repositorio principal (magnets.csv)
@@ -39,6 +43,9 @@ export class CascadingMagnetRepository extends MagnetRepository {
     
     // Repositorio secundario (torrentio.csv)
     this.#secondaryRepository = new CSVMagnetRepository(secondaryCsvPath, logger);
+    
+    // Repositorio de anime (anime.csv)
+    this.#animeRepository = new CSVMagnetRepository(animeCsvPath, logger);
     
     // Servicio de API externa
     this.#torrentioApiService = new TorrentioApiService(
@@ -63,6 +70,9 @@ export class CascadingMagnetRepository extends MagnetRepository {
       
       // Inicializar repositorio secundario
       await this.#initializeRepository(this.#secondaryRepository, 'torrentio.csv');
+      
+      // Inicializar repositorio anime
+      await this.#initializeRepository(this.#animeRepository, 'anime.csv');
       
       this.#isInitialized = true;
       this.#logger.info('Repositorios en cascada inicializados correctamente');
@@ -126,7 +136,19 @@ export class CascadingMagnetRepository extends MagnetRepository {
       return secondaryResults;
     }
     
-    // Paso 3: Buscar en API de Torrentio
+    // Paso 3: Buscar en anime.csv (repositorio anime)
+    const animeResults = await this.#searchInRepository(
+      this.#animeRepository,
+      imdbId,
+      'anime.csv'
+    );
+    
+    if (animeResults.length > 0) {
+      this.#logger.info(`Encontrados ${animeResults.length} magnets en anime.csv para ${imdbId}`);
+      return animeResults;
+    }
+    
+    // Paso 4: Buscar en API de Torrentio
     this.#logger.info(`No se encontraron magnets locales, consultando API Torrentio para ${imdbId} (${type})`);
     const apiResults = await this.#torrentioApiService.searchMagnetsByImdbId(imdbId, type);
     

@@ -35,6 +35,7 @@ class MagnetAddon {
     this.#magnetRepository = new CascadingMagnetRepository(
       this.#config.repository.primaryCsvPath,
       this.#config.repository.secondaryCsvPath,
+      this.#config.repository.animeCsvPath,
       this.#config.repository.torrentioApiUrl,
       this.#logger,
       this.#config.repository.timeout

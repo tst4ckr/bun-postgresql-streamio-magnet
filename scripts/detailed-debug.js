@@ -26,6 +26,7 @@ async function debugFullFlow() {
   const repository = new CascadingMagnetRepository(
     addonConfig.repository.primaryCsvPath,
     addonConfig.repository.secondaryCsvPath,
+    addonConfig.repository.animeCsvPath,
     addonConfig.repository.torrentioApiUrl,
     logger,
     addonConfig.repository.timeout

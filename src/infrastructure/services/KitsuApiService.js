@@ -1,6 +1,5 @@
 import Kitsu from 'kitsu';
 import { addonConfig } from '../../config/addonConfig.js';
-import { kitsuMappingFallback } from './KitsuMappingFallback.js';
 
 /**
  * Servicio para integración con la API de Kitsu
@@ -165,15 +164,6 @@ export class KitsuApiService {
 
       if (!response?.data?.length) {
         console.warn(`No se encontraron mapeos IMDb para ${kitsuId} en la API de Kitsu`);
-        
-        // Intentar mapeo manual de respaldo
-        const fallbackImdbId = kitsuMappingFallback.getImdbIdFromKitsu(numericId);
-        if (fallbackImdbId) {
-          console.info(`✅ Usando mapeo manual de respaldo: ${kitsuId} → ${fallbackImdbId}`);
-          this.#setCachedData(cacheKey, fallbackImdbId);
-          return fallbackImdbId;
-        }
-        
         return null;
       }
 

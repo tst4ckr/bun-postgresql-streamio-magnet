@@ -192,6 +192,7 @@ class TorrentioIntegrationTester {
       const cascadingRepo = new CascadingMagnetRepository(
         this.#config.magnetsPath,
         this.#config.torrentioPath,
+        this.#config.animePath || 'data/anime.csv',
         this.#config.torrentioUrl,
         this.#logger,
         this.#config.timeout

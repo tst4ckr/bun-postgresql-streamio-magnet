@@ -20,6 +20,7 @@ class KitsuIssueDiagnoser {
     this.repository = new CascadingMagnetRepository(
       addonConfig.repository.primaryCsvPath,
       addonConfig.repository.secondaryCsvPath,
+      addonConfig.repository.animeCsvPath,
       addonConfig.repository.torrentioApiUrl,
       this.logger,
       addonConfig.repository.timeout
