@@ -56,10 +56,10 @@ export class TorrentioApiService {
   }
 
   /**
-   * Busca magnets por ID de IMDb usando la API de Torrentio
+   * Busca magnets por cualquier tipo de ID usando la API de Torrentio
+   * Soporta IMDb, TMDB, TVDB, Kitsu y otros IDs
    * Soporta películas, series y anime con detección automática de tipo
-   * Incluye soporte mejorado para IDs de Kitsu con mapeo automático
-   * @param {string} imdbId - ID de IMDb (ej: 'tt1234567') - Kitsu IDs deben ser mapeados previamente
+   * @param {string} contentId - ID del contenido (ej: 'tt1234567', 'tmdb:12345', 'tvdb:67890', 'kitsu:12345')
    * @param {string} type - Tipo de contenido ('movie', 'series', 'anime', 'auto' para detección automática)
    * @param {number} season - Temporada (requerido para series/anime)
    * @param {number} episode - Episodio (requerido para series/anime)
@@ -74,23 +74,26 @@ export class TorrentioApiService {
    *   - season: Temporada (solo para series/anime)
    *   - episode: Episodio (solo para series/anime)
    */
-  async searchMagnetsByImdbId(imdbId, type = 'auto', season = null, episode = null) {
+  async searchMagnetsById(contentId, type = 'auto', season = null, episode = null) {
     try {
-      // Validar que sea un IMDb ID válido (Kitsu IDs deben ser mapeados previamente)
-      if (!imdbId || !imdbId.startsWith('tt')) {
-        this.#log('warn', `ID inválido para Torrentio API: ${imdbId}. Se requiere IMDb ID.`);
+      // Validar que tengamos un ID válido
+      if (!contentId || typeof contentId !== 'string') {
+        this.#log('warn', `ID inválido para Torrentio API: ${contentId}`);
         return [];
       }
       
       // Detectar tipo automáticamente si es necesario
-      const detectedType = type === 'auto' ? this.#detectContentType(imdbId, season, episode) : type;
-      this.#log('info', `Buscando magnets en API Torrentio para: ${imdbId} (${detectedType})`);
+      const detectedType = type === 'auto' ? this.#detectContentType(contentId, season, episode) : type;
+      this.#log('info', `Buscando magnets en API Torrentio para: ${contentId} (${detectedType})`);
+      
+      // Procesar el ID para obtener el formato correcto para Torrentio
+      const { processedId } = this.#processContentId(contentId);
       
       // Construir ID según el tipo de contenido
-      let streamId = imdbId;
+      let finalStreamId = processedId;
       if ((detectedType === 'series' || detectedType === 'anime') && season !== null && episode !== null) {
-        streamId = `${imdbId}:${season}:${episode}`;
-        this.#log('info', `Formato de serie/anime: ${streamId}`);
+        finalStreamId = `${processedId}:${season}:${episode}`;
+        this.#log('info', `Formato de serie/anime: ${finalStreamId}`);
       }
       
       // Construir URL según el tipo de contenido con proveedores optimizados
@@ -111,42 +114,55 @@ export class TorrentioApiService {
           break;
       }
       
-      const streamUrl = `${optimizedBaseUrl}/stream/${urlContentType}/${streamId}.json`;
+      const streamUrl = `${optimizedBaseUrl}/stream/${urlContentType}/${finalStreamId}.json`;
       this.#log('info', `URL construida: ${streamUrl}`);
       const response = await this.#fetchWithTimeout(streamUrl);
       
       if (!response.ok) {
-        this.#logger.warn(`API Torrentio respondió con status ${response.status} para ${streamId}`);
+        this.#logger.warn(`API Torrentio respondió con status ${response.status} para ${finalStreamId}`);
         return [];
       }
       
       const data = await response.json();
-      const magnets = this.#parseStreamsToMagnets(data.streams || [], imdbId, detectedType, season, episode);
+      const magnets = this.#parseStreamsToMagnets(data.streams || [], contentId, detectedType, season, episode);
       
       if (magnets.length > 0) {
         await this.#saveMagnetsToFile(magnets);
-        this.#logger.info(`Guardados ${magnets.length} magnets de API Torrentio para ${streamId}`);
+        this.#logger.info(`Guardados ${magnets.length} magnets de API Torrentio para ${finalStreamId}`);
       }
       
       return magnets;
       
     } catch (error) {
-      this.#logger.error(`Error al consultar API Torrentio para ${imdbId}:`, error);
+      this.#logger.error(`Error al consultar API Torrentio para ${contentId}:`, error);
       return [];
     }
+  }
+
+  /**
+   * Busca magnets por ID de IMDb usando la API de Torrentio
+   * @deprecated Use searchMagnetsById en su lugar
+   * @param {string} imdbId - ID de IMDb (ej: 'tt1234567')
+   * @param {string} type - Tipo de contenido
+   * @param {number} season - Temporada
+   * @param {number} episode - Episodio
+   * @returns {Promise<Array>} Array de magnets
+   */
+  async searchMagnetsByImdbId(imdbId, type = 'auto', season = null, episode = null) {
+    return this.searchMagnetsById(imdbId, type, season, episode);
   }
 
   /**
    * Convierte streams de Torrentio a objetos Magnet.
    * @private
    * @param {Array} streams - Streams de la respuesta de Torrentio
-   * @param {string} imdbId - ID de IMDb
+   * @param {string} contentId - ID del contenido (IMDb, TMDB, TVDB, Kitsu, etc.)
    * @param {string} type - Tipo de contenido
    * @param {number} season - Temporada (para series/anime)
    * @param {number} episode - Episodio (para series/anime)
    * @returns {Magnet[]} Array de magnets
    */
-  #parseStreamsToMagnets(streams, imdbId, type, season = null, episode = null) {
+  #parseStreamsToMagnets(streams, contentId, type, season = null, episode = null) {
     const magnets = [];
     
     for (const stream of streams) {
@@ -175,11 +191,11 @@ export class TorrentioApiService {
           ? { season, episode }
           : this.#extractEpisodeInfo(streamTitle, type);
         
-        // Extraer solo el ID base de IMDb (sin temporada:episodio)
-        const baseImdbId = imdbId.split(':')[0];
+        // Extraer solo el ID base (sin temporada:episodio)
+        const baseContentId = contentId.split(':')[0];
         
         const magnetData = {
-          imdb_id: baseImdbId,
+          content_id: baseContentId,
           name: fullName,
           magnet: magnetUri,
           quality: quality,
@@ -198,7 +214,7 @@ export class TorrentioApiService {
         magnets.push(magnet);
         
       } catch (error) {
-        this.#logger.error(`Error al procesar stream de Torrentio para ${imdbId}:`, error, stream);
+        this.#logger.error(`Error al procesar stream de Torrentio para ${contentId}:`, error, stream);
       }
     }
     
@@ -540,20 +556,20 @@ export class TorrentioApiService {
    * Detecta automáticamente el tipo de contenido basado en parámetros.
    * Incluye detección mejorada de anime usando múltiples heurísticas.
    * @private
-   * @param {string} id - ID del contenido
+   * @param {string} id - ID del contenido (IMDb, TMDB, TVDB, Kitsu, etc.)
    * @param {number} season - Temporada
    * @param {number} episode - Episodio
    * @returns {string} Tipo detectado ('movie', 'series', 'anime')
    */
   #detectContentType(id, season, episode) {
-    // Detectar anime por ID de Kitsu (siempre anime si viene de Kitsu)
+    // Detectar anime por cualquier ID que contenga indicadores de anime
     if (this.#isKitsuDerivedContent(id)) {
       return 'anime';
     }
     
     // Si tiene temporada y episodio, es serie o anime
     if (season !== null && episode !== null) {
-      // Usar heurísticas adicionales para detectar anime en IMDb IDs
+      // Usar heurísticas adicionales para detectar anime
       if (this.#isLikelyAnimeContent(id, season, episode)) {
         return 'anime';
       }
@@ -563,6 +579,62 @@ export class TorrentioApiService {
     
     // Por defecto, asumir que es película
     return 'movie';
+  }
+
+  /**
+   * Procesa cualquier tipo de ID (IMDb, TMDB, TVDB, Kitsu, AniList, MAL) y lo convierte al formato adecuado para Torrentio.
+   * @private
+   * @param {string} contentId - ID del contenido (puede ser cualquier tipo)
+   * @returns {Object} Objeto con el ID procesado y el tipo detectado
+   */
+  #processContentId(contentId) {
+    if (!contentId) {
+      throw new Error('ID de contenido no proporcionado');
+    }
+
+    const originalId = contentId.trim();
+    
+    // Detectar el tipo de ID basado en patrones
+    let processedId = originalId;
+    let idType = 'imdb'; // Por defecto
+
+    // IMDb ID (tt + números)
+    if (originalId.match(/^tt\d+$/i)) {
+      processedId = originalId;
+      idType = 'imdb';
+    }
+    // TMDB ID (solo números, opcionalmente con prefijo tmdb:)
+    else if (originalId.match(/^(?:tmdb:)?\d+$/i)) {
+      processedId = originalId.replace(/^tmdb:/i, '');
+      idType = 'tmdb';
+    }
+    // TVDB ID (solo números, opcionalmente con prefijo tvdb:)
+    else if (originalId.match(/^(?:tvdb:)?\d+$/i)) {
+      processedId = originalId.replace(/^tvdb:/i, '');
+      idType = 'tvdb';
+    }
+    // Kitsu ID (números o slug, opcionalmente con prefijo kitsu:)
+    else if (originalId.match(/^(?:kitsu:)?(?:\d+|[\w-]+)$/i)) {
+      processedId = originalId.replace(/^kitsu:/i, '');
+      idType = 'kitsu';
+    }
+    // AniList ID (solo números, opcionalmente con prefijo anilist:)
+    else if (originalId.match(/^(?:anilist:)?\d+$/i)) {
+      processedId = originalId.replace(/^anilist:/i, '');
+      idType = 'anilist';
+    }
+    // MyAnimeList ID (solo números, opcionalmente con prefijo mal:)
+    else if (originalId.match(/^(?:mal:)?\d+$/i)) {
+      processedId = originalId.replace(/^mal:/i, '');
+      idType = 'mal';
+    }
+
+    return {
+      originalId,
+      processedId,
+      idType,
+      isValid: true
+    };
   }
 
   /**
