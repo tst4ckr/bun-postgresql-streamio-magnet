@@ -139,10 +139,11 @@ export class StreamHandler {
     }
 
     // Usar validación dinámica para verificar el ID
+    // Para stream requests no forzamos conversión a IMDb ya que Torrentio maneja anime IDs
     const validationResult = await this.#validationService.validateContentId(
       args.id, 
       'stream_request',
-      { targetFormat: 'imdb', strictMode: false }
+      { strictMode: false }
     );
     
     if (!validationResult.isValid) {

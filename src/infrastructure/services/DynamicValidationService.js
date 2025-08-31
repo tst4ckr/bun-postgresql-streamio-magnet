@@ -70,7 +70,7 @@ export class DynamicValidationService {
       ['stream_request', {
         description: 'Validación para peticiones de stream',
         requiredTypes: ['imdb', 'imdb_series', 'kitsu', 'mal', 'anilist', 'anidb'],
-        allowConversion: true,
+        allowConversion: false,
         strictMode: false
       }],
       ['api_endpoint', {
