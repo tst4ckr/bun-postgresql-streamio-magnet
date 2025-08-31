@@ -142,7 +142,7 @@ export class TorrentioApiService {
       return magnets;
       
     } catch (error) {
-      this.#logger.error(`Error al consultar API Torrentio para ${contentId}:`, error);
+      this.#log('error', `Error al consultar API Torrentio para ${contentId}:`, error);
       return [];
     }
   }
@@ -228,7 +228,7 @@ export class TorrentioApiService {
         magnets.push(magnet);
         
       } catch (error) {
-        this.#logger.error(`Error al procesar stream de Torrentio para ${contentId}:`, error, stream);
+        this.#log('error', `Error al procesar stream de Torrentio para ${contentId}:`, { error, stream });
       }
     }
     
@@ -245,11 +245,36 @@ export class TorrentioApiService {
   #buildFullStreamName(streamName, streamTitle) {
     if (!streamTitle) return streamName;
     
-    // Extraer el nombre del archivo del title (primera línea)
     const titleLines = streamTitle.split('\n');
-    const filename = titleLines[0] || '';
+    const firstLine = titleLines[0] || '';
     
-    return filename || streamName;
+    // Lista de nombres genéricos que no son útiles
+    const genericNames = [
+      'emule descargas',
+      'torrent download',
+      'download',
+      'descargas',
+      'torrentio'
+    ];
+    
+    // Si la primera línea es genérica, buscar el nombre real en las siguientes líneas
+    if (genericNames.some(generic => firstLine.toLowerCase().includes(generic.toLowerCase()))) {
+      // Buscar líneas que contengan nombres de archivo (con extensiones)
+      for (let i = 1; i < titleLines.length; i++) {
+        const line = titleLines[i].trim();
+        // Buscar líneas que parezcan nombres de archivo
+        if (line && (line.includes('.mkv') || line.includes('.mp4') || line.includes('.avi') || 
+                    line.length > 20 && !line.includes('💾') && !line.includes('👤'))) {
+          return line;
+        }
+      }
+      
+      // Si no encontramos un nombre de archivo, usar el streamName
+      return streamName;
+    }
+    
+    // Si la primera línea no es genérica, usarla
+    return firstLine || streamName;
   }
 
   /**
@@ -529,7 +554,7 @@ export class TorrentioApiService {
         appendFileSync(this.#torrentioFilePath, csvLine + '\n', 'utf8');
       }
     } catch (error) {
-      this.#logger.error('Error al guardar magnets en torrentio.csv:', error);
+      this.#log('error', 'Error al guardar magnets en torrentio.csv:', error);
     }
   }
 
