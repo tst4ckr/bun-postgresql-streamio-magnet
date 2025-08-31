@@ -168,7 +168,7 @@ export class TorrentioApiService {
     for (const stream of streams) {
       try {
         if (!stream.infoHash) {
-          this.#logger.debug(`Stream sin infoHash ignorado para ${imdbId}:`, stream);
+          this.#logger.debug(`Stream sin infoHash ignorado para ${contentId}:`, stream);
           continue;
         }
         
@@ -194,13 +194,19 @@ export class TorrentioApiService {
         // Extraer solo el ID base (sin temporada:episodio)
         const baseContentId = contentId.split(':')[0];
         
+        // Detectar tipo de ID y asignar campos apropiados
+        const { idType, imdbId } = this.#extractIdInfo(baseContentId);
+        
         const magnetData = {
           content_id: baseContentId,
           name: fullName,
           magnet: magnetUri,
-          quality: quality,
-          size: size,
+          quality: quality || 'unknown',
+          size: size || 'unknown',
           source: 'torrentio-api',
+          // Campos opcionales para compatibilidad
+          imdb_id: imdbId,
+          id_type: idType,
           // Información adicional de Torrentio
           fileIdx: stream.fileIdx,
           filename: filename,
@@ -536,7 +542,7 @@ export class TorrentioApiService {
     };
     
     return [
-      escapeCsv(magnet.imdb_id),
+      escapeCsv(magnet.content_id),
       escapeCsv(magnet.name),
       escapeCsv(magnet.magnet),
       escapeCsv(magnet.quality),
@@ -548,8 +554,50 @@ export class TorrentioApiService {
       escapeCsv(magnet.seeders || 0),
       escapeCsv(magnet.peers || 0),
       escapeCsv(magnet.season || ''),
-      escapeCsv(magnet.episode || '')
+      escapeCsv(magnet.episode || ''),
+      escapeCsv(magnet.imdb_id || ''),
+      escapeCsv(magnet.id_type || '')
     ].join(',');
+  }
+
+  /**
+   * Extrae información del ID para determinar tipo y campos de compatibilidad.
+   * @private
+   * @param {string} contentId - ID del contenido
+   * @returns {Object} Objeto con idType e imdbId
+   */
+  #extractIdInfo(contentId) {
+    if (!contentId) {
+      return { idType: 'imdb', imdbId: undefined };
+    }
+
+    // IMDb ID (tt + números)
+    if (contentId.match(/^tt\d+$/i)) {
+      return { idType: 'imdb', imdbId: contentId };
+    }
+    // TMDB ID (solo números, opcionalmente con prefijo tmdb:)
+    else if (contentId.match(/^(?:tmdb:)?\d+$/i)) {
+      return { idType: 'tmdb', imdbId: undefined };
+    }
+    // TVDB ID (solo números, opcionalmente con prefijo tvdb:)
+    else if (contentId.match(/^(?:tvdb:)?\d+$/i)) {
+      return { idType: 'tvdb', imdbId: undefined };
+    }
+    // Kitsu ID (números o slug, opcionalmente con prefijo kitsu:)
+    else if (contentId.match(/^(?:kitsu:)?(?:\d+|[\w-]+)$/i)) {
+      return { idType: 'kitsu', imdbId: undefined };
+    }
+    // AniList ID (solo números, opcionalmente con prefijo anilist:)
+    else if (contentId.match(/^(?:anilist:)?\d+$/i)) {
+      return { idType: 'anilist', imdbId: undefined };
+    }
+    // MAL ID (solo números, opcionalmente con prefijo mal:)
+    else if (contentId.match(/^(?:mal:)?\d+$/i)) {
+      return { idType: 'mal', imdbId: undefined };
+    }
+    
+    // Por defecto, asumir IMDb
+    return { idType: 'imdb', imdbId: undefined };
   }
 
   /**
@@ -775,7 +823,7 @@ export class TorrentioApiService {
         this.#logger.info(`Directorio creado: ${dir}`);
       }
       
-      const headers = 'imdb_id,name,magnet,quality,size,source,fileIdx,filename,provider,seeders,peers,season,episode\n';
+      const headers = 'content_id,name,magnet,quality,size,source,fileIdx,filename,provider,seeders,peers,season,episode,imdb_id,id_type\n';
       writeFileSync(this.#torrentioFilePath, headers, 'utf8');
       this.#logger.info(`Archivo torrentio.csv creado en: ${this.#torrentioFilePath}`);
     }

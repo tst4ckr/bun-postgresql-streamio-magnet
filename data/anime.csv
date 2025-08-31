@@ -1,4 +1,4 @@
-imdb_id,name,magnet,quality,size,source,provider,seeders,peers
-tt0112178,"Cowboy Bebop: The Movie","magnet:?xt=urn:btih:CB79A5B1D8E8F5A2E8D9F8A7B6C5D4E3F2A1B0C9D&dn=Cowboy+Bebop+The+Movie+2001+1080p+BluRay&tr=udp://tracker.openbittorrent.com:80",1080p,2.1GB,BluRay,YTS,1250,3200
-tt0988824,"Naruto","magnet:?xt=urn:btih:N4R7T0988A5B1D8E8F5A2E8D9F8A7B6C5D4E3F2A1&dn=Naruto+Complete+Series+720p&tr=udp://tracker.openbittorrent.com:80",720p,45.2GB,TV,HorribleSubs,890,2100
-tt2560140,"Attack on Titan","magnet:?xt=urn:btih:A2T5K60140A5B1D8E8F5A2E8D9F8A7B6C5D4E3F2A&dn=Attack+on+Titan+S1+1080p&tr=udp://tracker.openbittorrent.com:80",1080p,8.7GB,BluRay,SubsPlease,2100,4500
+content_id,name,magnet,quality,size,source,fileIdx,filename,provider,seeders,peers,season,episode,imdb_id,id_type
+tt0112178,"Cowboy Bebop: The Movie","magnet:?xt=urn:btih:CB79A5B1D8E8F5A2E8D9F8A7B6C5D4E3F2A1B0C9D&dn=Cowboy+Bebop+The+Movie+2001+1080p+BluRay&tr=udp://tracker.openbittorrent.com:80",1080p,2.1GB,BluRay,,"Cowboy Bebop: The Movie",YTS,1250,3200,,,tt0112178,imdb
+tt0988824,"Naruto","magnet:?xt=urn:btih:N4R7T0988A5B1D8E8F5A2E8D9F8A7B6C5D4E3F2A1&dn=Naruto+Complete+Series+720p&tr=udp://tracker.openbittorrent.com:80",720p,45.2GB,TV,,"Naruto",HorribleSubs,890,2100,,,tt0988824,imdb
+tt2560140,"Attack on Titan","magnet:?xt=urn:btih:A2T5K60140A5B1D8E8F5A2E8D9F8A7B6C5D4E3F2A&dn=Attack+on+Titan+S1+1080p&tr=udp://tracker.openbittorrent.com:80",1080p,8.7GB,BluRay,,"Attack on Titan",SubsPlease,2100,4500,,,tt2560140,imdb
