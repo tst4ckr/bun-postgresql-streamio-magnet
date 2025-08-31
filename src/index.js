@@ -7,6 +7,7 @@ import { addonBuilder, serveHTTP } from 'stremio-addon-sdk';
 import { addonConfig, manifest } from './config/addonConfig.js';
 import { CascadingMagnetRepository } from './infrastructure/repositories/CascadingMagnetRepository.js';
 import { StreamHandler } from './application/handlers/StreamHandler.js';
+import { EnhancedLogger } from './infrastructure/utils/EnhancedLogger.js';
 
 /**
  * Clase principal que encapsula la lógica del addon.
@@ -96,32 +97,12 @@ class MagnetAddon {
   }
 
   /**
-   * Crea un logger simple.
-   * @returns {Object} Logger.
+   * Crea un logger mejorado con seguimiento de archivos fuente.
+   * @returns {EnhancedLogger} Logger con trazabilidad completa.
    */
   #createLogger() {
     const { logLevel } = this.#config.logging;
-
-    return {
-      info: (message, ...args) => {
-        if (['info', 'debug'].includes(logLevel)) {
-          console.log(`[INFO] ${new Date().toISOString()} - ${message}`, ...args);
-        }
-      },
-      warn: (message, ...args) => {
-        if (['info', 'warn', 'debug'].includes(logLevel)) {
-          console.warn(`[WARN] ${new Date().toISOString()} - ${message}`, ...args);
-        }
-      },
-      error: (message, ...args) => {
-        console.error(`[ERROR] ${new Date().toISOString()} - ${message}`, ...args);
-      },
-      debug: (message, ...args) => {
-        if (logLevel === 'debug') {
-          console.log(`[DEBUG] ${new Date().toISOString()} - ${message}`, ...args);
-        }
-      }
-    };
+    return new EnhancedLogger(logLevel, true);
   }
 }
 

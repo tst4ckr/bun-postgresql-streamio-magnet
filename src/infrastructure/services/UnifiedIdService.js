@@ -5,10 +5,12 @@
  */
 
 import { idDetectorService } from './IdDetectorService.js';
+import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 
 export class UnifiedIdService {
   constructor(detectorService) {
     this.detectorService = detectorService;
+    this.enhancedLogger = new EnhancedLogger('info', true);
     
     // Cache para optimizar conversiones repetidas
     this.conversionCache = new Map();
@@ -64,7 +66,7 @@ export class UnifiedIdService {
       );
 
     } catch (error) {
-      console.error('Error procesando ID de contenido:', error);
+      this.enhancedLogger.error('Error procesando ID de contenido:', error);
       return this.#createProcessingResult(false, null, contentId, {
         error: 'Error interno durante el procesamiento',
         details: error.message
@@ -101,7 +103,7 @@ export class UnifiedIdService {
       };
 
     } catch (error) {
-      console.error(`Error convirtiendo Kitsu ID ${kitsuId}:`, error);
+      this.enhancedLogger.error(`Error convirtiendo Kitsu ID ${kitsuId}:`, error);
       return {
         success: false,
         convertedId: null,
@@ -213,18 +215,18 @@ export class UnifiedIdService {
 
       const externalSite = siteMapping[sourceType];
       if (!externalSite) {
-        console.warn(`Tipo de servicio no soportado: ${sourceType}`);
+        this.enhancedLogger.warn(`Tipo de servicio no soportado: ${sourceType}`);
         return null;
       }
 
-      console.info(`Buscando mapeo ${sourceType.toUpperCase()}→Kitsu→IMDb para ID: ${animeId}`);
+      this.enhancedLogger.info(`Buscando mapeo ${sourceType.toUpperCase()}→Kitsu→IMDb para ID: ${animeId}`);
       
       // Servicios Kitsu eliminados - conversión no disponible
-      console.warn(`Conversión ${sourceType.toUpperCase()}→IMDb no disponible - servicios Kitsu eliminados`);
+      this.enhancedLogger.warn(`Conversión ${sourceType.toUpperCase()}→IMDb no disponible - servicios Kitsu eliminados`);
       return null;
 
     } catch (error) {
-      console.error(`Error en mapeo ${sourceType.toUpperCase()}→IMDb para ${animeId}:`, error.message);
+      this.enhancedLogger.error(`Error en mapeo ${sourceType.toUpperCase()}→IMDb para ${animeId}:`, error.message);
       return null;
     }
   }

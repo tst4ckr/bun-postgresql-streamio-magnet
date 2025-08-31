@@ -6,6 +6,7 @@
 import { writeFileSync, appendFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import { Magnet } from '../../domain/entities/Magnet.js';
+import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 
 /**
  * Servicio para integración con la API de Torrentio de Stremio.
@@ -21,19 +22,26 @@ export class TorrentioApiService {
   #manifestCacheExpiry;
 
   /**
-   * Método auxiliar para logging seguro
+   * Método auxiliar para logging seguro con seguimiento de archivos fuente
    * @param {string} level - Nivel de log (info, warn, error, debug)
    * @param {string} message - Mensaje a loggear
    * @param {any} data - Datos adicionales
    */
   #log(level, message, data = null) {
+    // Si tenemos un logger personalizado, usarlo
     if (this.#logger && typeof this.#logger[level] === 'function') {
-      this.#logger[level](message, data);
-    } else {
-      if (data) {
-        console[level](message, data);
+      if (data !== null && data !== undefined) {
+        this.#logger[level](message, data);
       } else {
-        console[level](message);
+        this.#logger[level](message);
+      }
+    } else {
+      // Fallback a EnhancedLogger si no hay logger personalizado
+      const fallbackLogger = new EnhancedLogger('info', true);
+      if (data !== null && data !== undefined) {
+        fallbackLogger[level](message, data);
+      } else {
+        fallbackLogger[level](message);
       }
     }
   }
