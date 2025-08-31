@@ -770,7 +770,7 @@ export class TorrentioApiService {
     const config = this.#providerConfigs[type] || this.#providerConfigs.movie;
     
     // Extraer solo la URL base sin parámetros
-    const cleanBaseUrl = this.#baseUrl.split('/providers=')[0];
+    const cleanBaseUrl = this.#baseUrl.replace(/\/$/, "").split('/providers=')[0];
     
     // Construir parámetros en formato Torrentio (separados por |)
     const params = [
