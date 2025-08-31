@@ -34,8 +34,7 @@ ID de entrada → Detección → Conversión → ID IMDb → Stremio
 **Estrategias de Conversión:**
 1. **Cache:** Almacena conversiones previas por 24 horas
 2. **Mapeo Directo:** Usa `KitsuMappingFallback` para conversiones conocidas
-3. **API de Kitsu:** Consulta la API oficial cuando los mapeos manuales no están disponibles
-4. **Conversión Cruzada:** Convierte entre servicios de anime usando Kitsu como intermediario
+3. **Conversión Cruzada:** Convierte entre servicios de anime usando Kitsu como intermediario
 
 ### 3. KitsuMappingFallback - Mapeos de Respaldo
 

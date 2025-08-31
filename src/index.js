@@ -7,7 +7,6 @@ import { addonBuilder, serveHTTP } from 'stremio-addon-sdk';
 import { addonConfig, manifest } from './config/addonConfig.js';
 import { CascadingMagnetRepository } from './infrastructure/repositories/CascadingMagnetRepository.js';
 import { StreamHandler } from './application/handlers/StreamHandler.js';
-import { kitsuMappingFallback } from './infrastructure/services/KitsuMappingFallback.js';
 
 /**
  * Clase principal que encapsula la lógica del addon.

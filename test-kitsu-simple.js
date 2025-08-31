@@ -6,7 +6,6 @@
  */
 
 import { UnifiedIdService } from './src/infrastructure/services/UnifiedIdService.js';
-import { KitsuApiService } from './src/infrastructure/services/KitsuApiService.js';
 import { TorrentioApiService } from './src/infrastructure/services/TorrentioApiService.js';
 
 console.log('🎯 Iniciando prueba de flujo Kitsu...\n');
@@ -25,7 +24,6 @@ async function testKitsuFlow() {
         console.log('📦 Inicializando servicios...');
         
         const idService = new UnifiedIdService();
-        const kitsuService = new KitsuApiService();
         const torrentioService = new TorrentioApiService();
         
         console.log('✅ Servicios inicializados');
@@ -43,9 +41,8 @@ async function testKitsuFlow() {
                     console.log(`   ❌ No se pudo obtener IMDb ID para ${kitsuId}`);
                     
                     // Verificar directamente con Kitsu API
-                    const kitsuNumId = kitsuId.replace('kitsu:', '');
-                    const directImdb = await kitsuService.getImdbId(kitsuNumId);
-                    console.log(`   📞 Kitsu API directo: ${directImdb || 'No encontrado'}`);
+                const kitsuNumId = kitsuId.replace('kitsu:', '');
+                console.log(`   📞 Kitsu API directo: No implementado`);
                     continue;
                 }
                 
@@ -70,8 +67,7 @@ async function testKitsuFlow() {
                 
                 // Paso 3: Verificar caché
                 const kitsuNumId = kitsuId.replace('kitsu:', '');
-                const cachedImdb = await kitsuService.getImdbId(kitsuNumId);
-                console.log(`   ℹ️ Caché Kitsu-IMDb: ${cachedImdb || 'No en caché'}`);
+                console.log(`   ℹ️ Caché Kitsu-IMDb: No implementado`);
                 
             } catch (error) {
                 console.log(`   ❌ Error procesando ${kitsuId}: ${error.message}`);

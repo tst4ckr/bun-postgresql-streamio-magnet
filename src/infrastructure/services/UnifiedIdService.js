@@ -5,14 +5,10 @@
  */
 
 import { idDetectorService } from './IdDetectorService.js';
-import { kitsuApiService } from './KitsuApiService.js';
-import { kitsuMappingFallback } from './KitsuMappingFallback.js';
 
 export class UnifiedIdService {
-  constructor(detectorService, apiService, fallbackService) {
+  constructor(detectorService) {
     this.detectorService = detectorService;
-    this.apiService = apiService;
-    this.fallbackService = fallbackService;
     
     // Cache para optimizar conversiones repetidas
     this.conversionCache = new Map();
@@ -96,25 +92,12 @@ export class UnifiedIdService {
     }
 
     try {
-      // Estrategia 1: API de Kitsu
-      const apiResult = await this.apiService.getImdbIdFromKitsu(kitsuId);
-      if (apiResult) {
-        const result = {
-          success: true,
-          convertedId: apiResult,
-          method: 'kitsu_api',
-          metadata: { source: 'Kitsu API oficial' }
-        };
-        this.#setCachedConversion(cacheKey, apiResult, result.metadata);
-        return result;
-      }
-
-      // No se encontró mapeo en la API
+      // Servicios Kitsu eliminados - conversión no disponible
       return {
         success: false,
         convertedId: null,
-        method: 'none',
-        metadata: { error: 'No se encontró mapeo Kitsu->IMDb' }
+        method: 'not_supported',
+        metadata: { error: 'Conversión Kitsu->IMDb no disponible - servicios Kitsu eliminados' }
       };
 
     } catch (error) {
@@ -236,24 +219,9 @@ export class UnifiedIdService {
 
       console.info(`Buscando mapeo ${sourceType.toUpperCase()}→Kitsu→IMDb para ID: ${animeId}`);
       
-      // Obtener Kitsu ID desde el servicio externo
-      const kitsuId = await this.kitsuApiService.getKitsuIdFromExternal(animeId, externalSite);
-      if (!kitsuId) {
-        console.warn(`No se encontró Kitsu ID para ${sourceType}:${animeId}`);
-        return null;
-      }
-
-      console.info(`Encontrado mapeo ${sourceType}:${animeId} → ${kitsuId}`);
-      
-      // Obtener IMDb ID desde Kitsu ID
-      const imdbId = await this.kitsuApiService.getImdbIdFromKitsu(kitsuId);
-      if (!imdbId) {
-        console.warn(`No se encontró IMDb ID para ${kitsuId}`);
-        return null;
-      }
-
-      console.info(`Conversión exitosa: ${sourceType}:${animeId} → ${kitsuId} → ${imdbId}`);
-      return imdbId;
+      // Servicios Kitsu eliminados - conversión no disponible
+      console.warn(`Conversión ${sourceType.toUpperCase()}→IMDb no disponible - servicios Kitsu eliminados`);
+      return null;
 
     } catch (error) {
       console.error(`Error en mapeo ${sourceType.toUpperCase()}→IMDb para ${animeId}:`, error.message);
@@ -347,8 +315,4 @@ export class UnifiedIdService {
 }
 
 // Instancia singleton con dependencias inyectadas
-export const unifiedIdService = new UnifiedIdService(
-  idDetectorService,
-  kitsuApiService,
-  kitsuMappingFallback
-);
+export const unifiedIdService = new UnifiedIdService(idDetectorService);
