@@ -1,5 +1,106 @@
 # 🎬 Stremio Torrent Search Addon
 
+
+
+          
+Necesito consultar el MCP de Context7 antes de analizar el código fuente para entender el orden de almacenamiento y búsqueda de torrents en Torrentio.
+        
+            
+toolName: run_mcp
+            
+status: success
+          
+mcp: mcp.config.usrlocalmcp.memory search_nodes [object Object]
+ {"content":[{"type":"text","text":"{\n  \"entities\": [],\n  \"relations\": []\n}"}],"isError":null}
+          
+No hay información previa en el MCP sobre el orden de torrents en Torrentio. Buscaré en el código fuente para entender cómo se almacenan y buscan los torrents.
+        
+            
+toolName: search_codebase
+            
+status: success
+          
+query: orden de almacenamiento y búsqueda de torrents en Torrentio, TorrentioApiService, repositorios CSV, cascading repository
+          
+Ahora examinaré el archivo TorrentioApiService para entender mejor cómo se almacenan los torrents en el archivo CSV.
+        
+            
+toolName: view_files
+            
+status: success
+          
+            
+filePath: c:\Users\Ankel\Documents\HAZ-BUN-TV-PROD\bun-postgresql-streamio-magnet\src\infrastructure\services\TorrentioApiService.js
+          
+Ahora examinaré la función que guarda los magnets en el archivo CSV para entender el orden de almacenamiento.
+        
+            
+toolName: view_files
+            
+status: success
+          
+            
+filePath: c:\Users\Ankel\Documents\HAZ-BUN-TV-PROD\bun-postgresql-streamio-magnet\src\infrastructure\services\TorrentioApiService.js
+          
+Ahora documentaré en el MCP la información completa sobre el orden de almacenamiento y búsqueda de torrents en Torrentio.
+        
+            
+toolName: run_mcp
+            
+status: success
+          
+mcp: mcp.config.usrlocalmcp.memory create_entities [object Object]
+ {"content":[{"type":"text","text":"[\n  {\n    \"name\": \"Orden Torrents Torrentio\",\n    \"entityType\": \"sistema\",\n    \"observations\": [\n      \"El sistema utiliza una arquitectura de búsqueda en cascada con 4 niveles jerárquicos\",\n      \"Nivel 1: magnets.csv (repositorio principal) - primera búsqueda\",\n      \"Nivel 2: torrentio.csv (repositorio secundario) - segunda búsqueda\",\n      \"Nivel 3: anime.csv (repositorio anime) - tercera búsqueda\",\n      \"Nivel 4: API Torrentio externa - última búsqueda\",\n      \"Los torrents se almacenan en formato CSV unificado de 15 campos\",\n      \"Orden de campos CSV: content_id,name,magnet,quality,size,source,fileIdx,filename,provider,seeders,peers,season,episode,imdb_id,id_type\",\n      \"Los nuevos torrents de la API se guardan automáticamente en torrentio.csv\",\n      \"El sistema reinicializa el repositorio secundario después de obtener nuevos datos\",\n      \"Búsqueda optimizada: se detiene en el primer nivel que encuentre resultados\"\n    ]\n  }\n]"}],"isError":null}
+          
+## Orden de Almacenamiento y Búsqueda de Torrents en Torrentio
+
+El sistema utiliza una **arquitectura de búsqueda en cascada** con 4 niveles jerárquicos que optimiza el rendimiento y garantiza la disponibilidad de contenido:
+
+### 🔍 Orden de Búsqueda (Cascada)
+
+1. **Nivel 1: <mcfile name="magnets.csv" path="data/magnets.csv"></mcfile>** (Repositorio Principal)
+   - Primera búsqueda en el repositorio local principal
+   - Contiene torrents curados y de alta calidad
+   - Si encuentra resultados, se detiene aquí
+
+2. **Nivel 2: <mcfile name="torrentio.csv" path="data/torrentio.csv"></mcfile>** (Repositorio Secundario)
+   - Segunda búsqueda si no hay resultados en magnets.csv
+   - Contiene torrents obtenidos previamente de la API Torrentio
+   - Actúa como caché de búsquedas anteriores
+
+3. **Nivel 3: <mcfile name="anime.csv" path="data/anime.csv"></mcfile>** (Repositorio Anime)
+   - Tercera búsqueda especializada en contenido anime
+   - Optimizado para IDs de anime (Kitsu, MAL, AniList, AniDB)
+   - Maneja episodios y temporadas específicas
+
+4. **Nivel 4: API Torrentio Externa**
+   - Última búsqueda cuando no hay resultados locales
+   - Consulta directa a la API de Torrentio
+   - Los resultados se guardan automáticamente en torrentio.csv
+
+### 💾 Almacenamiento de Torrents
+
+**Formato CSV Unificado (15 campos):**
+```
+content_id,name,magnet,quality,size,source,fileIdx,filename,provider,seeders,peers,season,episode,imdb_id,id_type
+```
+
+**Proceso de Almacenamiento:**
+- Los nuevos torrents de la API se almacenan en <mcfile name="torrentio.csv" path="data/torrentio.csv"></mcfile>
+- Se utiliza `appendFileSync` para agregar líneas al final del archivo
+- Cada magnet se convierte a formato CSV con escape de caracteres especiales
+- El sistema reinicializa el repositorio secundario después de obtener nuevos datos
+
+### ⚡ Optimizaciones
+
+- **Búsqueda eficiente**: Se detiene en el primer nivel que encuentre resultados
+- **Caché inteligente**: Los resultados de API se guardan para futuras consultas
+- **Compatibilidad de IDs**: Soporte para IMDb, TMDB, Kitsu, MAL, AniList, AniDB
+- **Indexación dual**: Búsqueda por `content_id` e `imdb_id` para compatibilidad
+
+Este sistema garantiza respuestas rápidas priorizando fuentes locales y manteniendo un respaldo completo a través de la API externa de Torrentio.
+        
+        
 Addon profesional de Stremio para búsqueda de torrents en múltiples proveedores españoles, desarrollado con Clean Architecture y Domain-Driven Design.
 
 ## 🌟 Características
