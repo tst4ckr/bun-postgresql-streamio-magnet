@@ -31,9 +31,13 @@ export class CascadingMagnetRepository extends MagnetRepository {
    */
   #log(level, message, data = null) {
     if (this.#logger && typeof this.#logger[level] === 'function') {
-      this.#logger[level](message, data);
+      if (data !== null && data !== undefined) {
+        this.#logger[level](message, data);
+      } else {
+        this.#logger[level](message);
+      }
     } else {
-      if (data) {
+      if (data !== null && data !== undefined) {
         console[level](message, data);
       } else {
         console[level](message);
