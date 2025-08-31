@@ -1,11 +1,14 @@
 import { z } from 'zod';
 
 const MagnetSchema = z.object({
-  imdb_id: z.string().regex(/^tt\d+$/),
+  content_id: z.string(),
   name: z.string(),
   magnet: z.string().startsWith('magnet:?xt=urn:btih:'),
   quality: z.string(),
   size: z.string(),
+  // Campos opcionales para compatibilidad hacia atrás
+  imdb_id: z.string().regex(/^tt\d+$/).optional(),
+  id_type: z.enum(['imdb', 'tmdb', 'tvdb', 'kitsu', 'anilist', 'mal']).optional(),
 });
 
 export class Magnet {

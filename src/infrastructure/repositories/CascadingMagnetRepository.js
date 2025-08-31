@@ -172,7 +172,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
     
     // Paso 4: Buscar en API de Torrentio
     this.#log('info', `No se encontraron magnets locales, consultando API Torrentio para ${imdbId} (${type})`);
-    const apiResults = await this.#torrentioApiService.searchMagnetsByImdbId(imdbId, type);
+    const apiResults = await this.#torrentioApiService.searchMagnetsById(imdbId, type);
     
     if (apiResults.length > 0) {
       this.#log('info', `Encontrados ${apiResults.length} magnets en API Torrentio para ${imdbId}`);
@@ -201,36 +201,65 @@ export class CascadingMagnetRepository extends MagnetRepository {
       await this.initialize();
     }
     
-    this.#log('info', `Búsqueda unificada iniciada para ID: ${contentId}`);
+    this.#log('info', `Búsqueda en cascada iniciada para content ID: ${contentId} (${type})`);
     
-    try {
-      // Procesar ID usando el servicio unificado
-      const processingResult = await this.#idService.processContentId(contentId, 'imdb');
+    // Paso 1: Buscar en repositorio primario (magnets.csv)
+    const primaryResults = await this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv');
+    if (primaryResults.length > 0) {
+      this.#log('info', `Encontrados ${primaryResults.length} magnets en repositorio primario para ${contentId}`);
+      return primaryResults;
+    }
+    
+    // Paso 2: Buscar en repositorio secundario (torrentio.csv)
+    const secondaryResults = await this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv');
+    if (secondaryResults.length > 0) {
+      this.#log('info', `Encontrados ${secondaryResults.length} magnets en repositorio secundario para ${contentId}`);
+      return secondaryResults;
+    }
+    
+    // Paso 3: Buscar en repositorio de anime (anime.csv)
+    const animeResults = await this.#searchInRepositoryByContentId(this.#animeRepository, contentId, 'anime.csv');
+    if (animeResults.length > 0) {
+      this.#log('info', `Encontrados ${animeResults.length} magnets en repositorio de anime para ${contentId}`);
+      return animeResults;
+    }
+    
+    // Paso 4: Buscar en API de Torrentio
+    this.#log('info', `No se encontraron magnets locales, consultando API Torrentio para ${contentId} (${type})`);
+    const apiResults = await this.#torrentioApiService.searchMagnetsById(contentId, type);
+    
+    if (apiResults.length > 0) {
+      this.#log('info', `Encontrados ${apiResults.length} magnets en API Torrentio para ${contentId}`);
       
-      if (!processingResult.success) {
-        this.#log('error', `Error procesando ID ${contentId}: ${processingResult.error || processingResult.details}`);
-        throw new MagnetNotFoundError(contentId);
-      }
+      // Reinicializar repositorio secundario para incluir nuevos datos
+      await this.#reinitializeSecondaryRepository();
+      
+      return apiResults;
+    }
+    
+    // No se encontraron magnets en ninguna fuente
+    this.#log('warn', `No se encontraron magnets para ${contentId} en ninguna fuente`);
+    throw new MagnetNotFoundError(contentId);
+  }
 
-      const imdbId = processingResult.processedId;
-      
-      // Log de conversión si fue necesaria
-      if (processingResult.conversionRequired) {
-        this.#log('info', `Conversión exitosa: ${contentId} → ${imdbId} (método: ${processingResult.conversionMethod})`);
-      } else {
-        this.#log('info', `ID ya en formato IMDb: ${imdbId}`);
-      }
-      
-      // Delegar a la búsqueda por IMDb ID
-      return await this.getMagnetsByImdbId(imdbId, type);
-      
+  /**
+   * Busca en un repositorio específico con manejo de errores usando content ID.
+   * @private
+   * @param {CSVMagnetRepository} repository - Repositorio donde buscar
+   * @param {string} contentId - ID de contenido
+   * @param {string} sourceName - Nombre de la fuente para logging
+   * @returns {Promise<Magnet[]>} Array de magnets encontrados
+   */
+  async #searchInRepositoryByContentId(repository, contentId, sourceName) {
+    try {
+      return await repository.getMagnetsByContentId(contentId);
     } catch (error) {
       if (error instanceof MagnetNotFoundError) {
-        throw error;
+        this.#log('debug', `No se encontraron magnets en ${sourceName} para content ID: ${contentId}`);
+        return [];
       }
-      
-      this.#log('error', `Error en búsqueda unificada para ${contentId}:`, error);
-      throw new RepositoryError(`Error buscando magnets para ${contentId}`, error);
+      this.#log('error', `Error buscando en ${sourceName} para content ID ${contentId}:`, error);
+      return [];
     }
   }
 
