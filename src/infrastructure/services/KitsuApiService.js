@@ -148,33 +148,44 @@ export class KitsuApiService {
       }
 
       console.info(`Consultando API de Kitsu para mapeo IMDb de ${kitsuId} (ID numérico: ${numericId})`);
-      const response = await this.api.get(`anime/${numericId}/mappings`, {
+      
+      // Intentar obtener el anime con sus mappings incluidos
+      const response = await this.api.get(`anime/${numericId}`, {
         params: {
-          filter: {
-            externalSite: 'imdb'
-          }
+          include: 'mappings'
         }
       });
 
-      console.info(`Respuesta de API Kitsu para ${kitsuId}:`, {
-        hasData: !!response?.data,
-        dataLength: response?.data?.length || 0,
-        data: response?.data
-      });
-
-      if (!response?.data?.length) {
-        console.warn(`No se encontraron mapeos IMDb para ${kitsuId} en la API de Kitsu`);
+      if (!response?.data) {
+        console.warn(`No se encontró el anime ${kitsuId} en la API de Kitsu`);
         return null;
       }
 
-      const mapping = response.data[0];
-      const imdbId = mapping.externalId ? `tt${mapping.externalId}` : null;
+      // Buscar mappings IMDb en los datos incluidos
+      const mappings = response.data.relationships?.mappings?.data || [];
+      if (!mappings.length) {
+        console.warn(`No se encontraron mappings para ${kitsuId}`);
+        return null;
+      }
+
+      // Obtener el mapping IMDb específico
+      const imdbMapping = response.included?.find(item => 
+        item.type === 'mappings' && 
+        item.attributes?.externalSite === 'imdb'
+      );
+
+      if (!imdbMapping) {
+        console.warn(`No se encontró mapeo IMDb para ${kitsuId}. La API de Kitsu no proporciona mapeos IMDb actualmente.`);
+        return null;
+      }
+
+      const imdbId = imdbMapping.attributes?.externalId ? `tt${imdbMapping.attributes.externalId}` : null;
       
       if (imdbId) {
         console.info(`Mapeo exitoso: ${kitsuId} → ${imdbId}`);
         this.#setCachedData(cacheKey, imdbId);
       } else {
-        console.warn(`Mapeo encontrado pero sin externalId válido para ${kitsuId}:`, mapping);
+        console.warn(`Mapeo IMDb encontrado pero sin externalId válido para ${kitsuId}`);
       }
 
       return imdbId;
