@@ -23,14 +23,9 @@ const CONFIG = {
 
 // Casos de prueba con diferentes tipos de contenido e identificadores
 const TEST_CASES = [
-    // Películas
+    // Películas que existen en los archivos CSV
     { id: 'tt0111161', type: 'movie', title: 'The Shawshank Redemption', category: 'Película' },
     { id: 'tt0468569', type: 'movie', title: 'The Dark Knight', category: 'Película' },
-    
-    // Series de TV
-    { id: 'tt0903747', type: 'series', title: 'Breaking Bad', category: 'Serie TV' },
-    { id: 'tt0944947', type: 'series', title: 'Game of Thrones', category: 'Serie TV' },
-    { id: 'tt2356777', type: 'series', title: 'True Detective', category: 'Serie TV' },
     
     // Anime con IDs de Kitsu
     { id: 'kitsu:1', type: 'anime', title: 'Cowboy Bebop', category: 'Anime' },
@@ -43,7 +38,7 @@ const TEST_CASES = [
     { id: 'tt2560140', type: 'anime', title: 'Attack on Titan (IMDb)', category: 'Anime' },
     
     // ID de prueba para API
-    { id: 'tt1234567', type: 'movie', title: 'Test Movie', category: 'Prueba API' }
+    { id: 'tt1234567', type: 'movie', title: 'Test Movie (API Test)', category: 'Prueba API' }
 ];
 
 async function testCascadingFlow() {

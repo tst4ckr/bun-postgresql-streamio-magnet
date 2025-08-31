@@ -95,4 +95,13 @@ export class CSVMagnetRepository extends MagnetRepository {
   async getMagnetsByImdbId(imdbId, type = 'movie') {
     return this.getMagnetsByContentId(imdbId, type);
   }
+
+  /**
+   * Obtiene el número total de entradas cargadas en el repositorio.
+   * @returns {Promise<number>} Número total de magnets
+   */
+  async getTotalEntries() {
+    if (!this.#isInitialized) await this.initialize();
+    return this.#magnets.length;
+  }
 }

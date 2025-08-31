@@ -329,26 +329,63 @@ export class CascadingMagnetRepository extends MagnetRepository {
     const stats = {
       primary: { name: 'magnets.csv', count: 0, status: 'unknown' },
       secondary: { name: 'torrentio.csv', count: 0, status: 'unknown' },
+      anime: { name: 'anime.csv', count: 0, status: 'unknown' },
       api: { name: 'torrentio-api', status: 'available' }
     };
     
     try {
-      // Intentar obtener estadísticas del repositorio principal
-      await this.#primaryRepository.getMagnetsByImdbId('test');
-      stats.primary.status = 'loaded';
+      // Obtener estadísticas del repositorio principal
+      if (this.#primaryRepository && typeof this.#primaryRepository.getTotalEntries === 'function') {
+        stats.primary.count = await this.#primaryRepository.getTotalEntries();
+        stats.primary.status = stats.primary.count > 0 ? 'loaded' : 'empty';
+      } else {
+        stats.primary.status = 'not accessible';
+      }
     } catch (error) {
-      stats.primary.status = this.#primaryRepository ? 'loaded' : 'error';
+      stats.primary.status = 'error';
+      this.#log('error', 'Error obteniendo estadísticas del repositorio principal:', error.message);
     }
     
     try {
-      // Intentar obtener estadísticas del repositorio secundario
-      await this.#secondaryRepository.getMagnetsByImdbId('test');
-      stats.secondary.status = 'loaded';
+      // Obtener estadísticas del repositorio secundario
+      if (this.#secondaryRepository && typeof this.#secondaryRepository.getTotalEntries === 'function') {
+        stats.secondary.count = await this.#secondaryRepository.getTotalEntries();
+        stats.secondary.status = stats.secondary.count > 0 ? 'loaded' : 'empty';
+      } else {
+        stats.secondary.status = 'not accessible';
+      }
     } catch (error) {
-      stats.secondary.status = this.#secondaryRepository ? 'loaded' : 'error';
+      stats.secondary.status = 'error';
+      this.#log('error', 'Error obteniendo estadísticas del repositorio secundario:', error.message);
+    }
+    
+    try {
+      // Obtener estadísticas del repositorio de anime
+      if (this.#animeRepository && typeof this.#animeRepository.getTotalEntries === 'function') {
+        stats.anime.count = await this.#animeRepository.getTotalEntries();
+        stats.anime.status = stats.anime.count > 0 ? 'loaded' : 'empty';
+      } else {
+        stats.anime.status = 'not accessible';
+      }
+    } catch (error) {
+      stats.anime.status = 'error';
+      this.#log('error', 'Error obteniendo estadísticas del repositorio de anime:', error.message);
     }
     
     return stats;
+  }
+  
+  /**
+   * Método de depuración para acceder a los repositorios internos.
+   * @returns {Object} Repositorios internos para depuración
+   */
+  getInternalRepositories() {
+    return {
+      primary: this.#primaryRepository,
+      secondary: this.#secondaryRepository,
+      anime: this.#animeRepository,
+      torrentioApi: this.#torrentioApiService
+    };
   }
 }
 
