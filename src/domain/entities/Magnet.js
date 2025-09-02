@@ -9,6 +9,11 @@ const MagnetSchema = z.object({
   // Campos opcionales para compatibilidad hacia atrás
   imdb_id: z.string().regex(/^tt\d+$/).optional(),
   id_type: z.enum(['imdb', 'tmdb', 'tvdb', 'kitsu', 'anilist', 'mal']).optional(),
+  // Campos adicionales opcionales
+  provider: z.string().optional(),
+  filename: z.string().optional(),
+  seeders: z.number().optional(),
+  peers: z.number().optional(),
 });
 
 export class Magnet {

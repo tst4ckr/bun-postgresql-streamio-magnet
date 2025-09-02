@@ -171,7 +171,7 @@ export class TorrentioApiService {
    * @returns {Magnet[]} Array de magnets
    */
   #parseStreamsToMagnets(streams, contentId, type, season = null, episode = null) {
-    const magnets = [];
+    const candidates = [];
     
     for (const stream of streams) {
       try {
@@ -190,6 +190,13 @@ export class TorrentioApiService {
         const size = this.#extractSizeFromStream(stream, streamTitle);
         const filename = this.#extractFilename(stream);
         const seedersInfo = this.#extractSeedersAndPeers(streamTitle);
+        
+        // Filtrar por tamaño: solo menores a 9GB
+        const sizeInGB = this.#convertSizeToGB(size);
+        if (sizeInGB >= 9) {
+          this.#log('debug', `Stream descartado por tamaño (${size}): ${fullName}`);
+          continue;
+        }
         
         // Construir magnet URI con información adicional
         const magnetUri = this.#buildMagnetUri(stream.infoHash, filename || fullName, stream.sources);
@@ -225,14 +232,115 @@ export class TorrentioApiService {
         };
         
         const magnet = new Magnet(magnetData);
-        magnets.push(magnet);
+        candidates.push(magnet);
         
       } catch (error) {
         this.#log('error', `Error al procesar stream de Torrentio para ${contentId}:`, { error, stream });
       }
     }
     
-    return magnets;
+    // Priorizar y devolver solo el mejor resultado
+    return this.#selectBestMagnet(candidates);
+  }
+
+  /**
+   * Convierte el tamaño a GB para comparación.
+   * @private
+   * @param {string} size - Tamaño en formato string (ej: "2.5 GB", "1500 MB")
+   * @returns {number} Tamaño en GB
+   */
+  #convertSizeToGB(size) {
+    if (!size || size === 'N/A' || size === 'unknown') {
+      return 0;
+    }
+    
+    const sizeStr = size.toString().toLowerCase();
+    const match = sizeStr.match(/(\d+(?:\.\d+)?)\s*(gb|mb|tb|kb)/i);
+    
+    if (!match) {
+      return 0;
+    }
+    
+    const value = parseFloat(match[1]);
+    const unit = match[2].toLowerCase();
+    
+    switch (unit) {
+      case 'tb':
+        return value * 1024;
+      case 'gb':
+        return value;
+      case 'mb':
+        return value / 1024;
+      case 'kb':
+        return value / (1024 * 1024);
+      default:
+        return 0;
+    }
+  }
+
+  /**
+   * Selecciona el mejor magnet basado en seeders y calidad.
+   * @private
+   * @param {Magnet[]} candidates - Candidatos a evaluar
+   * @returns {Magnet[]} Array con solo el mejor magnet o vacío
+   */
+  #selectBestMagnet(candidates) {
+    if (candidates.length === 0) {
+      return [];
+    }
+    
+    // Definir prioridades de calidad (mayor número = mejor calidad)
+    const qualityPriority = {
+      '4K': 100,
+      '2160p': 100,
+      '1080p': 80,
+      'FHD': 80,
+      'BluRay': 75,
+      'BDRip': 70,
+      'WEB-DL': 65,
+      'WEBRip': 60,
+      '720p': 50,
+      'HD': 50,
+      'DVDRip': 40,
+      '480p': 30,
+      'CAM': 10,
+      'TS': 5,
+      'SD': 20,
+      'unknown': 0
+    };
+    
+    // Calcular puntuación para cada candidato
+    const scoredCandidates = candidates.map(magnet => {
+      const qualityScore = qualityPriority[magnet.quality] || 0;
+      const seedersScore = (magnet.seeders || 0) * 2; // Dar más peso a los seeders
+      const totalScore = qualityScore + seedersScore;
+      
+      return {
+        magnet,
+        score: totalScore,
+        seeders: magnet.seeders || 0,
+        quality: magnet.quality
+      };
+    });
+    
+    // Ordenar por puntuación (descendente) y tomar el mejor
+    scoredCandidates.sort((a, b) => {
+      // Primero por puntuación total
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      // En caso de empate, priorizar por seeders
+      if (b.seeders !== a.seeders) {
+        return b.seeders - a.seeders;
+      }
+      // En último caso, por calidad
+      return (qualityPriority[b.quality] || 0) - (qualityPriority[a.quality] || 0);
+    });
+    
+    const bestCandidate = scoredCandidates[0];
+    this.#log('info', `Mejor magnet seleccionado: ${bestCandidate.magnet.name} (${bestCandidate.quality}, ${bestCandidate.seeders} seeders, score: ${bestCandidate.score})`);
+    
+    return [bestCandidate.magnet];
   }
 
   /**
@@ -765,21 +873,21 @@ export class TorrentioApiService {
         providers: 'mejortorrent,wolfmax4k,cinecalidad',
         sort: 'seeders',
         qualityFilter: 'scr,cam,unknown',
-        limit: 2,
+        limit: 5,
         priorityLanguage: 'spanish' // Priorizar contenido en español
       },
       series: {
         providers: 'horriblesubs,nyaasi,tokyotosho,anidex,mejortorrent,wolfmax4k,cinecalidad',
         sort: 'seeders',
         qualityFilter: 'scr,cam,unknown',
-        limit: 2,
+        limit: 5,
         priorityLanguage: 'spanish' // Priorizar contenido en español
       },
       anime: {
         providers: 'horriblesubs,nyaasi,tokyotosho,anidex,mejortorrent,wolfmax4k,cinecalidad',
         sort: 'seeders',
         qualityFilter: 'unknown',
-        limit: 2,
+        limit: 5,
         priorityLanguage: 'spanish' // Priorizar contenido en español
       }
     };

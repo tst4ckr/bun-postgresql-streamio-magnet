@@ -41,8 +41,20 @@ export class CSVMagnetRepository extends MagnetRepository {
           size: row.size,
           // Campos opcionales para compatibilidad
           imdb_id: row.imdb_id,
-          id_type: row.id_type || (row.imdb_id ? 'imdb' : 'unknown')
+          id_type: row.id_type || (row.imdb_id ? 'imdb' : 'unknown'),
+          // Campos adicionales opcionales
+          provider: row.provider,
+          filename: row.filename,
+          seeders: row.seeders ? parseInt(row.seeders, 10) : undefined,
+          peers: row.peers ? parseInt(row.peers, 10) : undefined
         };
+        
+        // Filtrar campos undefined para mantener el objeto limpio
+        Object.keys(magnetData).forEach(key => {
+          if (magnetData[key] === undefined || magnetData[key] === '') {
+            delete magnetData[key];
+          }
+        });
         
         const magnet = new Magnet(magnetData);
         this.#magnets.push(magnet);

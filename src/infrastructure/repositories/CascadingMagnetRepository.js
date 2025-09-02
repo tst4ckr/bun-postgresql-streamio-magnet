@@ -134,43 +134,50 @@ export class CascadingMagnetRepository extends MagnetRepository {
     
     this.#log('info', `Iniciando búsqueda en cascada para: ${imdbId}`);
     
-    // Paso 1: Buscar en magnets.csv (repositorio principal)
-    const primaryResults = await this.#searchInRepository(
-      this.#primaryRepository,
-      imdbId,
-      'magnets.csv'
-    );
+    // Buscar en todas las fuentes locales simultáneamente
+    const [primaryResults, secondaryResults, animeResults] = await Promise.all([
+      this.#searchInRepository(this.#primaryRepository, imdbId, 'magnets.csv'),
+      this.#searchInRepository(this.#secondaryRepository, imdbId, 'torrentio.csv'),
+      this.#searchInRepository(this.#animeRepository, imdbId, 'anime.csv')
+    ]);
     
+    // Lógica de priorización según los requisitos del usuario:
+    // 1. Si hay resultados en torrentio.csv, usar 1 resultado principal
+    // 2. Agregar coincidencias adicionales de magnets.csv o anime.csv
+    let finalResults = [];
+    
+    if (secondaryResults.length > 0) {
+      // Tomar solo el primer resultado de torrentio.csv como principal
+      finalResults.push(secondaryResults[0]);
+      this.#log('info', `Resultado principal encontrado en torrentio.csv para ${imdbId}`);
+      
+      // Agregar coincidencias adicionales de magnets.csv
+      if (primaryResults.length > 0) {
+        finalResults.push(...primaryResults);
+        this.#log('info', `Agregados ${primaryResults.length} resultados adicionales de magnets.csv`);
+      }
+      
+      // Agregar coincidencias adicionales de anime.csv
+      if (animeResults.length > 0) {
+        finalResults.push(...animeResults);
+        this.#log('info', `Agregados ${animeResults.length} resultados adicionales de anime.csv`);
+      }
+      
+      return finalResults;
+    }
+    
+    // Si no hay resultados en torrentio.csv, usar lógica de cascada tradicional
     if (primaryResults.length > 0) {
       this.#log('info', `Encontrados ${primaryResults.length} magnets en magnets.csv para ${imdbId}`);
       return primaryResults;
     }
-    
-    // Paso 2: Buscar en torrentio.csv (repositorio secundario)
-    const secondaryResults = await this.#searchInRepository(
-      this.#secondaryRepository,
-      imdbId,
-      'torrentio.csv'
-    );
-    
-    if (secondaryResults.length > 0) {
-      this.#log('info', `Encontrados ${secondaryResults.length} magnets en torrentio.csv para ${imdbId}`);
-      return secondaryResults;
-    }
-    
-    // Paso 3: Buscar en anime.csv (repositorio anime)
-    const animeResults = await this.#searchInRepository(
-      this.#animeRepository,
-      imdbId,
-      'anime.csv'
-    );
     
     if (animeResults.length > 0) {
       this.#log('info', `Encontrados ${animeResults.length} magnets en anime.csv para ${imdbId}`);
       return animeResults;
     }
     
-    // Paso 4: Buscar en API de Torrentio
+    // Paso final: Buscar en API de Torrentio
     this.#log('info', `No se encontraron magnets locales, consultando API Torrentio para ${imdbId} (${type})`);
     const apiResults = await this.#torrentioApiService.searchMagnetsById(imdbId, type);
     
@@ -203,28 +210,50 @@ export class CascadingMagnetRepository extends MagnetRepository {
     
     this.#log('info', `Búsqueda en cascada iniciada para content ID: ${contentId} (${type})`);
     
-    // Paso 1: Buscar en repositorio primario (magnets.csv)
-    const primaryResults = await this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv');
+    // Buscar en todas las fuentes locales simultáneamente
+    const [primaryResults, secondaryResults, animeResults] = await Promise.all([
+      this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv'),
+      this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv'),
+      this.#searchInRepositoryByContentId(this.#animeRepository, contentId, 'anime.csv')
+    ]);
+    
+    // Lógica de priorización según los requisitos del usuario:
+    // 1. Si hay resultados en torrentio.csv, usar 1 resultado principal
+    // 2. Agregar coincidencias adicionales de magnets.csv o anime.csv
+    let finalResults = [];
+    
+    if (secondaryResults.length > 0) {
+      // Tomar solo el primer resultado de torrentio.csv como principal
+      finalResults.push(secondaryResults[0]);
+      this.#log('info', `Resultado principal encontrado en torrentio.csv para ${contentId}`);
+      
+      // Agregar coincidencias adicionales de magnets.csv
+      if (primaryResults.length > 0) {
+        finalResults.push(...primaryResults);
+        this.#log('info', `Agregados ${primaryResults.length} resultados adicionales de magnets.csv`);
+      }
+      
+      // Agregar coincidencias adicionales de anime.csv
+      if (animeResults.length > 0) {
+        finalResults.push(...animeResults);
+        this.#log('info', `Agregados ${animeResults.length} resultados adicionales de anime.csv`);
+      }
+      
+      return finalResults;
+    }
+    
+    // Si no hay resultados en torrentio.csv, usar lógica de cascada tradicional
     if (primaryResults.length > 0) {
       this.#log('info', `Encontrados ${primaryResults.length} magnets en repositorio primario para ${contentId}`);
       return primaryResults;
     }
     
-    // Paso 2: Buscar en repositorio secundario (torrentio.csv)
-    const secondaryResults = await this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv');
-    if (secondaryResults.length > 0) {
-      this.#log('info', `Encontrados ${secondaryResults.length} magnets en repositorio secundario para ${contentId}`);
-      return secondaryResults;
-    }
-    
-    // Paso 3: Buscar en repositorio de anime (anime.csv)
-    const animeResults = await this.#searchInRepositoryByContentId(this.#animeRepository, contentId, 'anime.csv');
     if (animeResults.length > 0) {
       this.#log('info', `Encontrados ${animeResults.length} magnets en repositorio de anime para ${contentId}`);
       return animeResults;
     }
     
-    // Paso 4: Buscar en API de Torrentio
+    // Paso final: Buscar en API de Torrentio
     this.#log('info', `No se encontraron magnets locales, consultando API Torrentio para ${contentId} (${type})`);
     const apiResults = await this.#torrentioApiService.searchMagnetsById(contentId, type);
     
