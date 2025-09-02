@@ -7,6 +7,7 @@ import { writeFileSync, appendFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import { Magnet } from '../../domain/entities/Magnet.js';
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
+import { addonConfig } from '../../config/addonConfig.js';
 
 /**
  * Servicio para integración con la API de Torrentio de Stremio.
@@ -862,33 +863,33 @@ export class TorrentioApiService {
   }
 
   /**
-   * Inicializa las configuraciones de proveedores optimizadas por tipo de contenido.
-   * Prioriza contenido en español mexicano con máximo seeders.
+   * Inicializa las configuraciones de proveedores para diferentes tipos de contenido.
+   * Utiliza configuración desde variables de entorno para mayor flexibilidad.
    * @private
    * @returns {Object} Configuraciones de proveedores
    */
   #initializeProviderConfigs() {
     return {
       movie: {
-        providers: 'mejortorrent,wolfmax4k,cinecalidad',
-        sort: 'seeders',
-        qualityFilter: 'scr,cam,unknown',
-        limit: 5,
-        priorityLanguage: 'spanish' // Priorizar contenido en español
+        providers: addonConfig.torrentio.movie.providers,
+        sort: addonConfig.torrentio.movie.sort,
+        qualityFilter: addonConfig.torrentio.movie.qualityFilter,
+        limit: addonConfig.torrentio.movie.limit,
+        priorityLanguage: addonConfig.torrentio.movie.priorityLanguage
       },
       series: {
-        providers: 'horriblesubs,nyaasi,tokyotosho,anidex,mejortorrent,wolfmax4k,cinecalidad',
-        sort: 'seeders',
-        qualityFilter: 'scr,cam,unknown',
-        limit: 5,
-        priorityLanguage: 'spanish' // Priorizar contenido en español
+        providers: addonConfig.torrentio.series.providers,
+        sort: addonConfig.torrentio.series.sort,
+        qualityFilter: addonConfig.torrentio.series.qualityFilter,
+        limit: addonConfig.torrentio.series.limit,
+        priorityLanguage: addonConfig.torrentio.series.priorityLanguage
       },
       anime: {
-        providers: 'horriblesubs,nyaasi,tokyotosho,anidex,mejortorrent,wolfmax4k,cinecalidad',
-        sort: 'seeders',
-        qualityFilter: 'unknown',
-        limit: 5,
-        priorityLanguage: 'spanish' // Priorizar contenido en español
+        providers: addonConfig.torrentio.anime.providers,
+        sort: addonConfig.torrentio.anime.sort,
+        qualityFilter: addonConfig.torrentio.anime.qualityFilter,
+        limit: addonConfig.torrentio.anime.limit,
+        priorityLanguage: addonConfig.torrentio.anime.priorityLanguage
       }
     };
   }
