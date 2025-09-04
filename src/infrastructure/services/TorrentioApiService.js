@@ -225,12 +225,16 @@ export class TorrentioApiService {
           id_type: idType,
           // Información adicional de Torrentio
           fileIdx: stream.fileIdx,
-          filename: filename,
           provider: this.#extractProvider(streamTitle),
           seeders: seedersInfo.seeders,
           peers: seedersInfo.peers,
           ...episodeInfo
         };
+        
+        // Solo agregar filename si existe (evitar null)
+        if (filename) {
+          magnetData.filename = filename;
+        }
         
         const magnet = new Magnet(magnetData);
         candidates.push(magnet);
