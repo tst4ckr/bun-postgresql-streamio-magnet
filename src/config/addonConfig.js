@@ -73,7 +73,7 @@ const config = {
     timeout: parseInt(process.env.CSV_TIMEOUT) || 30000
   },
   tor: {
-    enabled: process.env.TOR_ENABLED === 'true',
+    enabled: process.env.TOR_ENABLED === 'true' || false, // Por defecto false, se activa explícitamente con TOR_ENABLED=true
     host: process.env.TOR_HOST || '127.0.0.1',
     port: parseInt(process.env.TOR_PORT) || 9050
   },
