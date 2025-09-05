@@ -66,24 +66,24 @@ const config = {
   },
   torrentio: {
     movie: {
-      providers: process.env.TORRENTIO_MOVIE_PROVIDERS || 'cinecalidad',
+      providers: process.env.TORRENTIO_MOVIE_PROVIDERS || 'mejortorrent,wolfmax4k,cinecalidad',
       sort: process.env.TORRENTIO_MOVIE_SORT || 'seeders',
       qualityFilter: process.env.TORRENTIO_MOVIE_QUALITY_FILTER || 'scr,cam,unknown',
-      limit: parseInt(process.env.TORRENTIO_MOVIE_LIMIT) || 1,
+      limit: parseInt(process.env.TORRENTIO_MOVIE_LIMIT) || 10,
       priorityLanguage: process.env.TORRENTIO_MOVIE_LANGUAGE || 'spanish'
     },
     series: {
-      providers: process.env.TORRENTIO_SERIES_PROVIDERS || 'horriblesubs,nyaasi,tokyotosho,anidex,cinecalidad',
+      providers: process.env.TORRENTIO_SERIES_PROVIDERS || 'horriblesubs,nyaasi,tokyotosho,anidex,mejortorrent,wolfmax4k,cinecalidad',
       sort: process.env.TORRENTIO_SERIES_SORT || 'seeders',
       qualityFilter: process.env.TORRENTIO_SERIES_QUALITY_FILTER || 'scr,cam,unknown',
-      limit: parseInt(process.env.TORRENTIO_SERIES_LIMIT) || 1,
+      limit: parseInt(process.env.TORRENTIO_SERIES_LIMIT) || 10,
       priorityLanguage: process.env.TORRENTIO_SERIES_LANGUAGE || 'spanish'
     },
     anime: {
       providers: process.env.TORRENTIO_ANIME_PROVIDERS || 'horriblesubs,nyaasi,tokyotosho,anidex,mejortorrent,wolfmax4k,cinecalidad',
       sort: process.env.TORRENTIO_ANIME_SORT || 'seeders',
       qualityFilter: process.env.TORRENTIO_ANIME_QUALITY_FILTER || 'unknown',
-      limit: parseInt(process.env.TORRENTIO_ANIME_LIMIT) || 1,
+      limit: parseInt(process.env.TORRENTIO_ANIME_LIMIT) || 10,
       priorityLanguage: process.env.TORRENTIO_ANIME_LANGUAGE || 'spanish'
     }
   }
