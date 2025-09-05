@@ -5,6 +5,7 @@
 
 import { writeFileSync, appendFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
+import net from 'net';
 import { Magnet } from '../../domain/entities/Magnet.js';
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 import { addonConfig } from '../../config/addonConfig.js';
@@ -1067,6 +1068,15 @@ export class TorrentioApiService {
       return this.#fetchWithTimeout(url);
     }
 
+    // Verificar si Tor está disponible antes del primer intento
+    if (attempt === 1) {
+      const torAvailable = await this.#checkTorAvailability();
+      if (!torAvailable) {
+        this.#log('warn', 'Tor no está disponible, usando fallback sin proxy');
+        return this.#fetchWithTimeout(url);
+      }
+    }
+
     try {
       this.#log('info', `Intento ${attempt}/${this.#maxRetries} - Consultando vía Tor: ${url}`);
       
@@ -1129,8 +1139,14 @@ export class TorrentioApiService {
       return response;
 
     } catch (error) {
-      // En caso de error de conexión y tenemos reintentos disponibles
-      if (attempt < this.#maxRetries && (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.message.includes('Timeout'))) {
+      // Si es error de conexión a Tor, usar fallback inmediatamente
+      if (error.code === 'ECONNREFUSED' && error.address === '127.0.0.1' && error.port === 9050) {
+        this.#log('warn', `Tor no está ejecutándose en ${this.#torHost}:${this.#torPort}, usando fallback sin proxy`);
+        return this.#fetchWithTimeout(url);
+      }
+
+      // En caso de otros errores de conexión y tenemos reintentos disponibles
+      if (attempt < this.#maxRetries && (error.code === 'ETIMEDOUT' || error.message.includes('Timeout'))) {
         this.#log('warn', `Error de conexión, rotando sesión Tor e intentando nuevamente (${attempt}/${this.#maxRetries}): ${error.message}`);
         await this.#rotateTorSession();
         await this.#delay(this.#retryDelay);
@@ -1140,6 +1156,33 @@ export class TorrentioApiService {
       this.#log('error', `Error en petición Tor después de ${attempt} intentos: ${error.message}`);
       throw error;
     }
+  }
+
+  /**
+   * Verifica si Tor está disponible y ejecutándose
+   * @private
+   * @returns {Promise<boolean>} - true si Tor está disponible
+   */
+  async #checkTorAvailability() {
+    return new Promise((resolve) => {
+      const socket = new net.Socket();
+      
+      const timeout = setTimeout(() => {
+        socket.destroy();
+        resolve(false);
+      }, 3000); // 3 segundos de timeout
+      
+      socket.connect(this.#torPort, this.#torHost, () => {
+        clearTimeout(timeout);
+        socket.destroy();
+        resolve(true);
+      });
+      
+      socket.on('error', () => {
+        clearTimeout(timeout);
+        resolve(false);
+      });
+    });
   }
 
   /**
