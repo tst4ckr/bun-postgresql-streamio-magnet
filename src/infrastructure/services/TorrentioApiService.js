@@ -1165,20 +1165,24 @@ export class TorrentioApiService {
    */
   async #checkTorAvailability() {
     return new Promise((resolve) => {
+      this.#log('debug', `Verificando disponibilidad de Tor en ${this.#torHost}:${this.#torPort}`);
       const socket = new net.Socket();
       
       const timeout = setTimeout(() => {
+        this.#log('warn', 'Timeout al verificar Tor - considerando no disponible');
         socket.destroy();
         resolve(false);
       }, 3000); // 3 segundos de timeout
       
       socket.connect(this.#torPort, this.#torHost, () => {
+        this.#log('info', 'Tor detectado y disponible');
         clearTimeout(timeout);
         socket.destroy();
         resolve(true);
       });
       
-      socket.on('error', () => {
+      socket.on('error', (err) => {
+        this.#log('warn', `Error al conectar con Tor: ${err.message}`);
         clearTimeout(timeout);
         resolve(false);
       });
