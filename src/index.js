@@ -38,7 +38,9 @@ class MagnetAddon {
       this.#config.repository.animeCsvPath,
       this.#config.repository.torrentioApiUrl,
       this.#logger,
-      this.#config.repository.timeout
+      this.#config.repository.timeout,
+      undefined, // idService (usar por defecto)
+      this.#config.tor // configuración de Tor
     );
     await this.#magnetRepository.initialize();
     this.#logger.info('Repositorio de magnets en cascada inicializado.');

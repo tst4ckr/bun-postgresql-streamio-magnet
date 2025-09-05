@@ -683,6 +683,12 @@ export class TorrentioApiService {
    * @param {Magnet[]} magnets - Magnets a guardar
    */
   async #saveMagnetsToFile(magnets) {
+    // Si no hay ruta de archivo especificada, omitir el guardado
+    if (!this.#torrentioFilePath || this.#torrentioFilePath.trim() === '') {
+      this.#logger.debug('No se especificó ruta para archivo torrentio.csv, omitiendo guardado');
+      return;
+    }
+    
     try {
       for (const magnet of magnets) {
         const csvLine = this.#magnetToCsvLine(magnet);
@@ -983,6 +989,12 @@ export class TorrentioApiService {
    * @private
    */
   #ensureTorrentioFileExists() {
+    // Si no hay ruta de archivo especificada, omitir la creación del archivo
+    if (!this.#torrentioFilePath || this.#torrentioFilePath.trim() === '') {
+      this.#logger.debug('No se especificó ruta para archivo torrentio.csv, omitiendo creación');
+      return;
+    }
+    
     if (!existsSync(this.#torrentioFilePath)) {
       // Asegurar que el directorio padre existe
       const dir = dirname(this.#torrentioFilePath);

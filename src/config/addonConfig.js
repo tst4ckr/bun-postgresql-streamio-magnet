@@ -72,6 +72,11 @@ const config = {
     torrentioApiUrl: process.env.TORRENTIO_API_URL || 'https://torrentio.strem.fun/',
     timeout: parseInt(process.env.CSV_TIMEOUT) || 30000
   },
+  tor: {
+    enabled: process.env.TOR_ENABLED === 'true' || true,
+    host: process.env.TOR_HOST || '127.0.0.1',
+    port: parseInt(process.env.TOR_PORT) || 9050
+  },
   torrentio: {
     movie: {
       providers: process.env.TORRENTIO_MOVIE_PROVIDERS || 'mejortorrent,wolfmax4k,cinecalidad',

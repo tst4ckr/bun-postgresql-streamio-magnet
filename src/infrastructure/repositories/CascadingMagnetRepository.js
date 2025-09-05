@@ -58,7 +58,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
    * @param {Object} logger - Logger para trazabilidad
    * @param {number} timeout - Timeout para operaciones remotas
    */
-  constructor(primaryCsvPath, secondaryCsvPath, animeCsvPath, torrentioApiUrl, logger = console, timeout = 30000, idService = unifiedIdService) {
+  constructor(primaryCsvPath, secondaryCsvPath, animeCsvPath, torrentioApiUrl, logger = console, timeout = 30000, idService = unifiedIdService, torConfig = null) {
     super();
     this.#logger = logger;
     this.#secondaryCsvPath = secondaryCsvPath;
@@ -79,7 +79,8 @@ export class CascadingMagnetRepository extends MagnetRepository {
       torrentioApiUrl,
       secondaryCsvPath,
       logger,
-      timeout
+      timeout,
+      torConfig
     );
   }
 
