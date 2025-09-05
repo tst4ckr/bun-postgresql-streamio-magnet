@@ -7,6 +7,8 @@ import { MagnetRepository, MagnetNotFoundError, RepositoryError } from '../../do
 import { CSVMagnetRepository } from './CSVMagnetRepository.js';
 import { TorrentioApiService } from '../services/TorrentioApiService.js';
 import { unifiedIdService } from '../services/UnifiedIdService.js';
+import { metadataService } from '../services/MetadataService.js';
+import { cacheService } from '../services/CacheService.js';
 
 /**
  * Repositorio que implementa búsqueda en cascada con fallback automático.
@@ -24,23 +26,26 @@ export class CascadingMagnetRepository extends MagnetRepository {
   #idService;
 
   /**
-   * Método auxiliar para logging seguro
+   * Método auxiliar para logging seguro con formato detallado
    * @param {string} level - Nivel de log (info, warn, error)
    * @param {string} message - Mensaje a loggear
    * @param {any} data - Datos adicionales
    */
   #log(level, message, data = null) {
+    const timestamp = new Date().toISOString();
+    const formattedMessage = `[${level.toUpperCase()}] ${timestamp} [repositories/CascadingMagnetRepository.js] - ${message}`;
+    
     if (this.#logger && typeof this.#logger[level] === 'function') {
       if (data !== null && data !== undefined) {
-        this.#logger[level](message, data);
+        this.#logger[level](formattedMessage, data);
       } else {
-        this.#logger[level](message);
+        this.#logger[level](formattedMessage);
       }
     } else {
       if (data !== null && data !== undefined) {
-        console[level](message, data);
+        console[level](formattedMessage, data);
       } else {
-        console[level](message);
+        console[level](formattedMessage);
       }
     }
   }
@@ -196,9 +201,9 @@ export class CascadingMagnetRepository extends MagnetRepository {
   }
 
   /**
-   * Busca magnets por cualquier tipo de ID de contenido (IMDb o Kitsu).
+   * Busca magnets por cualquier tipo de ID de contenido (IMDb, Kitsu, MAL, etc.).
    * Utiliza el servicio unificado de IDs para detectar y convertir automáticamente.
-   * @param {string} contentId - ID de contenido (IMDb o Kitsu)
+   * @param {string} contentId - ID de contenido (IMDb, Kitsu, MAL, AniList, etc.)
    * @param {string} type - Tipo de contenido ('movie', 'series', 'anime')
    * @param {Object} options - Opciones adicionales para la búsqueda
    * @returns {Promise<Magnet[]>} Array de magnets encontrados
@@ -208,67 +213,104 @@ export class CascadingMagnetRepository extends MagnetRepository {
       await this.initialize();
     }
     
+    const startTime = Date.now();
     this.#log('info', `Búsqueda en cascada iniciada para content ID: ${contentId} (${type})`);
     
-    // Buscar en todas las fuentes locales simultáneamente
-    const [primaryResults, secondaryResults, animeResults] = await Promise.all([
-      this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv'),
-      this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv'),
-      this.#searchInRepositoryByContentId(this.#animeRepository, contentId, 'anime.csv')
-    ]);
+    // Verificar cache primero
+    const cacheKey = cacheService.generateMagnetCacheKey(contentId, type, options);
+    const cachedResults = cacheService.get(cacheKey);
     
-    // Lógica de priorización según los requisitos del usuario:
-    // 1. Si hay resultados en torrentio.csv, usar 1 resultado principal
-    // 2. Agregar coincidencias adicionales de magnets.csv o anime.csv
-    let finalResults = [];
+    if (cachedResults) {
+      const duration = Date.now() - startTime;
+      this.#log('info', `Resultados obtenidos desde cache para ${contentId} en ${duration}ms`);
+      return cachedResults;
+    }
     
-    if (secondaryResults.length > 0) {
-      // Tomar solo el primer resultado de torrentio.csv como principal
-      finalResults.push(secondaryResults[0]);
-      this.#log('info', `Resultado principal encontrado en torrentio.csv para ${contentId}`);
+    try {
+      // Obtener metadatos del contenido para enriquecer la búsqueda
+      const metadata = await metadataService.getMetadata(contentId, type);
+      this.#log('info', `Metadatos obtenidos para ${contentId}: ${metadata.title || 'Sin título'}`);
       
-      // Agregar coincidencias adicionales de magnets.csv
-      if (primaryResults.length > 0) {
-        finalResults.push(...primaryResults);
-        this.#log('info', `Agregados ${primaryResults.length} resultados adicionales de magnets.csv`);
+      // Detectar tipo de ID y aplicar estrategia específica
+      const idType = this.#detectIdType(contentId);
+      this.#log('debug', `Tipo de ID detectado: ${idType} para ${contentId}`);
+      
+      // Buscar en todas las fuentes locales simultáneamente
+      const searchPromises = [
+        this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv'),
+        this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv')
+      ];
+      
+      // Para anime, priorizar búsqueda en repositorio de anime
+      if (type === 'anime' || idType === 'kitsu' || idType === 'mal' || idType === 'anilist') {
+        searchPromises.push(this.#searchInRepositoryByContentId(this.#animeRepository, contentId, 'anime.csv'));
+      } else {
+        searchPromises.push(Promise.resolve([]));
       }
       
-      // Agregar coincidencias adicionales de anime.csv
-      if (animeResults.length > 0) {
-        finalResults.push(...animeResults);
-        this.#log('info', `Agregados ${animeResults.length} resultados adicionales de anime.csv`);
+      const [primaryResults, secondaryResults, animeResults] = await Promise.all(searchPromises);
+      
+      // Enriquecer magnets con metadatos
+      const enrichedPrimary = this.#enrichMagnetsWithMetadata(primaryResults, metadata);
+      const enrichedSecondary = this.#enrichMagnetsWithMetadata(secondaryResults, metadata);
+      const enrichedAnime = this.#enrichMagnetsWithMetadata(animeResults, metadata);
+      
+      // Lógica de priorización mejorada según tipo de contenido
+      let finalResults = this.#prioritizeResults({
+        primary: enrichedPrimary,
+        secondary: enrichedSecondary, 
+        anime: enrichedAnime
+      }, type, contentId);
+      
+      if (finalResults.length > 0) {
+        // Cachear resultados exitosos
+        const cacheTTL = this.#getCacheTTL(type, finalResults.length);
+        cacheService.set(cacheKey, finalResults, cacheTTL);
+        
+        const duration = Date.now() - startTime;
+        this.#log('info', `Encontrados ${finalResults.length} magnets en fuentes locales para ${contentId} en ${duration}ms`);
+        return finalResults;
       }
       
-      return finalResults;
-    }
-    
-    // Si no hay resultados en torrentio.csv, usar lógica de cascada tradicional
-    if (primaryResults.length > 0) {
-      this.#log('info', `Encontrados ${primaryResults.length} magnets en repositorio primario para ${contentId}`);
-      return primaryResults;
-    }
-    
-    if (animeResults.length > 0) {
-      this.#log('info', `Encontrados ${animeResults.length} magnets en repositorio de anime para ${contentId}`);
-      return animeResults;
-    }
-    
-    // Paso final: Buscar en API de Torrentio
-    this.#log('info', `No se encontraron magnets locales, consultando API Torrentio para ${contentId} (${type})`);
-    const apiResults = await this.#torrentioApiService.searchMagnetsById(contentId, type);
-    
-    if (apiResults.length > 0) {
-      this.#log('info', `Encontrados ${apiResults.length} magnets en API Torrentio para ${contentId}`);
+      // Paso final: Buscar en API de Torrentio
+      this.#log('info', `No se encontraron magnets locales, consultando API Torrentio para ${contentId} (${type})`);
+      const apiResults = await this.#torrentioApiService.searchMagnetsById(contentId, type);
       
-      // Reinicializar repositorio secundario para incluir nuevos datos
-      await this.#reinitializeSecondaryRepository();
+      if (apiResults.length > 0) {
+        this.#log('info', `Encontrados ${apiResults.length} magnets en API Torrentio para ${contentId}`);
+        
+        // Enriquecer resultados de API con metadatos
+        const enrichedApiResults = this.#enrichMagnetsWithMetadata(apiResults, metadata);
+        
+        // Cachear resultados de API con TTL más corto
+        const apiCacheTTL = this.#getCacheTTL(type, enrichedApiResults.length, true);
+        cacheService.set(cacheKey, enrichedApiResults, apiCacheTTL);
+        
+        // Reinicializar repositorio secundario para incluir nuevos datos
+        await this.#reinitializeSecondaryRepository();
+        
+        const duration = Date.now() - startTime;
+        this.#log('info', `Búsqueda completada con API en ${duration}ms`);
+        return enrichedApiResults;
+      }
       
-      return apiResults;
+      // No se encontraron magnets en ninguna fuente
+      const duration = Date.now() - startTime;
+      this.#log('warn', `No se encontraron magnets para ${contentId} en ninguna fuente (${duration}ms)`);
+      
+      // Cachear resultado vacío con TTL corto para evitar búsquedas repetidas
+      cacheService.set(cacheKey, [], 300000); // 5 minutos
+      
+      throw new MagnetNotFoundError(contentId);
+      
+    } catch (error) {
+      if (error instanceof MagnetNotFoundError) {
+        throw error;
+      }
+      this.#log('error', `Error en búsqueda con metadatos para ${contentId}:`, error);
+      // Fallback a búsqueda sin metadatos
+      return this.#fallbackSearch(contentId, type);
     }
-    
-    // No se encontraron magnets en ninguna fuente
-    this.#log('warn', `No se encontraron magnets para ${contentId} en ninguna fuente`);
-    throw new MagnetNotFoundError(contentId);
   }
 
   /**
@@ -351,6 +393,119 @@ export class CascadingMagnetRepository extends MagnetRepository {
   }
 
   /**
+   * Detecta el tipo de ID de contenido basado en su formato.
+   * @private
+   * @param {string} contentId - ID de contenido a analizar
+   * @returns {string} Tipo de ID detectado
+   */
+  #detectIdType(contentId) {
+    if (!contentId) return 'unknown';
+    
+    // IMDb IDs empiezan con 'tt'
+    if (contentId.startsWith('tt')) {
+      return 'imdb';
+    }
+    
+    // Kitsu IDs empiezan con 'kitsu:'
+    if (contentId.startsWith('kitsu:')) {
+      return 'kitsu';
+    }
+    
+    // MyAnimeList IDs empiezan con 'mal:'
+    if (contentId.startsWith('mal:')) {
+      return 'mal';
+    }
+    
+    // AniList IDs empiezan con 'anilist:'
+    if (contentId.startsWith('anilist:')) {
+      return 'anilist';
+    }
+    
+    // AniDB IDs empiezan con 'anidb:'
+    if (contentId.startsWith('anidb:')) {
+      return 'anidb';
+    }
+    
+    // Si es solo números, podría ser Kitsu sin prefijo
+    if (/^\d+$/.test(contentId)) {
+      return 'numeric';
+    }
+    
+    return 'unknown';
+  }
+
+  /**
+   * Prioriza los resultados según el tipo de contenido y fuente.
+   * @private
+   * @param {Object} results - Resultados de las diferentes fuentes
+   * @param {string} type - Tipo de contenido
+   * @param {string} contentId - ID de contenido para logging
+   * @returns {Array} Resultados priorizados
+   */
+  #prioritizeResults(results, type, contentId) {
+    const { primary, secondary, anime } = results;
+    let finalResults = [];
+    
+    // Para anime, priorizar repositorio de anime
+    if (type === 'anime') {
+      if (anime.length > 0) {
+        finalResults.push(...anime);
+        this.#log('info', `Encontrados ${anime.length} magnets en repositorio de anime para ${contentId}`);
+      }
+      
+      // Agregar resultados de torrentio como secundarios para anime
+      if (secondary.length > 0) {
+        finalResults.push(...secondary.slice(0, 3)); // Limitar a 3 resultados adicionales
+        this.#log('info', `Agregados ${Math.min(secondary.length, 3)} resultados adicionales de torrentio.csv`);
+      }
+      
+      // Agregar algunos resultados del repositorio principal si es necesario
+      if (primary.length > 0 && finalResults.length < 5) {
+        const remainingSlots = 5 - finalResults.length;
+        finalResults.push(...primary.slice(0, remainingSlots));
+        this.#log('info', `Agregados ${Math.min(primary.length, remainingSlots)} resultados adicionales de magnets.csv`);
+      }
+      
+      return finalResults;
+    }
+    
+    // Para películas y series, usar lógica tradicional mejorada
+    if (secondary.length > 0) {
+      // Tomar el primer resultado de torrentio.csv como principal
+      finalResults.push(secondary[0]);
+      this.#log('info', `Resultado principal encontrado en torrentio.csv para ${contentId}`);
+      
+      // Agregar coincidencias adicionales de magnets.csv
+      if (primary.length > 0) {
+        finalResults.push(...primary.slice(0, 4)); // Limitar a 4 adicionales
+        this.#log('info', `Agregados ${Math.min(primary.length, 4)} resultados adicionales de magnets.csv`);
+      }
+      
+      // Para series, también considerar anime.csv si hay resultados
+      if (type === 'series' && anime.length > 0) {
+        finalResults.push(...anime.slice(0, 2)); // Máximo 2 de anime
+        this.#log('info', `Agregados ${Math.min(anime.length, 2)} resultados adicionales de anime.csv`);
+      }
+      
+      return finalResults;
+    }
+    
+    // Si no hay resultados en torrentio.csv, usar repositorio principal
+    if (primary.length > 0) {
+      this.#log('info', `Encontrados ${primary.length} magnets en repositorio primario para ${contentId}`);
+      return primary;
+    }
+    
+    // Como último recurso, usar repositorio de anime
+    if (anime.length > 0) {
+      this.#log('info', `Encontrados ${anime.length} magnets en repositorio de anime para ${contentId}`);
+      return anime;
+    }
+    
+    return [];
+  }
+
+  /**
    * Obtiene estadísticas de los repositorios.
    * @returns {Promise<Object>} Estadísticas de cada fuente
    */
@@ -404,6 +559,216 @@ export class CascadingMagnetRepository extends MagnetRepository {
     return stats;
   }
   
+  /**
+   * Enriquece los magnets con metadatos del contenido.
+   * @private
+   * @param {Array} magnets - Array de magnets a enriquecer
+   * @param {Object} metadata - Metadatos del contenido
+   * @returns {Array} Magnets enriquecidos
+   */
+  #enrichMagnetsWithMetadata(magnets, metadata) {
+    if (!magnets || !Array.isArray(magnets) || !metadata) {
+      return magnets || [];
+    }
+    
+    return magnets.map(magnet => ({
+      ...magnet,
+      metadata: {
+        title: metadata.title,
+        year: metadata.year,
+        genre: metadata.genre,
+        imdbRating: metadata.imdbRating,
+        type: metadata.type
+      },
+      // Mejorar scoring basado en metadatos
+      qualityScore: this.#calculateQualityScore(magnet, metadata)
+    }));
+  }
+  
+  /**
+   * Calcula un score de calidad basado en metadatos y características del magnet.
+   * @private
+   * @param {Object} magnet - Magnet a evaluar
+   * @param {Object} metadata - Metadatos del contenido
+   * @returns {number} Score de calidad (0-100)
+   */
+  #calculateQualityScore(magnet, metadata) {
+    let score = 50; // Score base
+    
+    // Bonus por coincidencia de título
+    if (metadata.title && magnet.title) {
+      const titleSimilarity = this.#calculateTitleSimilarity(magnet.title, metadata.title);
+      score += titleSimilarity * 20;
+    }
+    
+    // Bonus por año
+    if (metadata.year && magnet.title && magnet.title.includes(metadata.year)) {
+      score += 10;
+    }
+    
+    // Bonus por calidad de video
+    if (magnet.title) {
+      if (magnet.title.includes('2160p') || magnet.title.includes('4K')) score += 15;
+      else if (magnet.title.includes('1080p')) score += 10;
+      else if (magnet.title.includes('720p')) score += 5;
+    }
+    
+    // Bonus por seeders
+    if (magnet.seeders) {
+      score += Math.min(magnet.seeders / 10, 15);
+    }
+    
+    return Math.min(Math.max(score, 0), 100);
+  }
+  
+  /**
+   * Calcula la similitud entre dos títulos.
+   * @private
+   * @param {string} title1 - Primer título
+   * @param {string} title2 - Segundo título
+   * @returns {number} Similitud (0-1)
+   */
+  #calculateTitleSimilarity(title1, title2) {
+    if (!title1 || !title2) return 0;
+    
+    const normalize = str => str.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const norm1 = normalize(title1);
+    const norm2 = normalize(title2);
+    
+    if (norm1 === norm2) return 1;
+    if (norm1.includes(norm2) || norm2.includes(norm1)) return 0.8;
+    
+    // Algoritmo simple de distancia de Levenshtein normalizada
+    const maxLen = Math.max(norm1.length, norm2.length);
+    if (maxLen === 0) return 1;
+    
+    const distance = this.#levenshteinDistance(norm1, norm2);
+    return 1 - (distance / maxLen);
+  }
+  
+  /**
+   * Calcula la distancia de Levenshtein entre dos strings.
+   * @private
+   * @param {string} str1 - Primer string
+   * @param {string} str2 - Segundo string
+   * @returns {number} Distancia de Levenshtein
+   */
+  #levenshteinDistance(str1, str2) {
+    const matrix = [];
+    
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    
+    return matrix[str2.length][str1.length];
+  }
+  
+  /**
+   * Búsqueda de fallback sin metadatos.
+   * @private
+   * @param {string} contentId - ID del contenido
+   * @param {string} type - Tipo de contenido
+   * @returns {Promise<Array>} Array de magnets encontrados
+   */
+  async #fallbackSearch(contentId, type) {
+    this.#log('info', `Ejecutando búsqueda de fallback para ${contentId}`);
+    
+    // Detectar tipo de ID y aplicar estrategia específica
+    const idType = this.#detectIdType(contentId);
+    
+    // Buscar en todas las fuentes locales simultáneamente
+    const searchPromises = [
+      this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv'),
+      this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv')
+    ];
+    
+    // Para anime, priorizar búsqueda en repositorio de anime
+    if (type === 'anime' || idType === 'kitsu' || idType === 'mal' || idType === 'anilist') {
+      searchPromises.push(this.#searchInRepositoryByContentId(this.#animeRepository, contentId, 'anime.csv'));
+    } else {
+      searchPromises.push(Promise.resolve([]));
+    }
+    
+    const [primaryResults, secondaryResults, animeResults] = await Promise.all(searchPromises);
+    
+    // Lógica de priorización básica
+    let finalResults = this.#prioritizeResults({
+      primary: primaryResults,
+      secondary: secondaryResults, 
+      anime: animeResults
+    }, type, contentId);
+    
+    if (finalResults.length > 0) {
+      this.#log('info', `Encontrados ${finalResults.length} magnets en búsqueda de fallback para ${contentId}`);
+      return finalResults;
+    }
+    
+    // Paso final: Buscar en API de Torrentio
+    this.#log('info', `Consultando API Torrentio en fallback para ${contentId} (${type})`);
+    const apiResults = await this.#torrentioApiService.searchMagnetsById(contentId, type);
+    
+    if (apiResults.length > 0) {
+      this.#log('info', `Encontrados ${apiResults.length} magnets en API Torrentio (fallback) para ${contentId}`);
+      await this.#reinitializeSecondaryRepository();
+      return apiResults;
+    }
+    
+    throw new MagnetNotFoundError(contentId);
+  }
+  
+  /**
+   * Calcula el TTL del cache basado en el tipo de contenido y número de resultados.
+   * @private
+   * @param {string} type - Tipo de contenido
+   * @param {number} resultCount - Número de resultados encontrados
+   * @param {boolean} isApiResult - Si los resultados vienen de API
+   * @returns {number} TTL en milisegundos
+   */
+  #getCacheTTL(type, resultCount, isApiResult = false) {
+    // TTL base según tipo de contenido
+    let baseTTL;
+    
+    if (type === 'anime') {
+      baseTTL = 3600000; // 1 hora para anime
+    } else if (type === 'series') {
+      baseTTL = 1800000; // 30 minutos para series
+    } else {
+      baseTTL = 2700000; // 45 minutos para películas
+    }
+    
+    // Ajustar TTL según número de resultados
+    if (resultCount > 10) {
+      baseTTL *= 1.5; // Más tiempo para muchos resultados
+    } else if (resultCount < 3) {
+      baseTTL *= 0.5; // Menos tiempo para pocos resultados
+    }
+    
+    // Resultados de API tienen TTL más corto
+    if (isApiResult) {
+      baseTTL *= 0.7;
+    }
+    
+    return Math.floor(baseTTL);
+  }
+
   /**
    * Método de depuración para acceder a los repositorios internos.
    * @returns {Object} Repositorios internos para depuración

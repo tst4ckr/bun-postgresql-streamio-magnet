@@ -30,9 +30,9 @@ function resolvePath(relativePath) {
 const config = {
   addon: {
     id: process.env.ADDON_ID || 'org.stremio.torrent.search',
-    version: process.env.ADDON_VERSION || '1.2.0',
+    version: process.env.ADDON_VERSION || '1.3.0',
     name: process.env.ADDON_NAME || 'Torrent Search Pro',
-    description: process.env.ADDON_DESCRIPTION || 'Advanced torrent search addon with multiple providers for movies, series and anime with high-quality streams. Full anime support with specialized providers.',
+    description: process.env.ADDON_DESCRIPTION || 'Advanced torrent search addon with cascading search system for movies, series and anime. Features unified metadata management, detailed logging, and specialized anime support with multiple ID formats.',
     logo: process.env.ADDON_LOGO || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjMWExYTFhIi8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTQwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iNzIiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjZmZmZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5UUzwvdGV4dD4KPC9zdmc+',
     background: process.env.ADDON_BACKGROUND || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyMCIgaGVpZ2h0PSIxMDgwIiB2aWV3Qm94PSIwIDAgMTkyMCAxMDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTkyMCIgaGVpZ2h0PSIxMDgwIiBmaWxsPSIjMWExYTFhIi8+Cjx0ZXh0IHg9Ijk2MCIgeT0iNTgwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iODAiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjZmZmZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5Ub3JyZW50IFNlYXJjaDwvdGV4dD4KPC9zdmc+',
     resources: [
@@ -53,9 +53,17 @@ const config = {
     streamCacheMaxAge: process.env.CACHE_STREAM_MAX_AGE || 3600, // 1 hora
     streamStaleRevalidate: process.env.CACHE_STREAM_STALE_REVALIDATE || 3600,
     streamStaleError: process.env.CACHE_STREAM_STALE_ERROR || 86400, // 1 día
+    // Cache específico para anime (más largo debido a menor frecuencia de cambios)
+    animeCacheMaxAge: process.env.CACHE_ANIME_MAX_AGE || 7200, // 2 horas
+    // Cache para metadatos
+    metadataCacheMaxAge: process.env.CACHE_METADATA_MAX_AGE || 86400, // 1 día
   },
   logging: {
     logLevel: process.env.LOG_LEVEL || 'info', // 'debug', 'info', 'warn', 'error'
+    enableDetailedLogging: process.env.ENABLE_DETAILED_LOGGING === 'true' || true,
+    logFormat: process.env.LOG_FORMAT || 'detailed', // 'simple', 'detailed', 'json'
+    logToFile: process.env.LOG_TO_FILE === 'true' || false,
+    logFilePath: process.env.LOG_FILE_PATH || resolvePath('logs/addon.log')
   },
   repository: {
     primaryCsvPath: process.env.PRIMARY_CSV_PATH || resolvePath('data/magnets.csv'),
@@ -80,11 +88,79 @@ const config = {
       priorityLanguage: process.env.TORRENTIO_SERIES_LANGUAGE || 'spanish'
     },
     anime: {
-      providers: process.env.TORRENTIO_ANIME_PROVIDERS || 'horriblesubs,nyaasi,tokyotosho,anidex,mejortorrent,wolfmax4k,cinecalidad',
+      providers: process.env.TORRENTIO_ANIME_PROVIDERS || 'horriblesubs,nyaasi,tokyotosho,anidex,subsplease,erai-raws',
       sort: process.env.TORRENTIO_ANIME_SORT || 'seeders',
       qualityFilter: process.env.TORRENTIO_ANIME_QUALITY_FILTER || 'unknown',
-      limit: parseInt(process.env.TORRENTIO_ANIME_LIMIT) || 10,
-      priorityLanguage: process.env.TORRENTIO_ANIME_LANGUAGE || 'spanish'
+      limit: parseInt(process.env.TORRENTIO_ANIME_LIMIT) || 15, // Más resultados para anime
+      priorityLanguage: process.env.TORRENTIO_ANIME_LANGUAGE || 'japanese',
+      // Configuración específica para anime
+      enableSubtitles: process.env.TORRENTIO_ANIME_SUBTITLES === 'true' || true,
+      preferredFansubs: process.env.TORRENTIO_ANIME_FANSUBS || 'horriblesubs,subsplease,erai-raws',
+      qualityPriority: process.env.TORRENTIO_ANIME_QUALITY_PRIORITY || '1080p,720p,480p',
+      enableBatch: process.env.TORRENTIO_ANIME_BATCH === 'true' || false
+    }
+  },
+  // Configuración específica para metadatos
+  metadata: {
+    // Configuración para películas
+    movie: {
+      requiredFields: ['title', 'year', 'imdbId'],
+      optionalFields: ['genre', 'director', 'cast', 'plot', 'poster', 'rating'],
+      cacheExpiry: 86400000 // 1 día en ms
+    },
+    // Configuración para series
+    series: {
+      requiredFields: ['title', 'year', 'imdbId'],
+      optionalFields: ['genre', 'creator', 'cast', 'plot', 'poster', 'rating', 'seasons', 'episodes'],
+      cacheExpiry: 86400000 // 1 día en ms
+    },
+    // Configuración específica para anime
+    anime: {
+      requiredFields: ['title', 'year'],
+      optionalFields: ['genre', 'studio', 'director', 'cast', 'plot', 'poster', 'rating', 'episodes', 'status', 'source'],
+      cacheExpiry: 604800000, // 1 semana en ms (anime cambia menos frecuentemente)
+      // Campos específicos de anime
+      animeSpecificFields: {
+        malId: 'MyAnimeList ID',
+        kitsuId: 'Kitsu ID',
+        anilistId: 'AniList ID',
+        anidbId: 'AniDB ID',
+        studio: 'Animation Studio',
+        source: 'Source Material (manga, novel, etc.)',
+        status: 'Airing Status',
+        season: 'Anime Season',
+        episodeCount: 'Total Episodes',
+        duration: 'Episode Duration',
+        fansub: 'Fansub Group',
+        language: 'Audio Language',
+        subtitles: 'Subtitle Languages'
+      },
+      // Proveedores de metadatos para anime
+      metadataProviders: {
+        primary: process.env.ANIME_METADATA_PRIMARY || 'kitsu',
+        secondary: process.env.ANIME_METADATA_SECONDARY || 'mal,anilist',
+        fallback: process.env.ANIME_METADATA_FALLBACK || 'anidb'
+      }
+    }
+  },
+  // Configuración del sistema de búsqueda en cascada
+  cascadeSearch: {
+    enabled: process.env.CASCADE_SEARCH_ENABLED === 'true' || true,
+    maxRetries: parseInt(process.env.CASCADE_MAX_RETRIES) || 3,
+    retryDelay: parseInt(process.env.CASCADE_RETRY_DELAY) || 1000, // ms
+    timeout: parseInt(process.env.CASCADE_TIMEOUT) || 30000, // ms
+    // Prioridades por tipo de contenido
+    priorities: {
+      movie: ['torrentio', 'primary', 'anime'], // Para películas, priorizar torrentio
+      series: ['torrentio', 'primary', 'anime'], // Para series, priorizar torrentio
+      anime: ['anime', 'torrentio', 'primary'] // Para anime, priorizar repositorio de anime
+    },
+    // Configuración de logging para cascada
+    logging: {
+      logSearchStart: true,
+      logSourceResults: true,
+      logPrioritization: true,
+      logFinalResults: true
     }
   }
 };

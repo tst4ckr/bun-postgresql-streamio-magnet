@@ -7,6 +7,7 @@ import { MagnetNotFoundError } from '../../domain/repositories/MagnetRepository.
 import { parseMagnet } from 'parse-magnet-uri';
 import { unifiedIdService } from '../../infrastructure/services/UnifiedIdService.js';
 import { dynamicValidationService } from '../../infrastructure/services/DynamicValidationService.js';
+import { cacheService } from '../../infrastructure/services/CacheService.js';
 
 /**
  * Handler para peticiones de streams de magnets.
@@ -97,30 +98,70 @@ export class StreamHandler {
    */
   async #handleStreamRequest(args) {
     const { type, id } = args;
+    const startTime = Date.now();
+    const timestamp = new Date().toISOString();
+    
+    // Log detallado del inicio de la petición
+    this.#log('info', `Petición de stream iniciada para content ID: ${id} (${type})`);
+    
+    // Verificar cache de streams primero
+    const streamCacheKey = cacheService.generateStreamCacheKey(id, type);
+    const cachedStreams = cacheService.get(streamCacheKey);
+    
+    if (cachedStreams) {
+      const duration = Date.now() - startTime;
+      this.#log('info', `Streams obtenidos desde cache para ${id} en ${duration}ms`);
+      return cachedStreams;
+    }
     
     // Validación asíncrona con servicio dinámico
     const validationResult = await this.#validateStreamRequest(args);
     
     if (!this.#isSupportedType(type)) {
-      this.#logger.warn(`Tipo no soportado: ${type}`);
-      return this.#createEmptyResponse();
+      this.#log('warn', `Tipo no soportado: ${type}`);
+      const emptyResponse = this.#createEmptyResponse();
+      
+      // Cachear respuesta vacía con TTL corto
+      cacheService.set(streamCacheKey, emptyResponse, 300000); // 5 minutos
+      
+      return emptyResponse;
+    }
+
+    // Detectar tipo de ID para anime
+    const idType = this.#detectAnimeIdType(id);
+    if (type === 'anime' && idType !== 'unknown') {
+      this.#log('info', `ID de anime detectado: ${id} (tipo: ${idType})`);
     }
 
     const magnets = await this.#getMagnets(id, type);
     
     if (!magnets || magnets.length === 0) {
-      this.#logger.warn(`No se encontraron magnets para: ${id}`);
-      return this.#createEmptyResponse();
+      this.#log('warn', `No se encontraron magnets para: ${id}`);
+      const emptyResponse = this.#createEmptyResponse();
+      
+      // Cachear respuesta vacía con TTL corto
+      cacheService.set(streamCacheKey, emptyResponse, 300000); // 5 minutos
+      
+      return emptyResponse;
     }
 
     const streams = this.#createStreamsFromMagnets(magnets, type);
+    const duration = Date.now() - startTime;
     
-    // Log de información de validación para diagnóstico
+    // Log detallado de resultados
     if (validationResult?.details?.detection) {
-      this.#logger.info(`Stream generado para ${id} (${validationResult.details.detection.type}): ${streams.length} streams encontrados`);
+      this.#log('info', `Stream generado para ${id} (${validationResult.details.detection.type}): ${streams.length} streams encontrados en ${duration}ms`);
+    } else {
+      this.#log('info', `Stream generado para ${id} (${type}): ${streams.length} streams encontrados en ${duration}ms`);
     }
     
-    return this.#createStreamResponse(streams);
+    const streamResponse = this.#createStreamResponse(streams);
+    
+    // Cachear respuesta exitosa
+    const cacheTTL = this.#getStreamCacheTTL(type, streams.length);
+    cacheService.set(streamCacheKey, streamResponse, cacheTTL);
+    
+    return streamResponse;
   }
 
   /**
@@ -173,19 +214,34 @@ export class StreamHandler {
   /**
    * Obtiene los magnets por contenido ID de forma unificada.
    * @private
-   * @param {string} contentId - ID de contenido (IMDb o Kitsu)
-   * @param {string} type - Tipo de contenido ('movie' o 'series')
+   * @param {string} contentId - ID de contenido (IMDb, Kitsu, MAL, etc.)
+   * @param {string} type - Tipo de contenido ('movie', 'series', 'anime')
    * @returns {Promise<import('../../domain/entities/Magnet.js').Magnet[]|null>}
    */
   async #getMagnets(contentId, type = 'movie') {
     try {
+      this.#log('info', `Iniciando búsqueda de magnets para ${contentId} (${type})`);
+      
       // Usar el método unificado del repositorio para manejar cualquier tipo de ID
-      return await this.#magnetRepository.getMagnetsByContentId(contentId, type);
+      const magnets = await this.#magnetRepository.getMagnetsByContentId(contentId, type);
+      
+      if (magnets && magnets.length > 0) {
+        this.#log('info', `Encontrados ${magnets.length} magnets para ${contentId}`);
+        
+        // Log adicional para anime con información de fuentes
+        if (type === 'anime') {
+          const sources = [...new Set(magnets.map(m => m.provider || 'Unknown'))];
+          this.#log('info', `Fuentes de anime para ${contentId}: ${sources.join(', ')}`);
+        }
+      }
+      
+      return magnets;
     } catch (error) {
       if (error instanceof MagnetNotFoundError) {
+        this.#log('warn', `No se encontraron magnets para ${contentId}: ${error.message}`);
         return null;
       }
-      this.#logger.error(`Error obteniendo magnets para ${contentId}:`, error);
+      this.#log('error', `Error obteniendo magnets para ${contentId}: ${error.message}`);
       throw error;
     }
   }
@@ -240,8 +296,32 @@ export class StreamHandler {
     const quality = magnet.quality || 'SD';
     const provider = magnet.provider || 'Unknown';
     
-    // Formato esencial: Resolución | Proveedor
+    // Formato específico para anime
+    if (type === 'anime') {
+      let title = `${quality} | ${provider}`;
+      
+      // Agregar información de episodio para anime
+      if (magnet.season && magnet.episode) {
+        title += ` | T${magnet.season}E${magnet.episode}`;
+      } else if (magnet.episode) {
+        title += ` | Ep${magnet.episode}`;
+      }
+      
+      // Agregar información de seeders
+      if (magnet.seeders && magnet.seeders > 0) {
+        title += ` (${magnet.seeders}S)`;
+      }
+      
+      return title;
+    }
+    
+    // Formato para películas y series
     let title = `${quality} | ${provider}`;
+    
+    // Para series, agregar información de temporada/episodio
+    if (type === 'series' && magnet.season && magnet.episode) {
+      title += ` | T${magnet.season}E${magnet.episode}`;
+    }
     
     // Agregar información de seeders si está disponible
     if (magnet.seeders && magnet.seeders > 0) {
@@ -284,6 +364,31 @@ export class StreamHandler {
       techInfo.push(`Proveedor: ${magnet.provider}`);
     }
     
+    // Información específica para anime
+    if (type === 'anime') {
+      // Información de episodio/temporada para anime
+      if (magnet.season && magnet.episode) {
+        techInfo.push(`Temporada ${magnet.season} - Episodio ${magnet.episode}`);
+      } else if (magnet.episode) {
+        techInfo.push(`Episodio ${magnet.episode}`);
+      }
+      
+      // Información de idioma/subtítulos para anime
+      if (magnet.language) {
+        techInfo.push(`Idioma: ${magnet.language}`);
+      }
+      
+      // Información de fansub para anime
+      if (magnet.fansub) {
+        techInfo.push(`Fansub: ${magnet.fansub}`);
+      }
+    } else {
+      // Información de episodio para series
+      if (type === 'series' && magnet.season && magnet.episode) {
+        techInfo.push(`T${magnet.season}E${magnet.episode}`);
+      }
+    }
+    
     // Información de seeders/peers
     if (magnet.seeders && magnet.seeders > 0) {
       const seedersInfo = `Seeders: ${magnet.seeders}`;
@@ -292,11 +397,6 @@ export class StreamHandler {
       } else {
         techInfo.push(seedersInfo);
       }
-    }
-    
-    // Información de episodio para series/anime
-    if ((type === 'series' || type === 'anime') && magnet.season && magnet.episode) {
-      techInfo.push(`T${magnet.season}E${magnet.episode}`);
     }
     
     if (techInfo.length > 0) {
@@ -341,11 +441,98 @@ export class StreamHandler {
    * @returns {Object}
    */
   #createErrorResponse(error) {
-    this.#logger.error('Error en stream handler:', error);
+    this.#log('error', `Error en stream handler: ${error.message}`);
     return {
       streams: [],
       cacheMaxAge: 60 // Cache corto para errores
     };
+  }
+
+  /**
+   * Detecta el tipo de ID específico para anime.
+   * @private
+   * @param {string} contentId - ID de contenido
+   * @returns {string} Tipo de ID detectado
+   */
+  #detectAnimeIdType(contentId) {
+    if (!contentId) return 'unknown';
+    
+    // Kitsu IDs empiezan con 'kitsu:'
+    if (contentId.startsWith('kitsu:')) {
+      return 'kitsu';
+    }
+    
+    // MyAnimeList IDs empiezan con 'mal:'
+    if (contentId.startsWith('mal:')) {
+      return 'mal';
+    }
+    
+    // AniList IDs empiezan con 'anilist:'
+    if (contentId.startsWith('anilist:')) {
+      return 'anilist';
+    }
+    
+    // AniDB IDs empiezan con 'anidb:'
+    if (contentId.startsWith('anidb:')) {
+      return 'anidb';
+    }
+    
+    // IMDb IDs empiezan con 'tt'
+    if (contentId.startsWith('tt')) {
+      return 'imdb';
+    }
+    
+    // Si es solo números, podría ser Kitsu sin prefijo
+    if (/^\d+$/.test(contentId)) {
+      return 'numeric';
+    }
+    
+    return 'unknown';
+  }
+
+  /**
+   * Determina el TTL de cache para streams basado en el tipo y cantidad.
+   * @private
+   * @param {string} type - Tipo de contenido
+   * @param {number} streamCount - Cantidad de streams encontrados
+   * @returns {number} TTL en milisegundos
+   */
+  #getStreamCacheTTL(type, streamCount) {
+    // Cache más largo para contenido con muchos streams
+    if (streamCount > 10) {
+      return 3600000; // 1 hora
+    } else if (streamCount > 5) {
+      return 1800000; // 30 minutos
+    } else if (streamCount > 0) {
+      return 900000; // 15 minutos
+    } else {
+      return 300000; // 5 minutos para respuestas vacías
+    }
+  }
+
+  /**
+   * Método de logging unificado con formato específico.
+   * @private
+   * @param {string} level - Nivel de log (info, warn, error)
+   * @param {string} message - Mensaje a registrar
+   */
+  #log(level, message) {
+    const timestamp = new Date().toISOString();
+    const formattedMessage = `[${level.toUpperCase()}] ${timestamp} [handlers/StreamHandler.js] - ${message}`;
+    
+    switch (level) {
+      case 'info':
+        this.#logger.info(formattedMessage);
+        break;
+      case 'warn':
+        this.#logger.warn(formattedMessage);
+        break;
+      case 'error':
+        this.#logger.error(formattedMessage);
+        break;
+      default:
+        this.#logger.log(formattedMessage);
+    }
   }
 }
 
