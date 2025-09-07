@@ -105,12 +105,28 @@ const config = {
       qualityFilter: process.env.TORRENTIO_ANIME_QUALITY_FILTER || 'unknown',
       limit: parseInt(process.env.TORRENTIO_ANIME_LIMIT) || 15, // Más resultados para anime
       priorityLanguage: process.env.TORRENTIO_ANIME_LANGUAGE || 'japanese',
-      // Configuración específica para anime
+      // Configuraciones específicas para anime
       enableSubtitles: process.env.TORRENTIO_ANIME_SUBTITLES === 'true' || true,
       preferredFansubs: process.env.TORRENTIO_ANIME_FANSUBS || 'horriblesubs,subsplease,erai-raws',
       qualityPriority: process.env.TORRENTIO_ANIME_QUALITY_PRIORITY || '1080p,720p,480p',
       enableBatch: process.env.TORRENTIO_ANIME_BATCH === 'true' || false
     }
+  },
+  // Configuración para selección de magnets
+  magnetSelection: {
+    // Estrategia de selección: 'seeders', 'quality', 'balanced'
+    strategy: process.env.MAGNET_SELECTION_STRATEGY || 'seeders',
+    // Pesos para estrategia 'balanced'
+    balancedWeights: {
+      seeders: parseInt(process.env.MAGNET_SEEDERS_WEIGHT) || 70,
+      quality: parseInt(process.env.MAGNET_QUALITY_WEIGHT) || 30
+    },
+    // Mínimo de seeders requerido
+    minSeeders: parseInt(process.env.MAGNET_MIN_SEEDERS) || 0,
+    // Calidades preferidas en orden de prioridad (array)
+    qualityPriority: (process.env.MAGNET_QUALITY_PRIORITY || '4K,2160p,1080p,720p,480p').split(','),
+    // Habilitar logging detallado de selección
+    enableSelectionLogging: process.env.MAGNET_SELECTION_LOGGING === 'true' || false
   },
   // Configuración específica para metadatos
   metadata: {

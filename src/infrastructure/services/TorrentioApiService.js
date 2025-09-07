@@ -323,7 +323,7 @@ export class TorrentioApiService {
   }
 
   /**
-   * Selecciona el mejor magnet basado en seeders y calidad.
+   * Selecciona el mejor magnet basado en la estrategia configurada.
    * @private
    * @param {Magnet[]} candidates - Candidatos a evaluar
    * @returns {Magnet[]} Array con solo el mejor magnet o vacío
@@ -333,58 +333,103 @@ export class TorrentioApiService {
       return [];
     }
     
-    // Definir prioridades de calidad (mayor número = mejor calidad)
-    const qualityPriority = {
-      '4K': 100,
-      '2160p': 100,
-      '1080p': 80,
-      'FHD': 80,
-      'BluRay': 75,
-      'BDRip': 70,
-      'WEB-DL': 65,
-      'WEBRip': 60,
-      '720p': 50,
-      'HD': 50,
-      'DVDRip': 40,
-      '480p': 30,
-      'CAM': 10,
-      'TS': 5,
-      'SD': 20,
-      'unknown': 0
-    };
+    const config = addonConfig.magnetSelection;
     
-    // Calcular puntuación para cada candidato
-    const scoredCandidates = candidates.map(magnet => {
-      const qualityScore = qualityPriority[magnet.quality] || 0;
-      const seedersScore = (magnet.seeders || 0) * 2; // Dar más peso a los seeders
-      const totalScore = qualityScore + seedersScore;
+    // Filtrar magnets que cumplan el mínimo de seeders
+    const validCandidates = candidates.filter(magnet => 
+      (magnet.seeders || 0) >= config.minSeeders
+    );
+    
+    if (validCandidates.length === 0) {
+      this.#log('warn', `Ningún magnet cumple el mínimo de ${config.minSeeders} seeders`);
+      return [];
+    }
+    
+    let sortedCandidates;
+    
+    switch (config.strategy) {
+      case 'quality':
+        sortedCandidates = this.#sortByQuality(validCandidates, config);
+        break;
+      case 'balanced':
+        sortedCandidates = this.#sortByBalanced(validCandidates, config);
+        break;
+      case 'seeders':
+      default:
+        sortedCandidates = this.#sortBySeeders(validCandidates);
+        break;
+    }
+    
+    const bestCandidate = sortedCandidates[0];
+    
+    if (config.enableSelectionLogging) {
+      this.#log('info', `Mejor magnet seleccionado (estrategia: ${config.strategy}): ${bestCandidate.name} (${bestCandidate.quality}, ${bestCandidate.seeders || 0} seeders)`);
+    }
+    
+    return [bestCandidate];
+  }
+
+  /**
+   * Ordena magnets únicamente por número de seeders (descendente).
+   * @private
+   * @param {Magnet[]} magnets - Magnets a ordenar
+   * @returns {Magnet[]} Magnets ordenados por seeders
+   */
+  #sortBySeeders(magnets) {
+    return magnets.sort((a, b) => (b.seeders || 0) - (a.seeders || 0));
+  }
+
+  /**
+   * Ordena magnets priorizando calidad sobre seeders.
+   * @private
+   * @param {Magnet[]} magnets - Magnets a ordenar
+   * @param {Object} config - Configuración de selección
+   * @returns {Magnet[]} Magnets ordenados por calidad y seeders
+   */
+  #sortByQuality(magnets, config) {
+    const qualityOrder = config.qualityPriority;
+    
+    return magnets.sort((a, b) => {
+      const aQualityIndex = qualityOrder.indexOf(a.quality) !== -1 ? qualityOrder.indexOf(a.quality) : qualityOrder.length;
+      const bQualityIndex = qualityOrder.indexOf(b.quality) !== -1 ? qualityOrder.indexOf(b.quality) : qualityOrder.length;
       
-      return {
-        magnet,
-        score: totalScore,
-        seeders: magnet.seeders || 0,
-        quality: magnet.quality
-      };
+      // Priorizar por calidad
+      if (aQualityIndex !== bQualityIndex) {
+        return aQualityIndex - bQualityIndex;
+      }
+      
+      // En caso de empate en calidad, priorizar por seeders
+      return (b.seeders || 0) - (a.seeders || 0);
+    });
+  }
+
+  /**
+   * Ordena magnets con estrategia balanceada (calidad y seeders).
+   * @private
+   * @param {Magnet[]} magnets - Magnets a ordenar
+   * @param {Object} config - Configuración de selección
+   * @returns {Magnet[]} Magnets ordenados de forma balanceada
+   */
+  #sortByBalanced(magnets, config) {
+    const qualityOrder = config.qualityPriority;
+    const qualityWeight = config.balancedWeights.quality;
+    const seedersWeight = config.balancedWeights.seeders;
+    
+    // Calcular score balanceado para cada magnet
+    const magnetsWithScore = magnets.map(magnet => {
+      const qualityIndex = qualityOrder.indexOf(magnet.quality);
+      const qualityScore = qualityIndex !== -1 ? (qualityOrder.length - qualityIndex) : 0;
+      const seedersScore = magnet.seeders || 0;
+      
+      const totalScore = (qualityScore * qualityWeight) + (seedersScore * seedersWeight);
+      
+      return { magnet, score: totalScore };
     });
     
-    // Ordenar por puntuación (descendente) y tomar el mejor
-    scoredCandidates.sort((a, b) => {
-      // Primero por puntuación total
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-      // En caso de empate, priorizar por seeders
-      if (b.seeders !== a.seeders) {
-        return b.seeders - a.seeders;
-      }
-      // En último caso, por calidad
-      return (qualityPriority[b.quality] || 0) - (qualityPriority[a.quality] || 0);
-    });
-    
-    const bestCandidate = scoredCandidates[0];
-    this.#log('info', `Mejor magnet seleccionado: ${bestCandidate.magnet.name} (${bestCandidate.quality}, ${bestCandidate.seeders} seeders, score: ${bestCandidate.score})`);
-    
-    return [bestCandidate.magnet];
+    // Ordenar por score descendente
+    return magnetsWithScore
+      .sort((a, b) => b.score - a.score)
+      .map(item => item.magnet);
   }
 
   /**
