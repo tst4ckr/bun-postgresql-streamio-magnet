@@ -27,7 +27,8 @@ export class TorrentioApiService {
   #torHost;
   #torPort;
   #torControlPort;
-  #torControlHost;
+    #torControlHost;
+    #torRotationInterval;
   #maxRetries;
   #retryDelay;
 
@@ -79,7 +80,9 @@ export class TorrentioApiService {
     this.#providerConfigs = this.#initializeProviderConfigs();
     this.#manifestCache = new Map();
     this.#manifestCacheExpiry = 24 * 60 * 60 * 1000; // 24 horas en milisegundos
+    this.#torRotationInterval = null;
     this.#ensureTorrentioFileExists();
+    this.#startTorRotation();
     
     // Configuración de Tor con socks-proxy-agent
     if (this.#torEnabled) {
@@ -1245,6 +1248,41 @@ export class TorrentioApiService {
         resolve(false);
       });
     });
+  }
+
+  /**
+   * Inicia la rotación automática de circuitos Tor cada 5 minutos
+   * @private
+   */
+  #startTorRotation() {
+    if (!this.#torEnabled) {
+      this.#log('debug', 'Tor no está habilitado, omitiendo rotación automática');
+      return;
+    }
+
+    // Rotar circuitos cada 5 minutos (300000 ms)
+    this.#torRotationInterval = setInterval(async () => {
+      try {
+        await this.#rotateTorSession();
+        this.#log('info', 'Rotación automática de circuitos Tor completada');
+      } catch (error) {
+        this.#log('error', 'Error en rotación automática de Tor:', error);
+      }
+    }, 300000);
+
+    this.#log('info', 'Rotación automática de circuitos Tor iniciada (cada 5 minutos)');
+  }
+
+  /**
+   * Detiene la rotación automática de circuitos Tor
+   * @private
+   */
+  #stopTorRotation() {
+    if (this.#torRotationInterval) {
+      clearInterval(this.#torRotationInterval);
+      this.#torRotationInterval = null;
+      this.#log('info', 'Rotación automática de circuitos Tor detenida');
+    }
   }
 
   /**
