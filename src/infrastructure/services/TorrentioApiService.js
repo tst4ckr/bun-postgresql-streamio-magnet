@@ -81,9 +81,8 @@ export class TorrentioApiService {
     this.#manifestCacheExpiry = 24 * 60 * 60 * 1000; // 24 horas en milisegundos
     this.#ensureTorrentioFileExists();
     
-    // Configurar tor-request si está habilitado
+    // Configuración de Tor con socks-proxy-agent
     if (this.#torEnabled) {
-      torRequest.setTorAddress(this.#torHost, this.#torPort);
       this.#log('info', `Tor configurado en ${this.#torHost}:${this.#torPort}`);
     }
   }
