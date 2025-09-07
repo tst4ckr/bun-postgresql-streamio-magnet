@@ -6,3 +6,5 @@ services:
       - "9050:9050"
     volumes:
       - .:/app
+    environment:
+      - WINDOWS_DEV=true

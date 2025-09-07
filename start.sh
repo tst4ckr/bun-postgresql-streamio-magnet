@@ -7,5 +7,11 @@ gosu debian-tor /usr/bin/tor -f /etc/tor/torrc &
 # Esperar a que Tor se inicialice
 sleep 5
 
-# Ejecutar la aplicación bun como root para evitar problemas de permisos en montajes de Windows
-exec bun run start
+# Verificar si se ejecuta en entorno de nube (sin problemas de bind mount)
+if [ -z "$WINDOWS_DEV" ]; then
+    # Producción/Nube: Ejecutar como appuser por seguridad
+    exec gosu appuser bun run start
+else
+    # Desarrollo en Windows: Ejecutar como root para manejar permisos de bind mount
+    exec bun run start
+fi
