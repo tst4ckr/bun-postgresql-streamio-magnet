@@ -74,6 +74,8 @@ export class TorrentioApiService {
     this.#torEnabled = torConfig.enabled ?? true;
     this.#torHost = torConfig.host ?? '127.0.0.1';
     this.#torPort = torConfig.port ?? 9050;
+    this.#torControlHost = torConfig.controlHost ?? '127.0.0.1';
+    this.#torControlPort = torConfig.controlPort ?? 9051;
     this.#maxRetries = torConfig.maxRetries ?? 3;
     this.#retryDelay = torConfig.retryDelay ?? 2000;
     
@@ -1290,6 +1292,12 @@ export class TorrentioApiService {
    * @private
    */
   async #rotateTorSession() {
+    // Validar configuración de control de Tor
+    if (!this.#torControlPort || !this.#torControlHost) {
+      this.#log('warn', 'Control de Tor no configurado correctamente - saltando rotación');
+      return;
+    }
+
     return new Promise((resolve) => {
       const socket = net.createConnection({ port: this.#torControlPort, host: this.#torControlHost }, () => {
         socket.write('AUTHENTICATE ""\r\n');
