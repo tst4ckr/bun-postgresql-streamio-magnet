@@ -83,7 +83,17 @@ export class StreamHandler {
         
       } catch (error) {
         const duration = Date.now() - startTime;
-        this.#logger.error(`Stream request failed in ${duration}ms:`, error);
+        
+        // Preservar stack trace completo para errores asíncronos
+        const errorDetails = {
+          message: error.message,
+          stack: error.stack,
+          name: error.name,
+          code: error.code,
+          duration
+        };
+        
+        this.#logger.error(`Stream request failed in ${duration}ms:`, errorDetails);
         
         return this.#createErrorResponse(error);
       }
@@ -169,6 +179,7 @@ export class StreamHandler {
    * @private
    * @param {Object} args 
    * @throws {Error}
+   * @returns {Promise<Object>} Resultado de validación
    */
   async #validateStreamRequest(args) {
     if (!args?.type || !['movie', 'series', 'anime'].includes(args.type)) {
@@ -179,26 +190,36 @@ export class StreamHandler {
       throw new Error('ID de contenido requerido');
     }
 
-    // Usar validación dinámica para verificar el ID
-    // Para stream requests no forzamos conversión a IMDb ya que Torrentio maneja anime IDs
-    const validationResult = await this.#validationService.validateContentId(
-      args.id, 
-      'stream_request',
-      { strictMode: false }
-    );
-    
-    if (!validationResult.isValid) {
-      const errorMsg = validationResult.details?.error || 'ID de contenido inválido';
-      this.#logger.warn(`Validación falló para ID ${args.id}: ${errorMsg}`);
-      throw new Error(`ID de contenido inválido: ${errorMsg}`);
-    }
+    try {
+      // Usar validación dinámica para verificar el ID
+      // Para stream requests no forzamos conversión a IMDb ya que Torrentio maneja anime IDs
+      const validationResult = await this.#validationService.validateContentId(
+        args.id, 
+        'stream_request',
+        { strictMode: false }
+      );
+      
+      if (!validationResult.isValid) {
+        const errorMsg = validationResult.details?.error || 'ID de contenido inválido';
+        this.#logger.warn(`Validación falló para ID ${args.id}: ${errorMsg}`);
+        throw new Error(`ID de contenido inválido: ${errorMsg}`);
+      }
 
-    this.#logger.debug(`Validación exitosa para ID ${args.id}:`, {
-      type: validationResult.details?.detection?.type,
-      confidence: validationResult.details?.detection?.confidence
-    });
-    
-    return validationResult;
+      this.#logger.debug(`Validación exitosa para ID ${args.id}:`, {
+        type: validationResult.details?.detection?.type,
+        confidence: validationResult.details?.detection?.confidence
+      });
+      
+      return validationResult;
+      
+    } catch (error) {
+      // Preservar stack trace y contexto para errores de validación
+      const validationError = new Error(`Error en validación de stream request para ${args.id}: ${error.message}`);
+      validationError.cause = error;
+      validationError.contentId = args.id;
+      validationError.contentType = args.type;
+      throw validationError;
+    }
   }
 
   /**

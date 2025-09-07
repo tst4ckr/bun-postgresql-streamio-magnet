@@ -236,7 +236,8 @@ export class CascadingMagnetRepository extends MagnetRepository {
       const idType = this.#detectIdType(contentId);
       this.#log('debug', `Tipo de ID detectado: ${idType} para ${contentId}`);
       
-      // Buscar en todas las fuentes locales simultáneamente
+      // Buscar en todas las fuentes locales simultáneamente usando Promise.allSettled
+      // para evitar que un error en una fuente cancele las demás búsquedas
       const searchPromises = [
         this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv'),
         this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv')
@@ -249,7 +250,20 @@ export class CascadingMagnetRepository extends MagnetRepository {
         searchPromises.push(Promise.resolve([]));
       }
       
-      const [primaryResults, secondaryResults, animeResults] = await Promise.all(searchPromises);
+      const searchResults = await Promise.allSettled(searchPromises);
+      
+      // Extraer resultados exitosos y loggear errores sin interrumpir el flujo
+      const primaryResults = searchResults[0].status === 'fulfilled' ? searchResults[0].value : [];
+      const secondaryResults = searchResults[1].status === 'fulfilled' ? searchResults[1].value : [];
+      const animeResults = searchResults[2].status === 'fulfilled' ? searchResults[2].value : [];
+      
+      // Loggear errores de búsquedas fallidas sin interrumpir el proceso
+      searchResults.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          const sources = ['magnets.csv', 'torrentio.csv', 'anime.csv'];
+          this.#log('warn', `Error en búsqueda de ${sources[index]} para ${contentId}:`, result.reason?.message);
+        }
+      });
       
       // Enriquecer magnets con metadatos
       const enrichedPrimary = this.#enrichMagnetsWithMetadata(primaryResults, metadata);
@@ -692,23 +706,37 @@ export class CascadingMagnetRepository extends MagnetRepository {
   async #fallbackSearch(contentId, type) {
     this.#log('info', `Ejecutando búsqueda de fallback para ${contentId}`);
     
-    // Detectar tipo de ID y aplicar estrategia específica
-    const idType = this.#detectIdType(contentId);
-    
-    // Buscar en todas las fuentes locales simultáneamente
-    const searchPromises = [
-      this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv'),
-      this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv')
-    ];
-    
-    // Para anime, priorizar búsqueda en repositorio de anime
-    if (type === 'anime' || idType === 'kitsu' || idType === 'mal' || idType === 'anilist') {
-      searchPromises.push(this.#searchInRepositoryByContentId(this.#animeRepository, contentId, 'anime.csv'));
-    } else {
-      searchPromises.push(Promise.resolve([]));
-    }
-    
-    const [primaryResults, secondaryResults, animeResults] = await Promise.all(searchPromises);
+    try {
+      // Detectar tipo de ID y aplicar estrategia específica
+      const idType = this.#detectIdType(contentId);
+      
+      // Buscar en todas las fuentes locales simultáneamente usando Promise.allSettled
+      const searchPromises = [
+        this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv'),
+        this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv')
+      ];
+      
+      // Para anime, priorizar búsqueda en repositorio de anime
+      if (type === 'anime' || idType === 'kitsu' || idType === 'mal' || idType === 'anilist') {
+        searchPromises.push(this.#searchInRepositoryByContentId(this.#animeRepository, contentId, 'anime.csv'));
+      } else {
+        searchPromises.push(Promise.resolve([]));
+      }
+      
+      const searchResults = await Promise.allSettled(searchPromises);
+      
+      // Extraer resultados exitosos de fallback
+      const primaryResults = searchResults[0].status === 'fulfilled' ? searchResults[0].value : [];
+      const secondaryResults = searchResults[1].status === 'fulfilled' ? searchResults[1].value : [];
+      const animeResults = searchResults[2].status === 'fulfilled' ? searchResults[2].value : [];
+      
+      // Loggear errores de fallback sin interrumpir
+      searchResults.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          const sources = ['magnets.csv', 'torrentio.csv', 'anime.csv'];
+          this.#log('warn', `Error en fallback de ${sources[index]} para ${contentId}:`, result.reason?.message);
+        }
+      });
     
     // Lógica de priorización básica
     let finalResults = this.#prioritizeResults({
@@ -733,6 +761,21 @@ export class CascadingMagnetRepository extends MagnetRepository {
     }
     
     throw new MagnetNotFoundError(contentId);
+    
+    } catch (error) {
+      // Preservar stack trace completo del error de fallback
+      const fallbackError = {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        contentId,
+        type,
+        operation: 'fallback_search'
+      };
+      
+      this.#log('error', 'Error crítico en búsqueda de fallback:', fallbackError);
+      throw new RepositoryError(`Fallback search failed for ${contentId}`, { cause: error, contentId, type });
+    }
   }
   
   /**

@@ -1,27 +1,42 @@
 /**
- * @fileoverview EnhancedLogger - Sistema de logging mejorado con seguimiento de archivos fuente y números de línea.
- * Proporciona trazabilidad completa de los registros para facilitar el debugging y mantenimiento.
+ * @fileoverview EnhancedLogger - Sistema de logging optimizado con lazy evaluation y structured logging.
+ * Proporciona trazabilidad completa con mínimo overhead de rendimiento.
  */
 
 /**
- * Logger mejorado que incluye información del archivo fuente y número de línea
- * en todos los registros para mantener un control preciso y detallado.
+ * Logger optimizado con lazy evaluation, structured logging y minimal overhead
+ * Implementa mejores prácticas de rendimiento para aplicaciones de alta concurrencia
  */
 export class EnhancedLogger {
   #logLevel;
   #enableSourceTracking;
+  #logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
+  #isProduction = process.env.NODE_ENV === 'production';
+  #sourceLocationCache = new Map();
+  #minimalOutput = false;
+  #errorOnly = false;
 
   /**
    * @param {string} logLevel - Nivel de logging (debug, info, warn, error)
    * @param {boolean} enableSourceTracking - Habilitar seguimiento de archivos fuente
    */
-  constructor(logLevel = 'info', enableSourceTracking = true) {
+  constructor(logLevel = 'info', enableSourceTracking = true, productionConfig = {}) {
     this.#logLevel = logLevel;
-    this.#enableSourceTracking = enableSourceTracking;
+    
+    // Aplicar configuración específica de producción
+    if (this.#isProduction) {
+      this.#enableSourceTracking = productionConfig.disableSourceTracking ? false : enableSourceTracking;
+      this.#minimalOutput = productionConfig.minimalOutput || false;
+      this.#errorOnly = productionConfig.errorOnly || false;
+    } else {
+      this.#enableSourceTracking = enableSourceTracking;
+      this.#minimalOutput = false;
+      this.#errorOnly = false;
+    }
   }
 
   /**
-   * Obtiene información del archivo fuente y número de línea del llamador
+   * Obtiene información del archivo fuente y número de línea del llamador con cache optimizado
    * @returns {string} Información de ubicación del código fuente
    */
   #getSourceLocation() {
@@ -29,64 +44,112 @@ export class EnhancedLogger {
       return '';
     }
 
-    const stack = new Error().stack;
-    if (!stack) {
-      return '';
-    }
-
-    const lines = stack.split('\n');
-    // Buscar la línea que no sea del logger (saltamos las primeras 3 líneas del stack)
-    for (let i = 3; i < lines.length; i++) {
-      const line = lines[i];
-      if (line && !line.includes('EnhancedLogger.js')) {
-        const match = line.match(/at\s+(?:.*\s+\()?([^\s]+):(\d+):(\d+)\)?/);
-        if (match) {
-          const [, filePath, lineNumber] = match;
-          // Extraer solo el nombre del archivo y directorio padre para mayor legibilidad
-          const pathParts = filePath.replace(/\\/g, '/').split('/');
-          const fileName = pathParts.slice(-2).join('/');
-          return `[${fileName}:${lineNumber}]`;
+    // Usar Error.prepareStackTrace para mejor rendimiento en V8
+    const originalPrepareStackTrace = Error.prepareStackTrace;
+    let callSite;
+    
+    try {
+      Error.prepareStackTrace = (_, stack) => stack;
+      const stack = new Error().stack;
+      
+      // Encontrar el primer frame que no sea del logger
+      for (let i = 2; i < stack.length; i++) {
+        const frame = stack[i];
+        const fileName = frame.getFileName();
+        if (fileName && !fileName.includes('EnhancedLogger.js')) {
+          callSite = frame;
+          break;
         }
       }
+    } finally {
+      Error.prepareStackTrace = originalPrepareStackTrace;
     }
-    return '';
+
+    if (!callSite) return '';
+
+    const fileName = callSite.getFileName();
+    const lineNumber = callSite.getLineNumber();
+    const cacheKey = `${fileName}:${lineNumber}`;
+    
+    // Cache del formato de ubicación para evitar procesamiento repetido
+    if (this.#sourceLocationCache.has(cacheKey)) {
+      return this.#sourceLocationCache.get(cacheKey);
+    }
+
+    const pathParts = fileName.replace(/\\/g, '/').split('/');
+    const shortPath = pathParts.slice(-2).join('/');
+    const location = `[${shortPath}:${lineNumber}]`;
+    
+    // Limitar cache a 100 entradas para evitar memory leaks
+    if (this.#sourceLocationCache.size >= 100) {
+      const firstKey = this.#sourceLocationCache.keys().next().value;
+      this.#sourceLocationCache.delete(firstKey);
+    }
+    
+    this.#sourceLocationCache.set(cacheKey, location);
+    return location;
   }
 
   /**
-   * Formatea el mensaje de log con timestamp y ubicación del código fuente
+   * Formatea el mensaje de log con lazy evaluation y structured logging
    * @param {string} level - Nivel del log
-   * @param {string} message - Mensaje principal
+   * @param {string|Function} message - Mensaje principal o función que lo genera
    * @param {Array} args - Argumentos adicionales
    * @returns {Object} Mensaje formateado y argumentos
    */
   #formatMessage(level, message, args) {
+    // Lazy evaluation: solo evaluar el mensaje si es necesario
+    const actualMessage = typeof message === 'function' ? message() : message;
+    
+    // En producción con salida mínima, usar formato ultra-compacto
+    if (this.#isProduction && this.#minimalOutput) {
+      const levelTag = level.charAt(0).toUpperCase(); // Solo primera letra
+      return {
+        formattedMessage: `${levelTag}: ${actualMessage}`,
+        args
+      };
+    }
+    
+    // En producción estándar, usar formato simple
+    if (this.#isProduction) {
+      const timestamp = new Date().toISOString();
+      const levelTag = `[${level.toUpperCase()}]`;
+      return {
+        formattedMessage: `${levelTag} ${timestamp} - ${actualMessage}`,
+        args
+      };
+    }
+    
+    // En desarrollo, incluir información completa
     const timestamp = new Date().toISOString();
     const sourceLocation = this.#getSourceLocation();
     const levelTag = `[${level.toUpperCase()}]`;
     
     const formattedMessage = sourceLocation 
-      ? `${levelTag} ${timestamp} ${sourceLocation} - ${message}`
-      : `${levelTag} ${timestamp} - ${message}`;
+      ? `${levelTag} ${timestamp} ${sourceLocation} - ${actualMessage}`
+      : `${levelTag} ${timestamp} - ${actualMessage}`;
 
     return { formattedMessage, args };
   }
 
   /**
-   * Verifica si el nivel de log debe ser mostrado
+   * Verifica si el nivel de log debe ser mostrado (optimizado)
    * @param {string} level - Nivel a verificar
    * @returns {boolean} True si debe mostrarse
    */
   #shouldLog(level) {
-    const levels = { error: 0, warn: 1, info: 2, debug: 3 };
-    return levels[level] <= levels[this.#logLevel];
+    return this.#logLevels[level] <= this.#logLevels[this.#logLevel];
   }
 
   /**
-   * Log de información
-   * @param {string} message - Mensaje a loggear
+   * Log de información con lazy evaluation
+   * @param {string|Function} message - Mensaje a loggear o función que lo genera
    * @param {...any} args - Argumentos adicionales
    */
   info(message, ...args) {
+    // En producción con errorOnly, omitir logs info
+    if (this.#isProduction && this.#errorOnly) return;
+    
     if (this.#shouldLog('info')) {
       const { formattedMessage, args: formattedArgs } = this.#formatMessage('info', message, args);
       console.log(formattedMessage, ...formattedArgs);
@@ -94,11 +157,14 @@ export class EnhancedLogger {
   }
 
   /**
-   * Log de advertencia
-   * @param {string} message - Mensaje a loggear
+   * Log de advertencia con lazy evaluation
+   * @param {string|Function} message - Mensaje a loggear o función que lo genera
    * @param {...any} args - Argumentos adicionales
    */
   warn(message, ...args) {
+    // En producción con errorOnly, omitir logs warn
+    if (this.#isProduction && this.#errorOnly) return;
+    
     if (this.#shouldLog('warn')) {
       const { formattedMessage, args: formattedArgs } = this.#formatMessage('warn', message, args);
       console.warn(formattedMessage, ...formattedArgs);
@@ -106,8 +172,8 @@ export class EnhancedLogger {
   }
 
   /**
-   * Log de error
-   * @param {string} message - Mensaje a loggear
+   * Log de error con lazy evaluation
+   * @param {string|Function} message - Mensaje a loggear o función que lo genera
    * @param {...any} args - Argumentos adicionales
    */
   error(message, ...args) {
@@ -118,11 +184,14 @@ export class EnhancedLogger {
   }
 
   /**
-   * Log de debug
-   * @param {string} message - Mensaje a loggear
+   * Log de debug con lazy evaluation
+   * @param {string|Function} message - Mensaje a loggear o función que lo genera
    * @param {...any} args - Argumentos adicionales
    */
   debug(message, ...args) {
+    // En producción, omitir completamente logs debug para máximo rendimiento
+    if (this.#isProduction) return;
+    
     if (this.#shouldLog('debug')) {
       const { formattedMessage, args: formattedArgs } = this.#formatMessage('debug', message, args);
       console.log(formattedMessage, ...formattedArgs);
@@ -160,14 +229,108 @@ export class EnhancedLogger {
    */
   createChild(prefix) {
     const childLogger = new EnhancedLogger(this.#logLevel, this.#enableSourceTracking);
-    const originalFormatMessage = childLogger._formatMessage;
     
-    childLogger._formatMessage = (level, message, args) => {
-      const prefixedMessage = `[${prefix}] ${message}`;
-      return originalFormatMessage.call(childLogger, level, prefixedMessage, args);
+    // Sobrescribir métodos de logging para incluir prefijo
+    const originalInfo = childLogger.info.bind(childLogger);
+    const originalWarn = childLogger.warn.bind(childLogger);
+    const originalError = childLogger.error.bind(childLogger);
+    const originalDebug = childLogger.debug.bind(childLogger);
+    
+    childLogger.info = (message, ...args) => {
+      const prefixedMessage = typeof message === 'function' 
+        ? () => `[${prefix}] ${message()}`
+        : `[${prefix}] ${message}`;
+      return originalInfo(prefixedMessage, ...args);
+    };
+    
+    childLogger.warn = (message, ...args) => {
+      const prefixedMessage = typeof message === 'function' 
+        ? () => `[${prefix}] ${message()}`
+        : `[${prefix}] ${message}`;
+      return originalWarn(prefixedMessage, ...args);
+    };
+    
+    childLogger.error = (message, ...args) => {
+      const prefixedMessage = typeof message === 'function' 
+        ? () => `[${prefix}] ${message()}`
+        : `[${prefix}] ${message}`;
+      return originalError(prefixedMessage, ...args);
+    };
+    
+    childLogger.debug = (message, ...args) => {
+      const prefixedMessage = typeof message === 'function' 
+        ? () => `[${prefix}] ${message()}`
+        : `[${prefix}] ${message}`;
+      return originalDebug(prefixedMessage, ...args);
     };
     
     return childLogger;
+  }
+
+  /**
+   * Log estructurado con metadatos adicionales
+   * @param {string} level - Nivel del log
+   * @param {string|Function} message - Mensaje principal
+   * @param {Object} metadata - Metadatos estructurados
+   */
+  structured(level, message, metadata = {}) {
+    if (this.#shouldLog(level)) {
+      const { formattedMessage, args: formattedArgs } = this.#formatMessage(level, message, []);
+      const structuredData = {
+        timestamp: new Date().toISOString(),
+        level: level.toUpperCase(),
+        message: typeof message === 'function' ? message() : message,
+        ...metadata
+      };
+      
+      if (this.#isProduction) {
+        // En producción, usar JSON compacto
+        console.log(JSON.stringify(structuredData));
+      } else {
+        // En desarrollo, usar formato legible
+        console.log(formattedMessage, '\nMetadata:', structuredData);
+      }
+    }
+  }
+
+  /**
+   * Log con transaction ID para correlación de requests
+   * @param {string} level - Nivel del log
+   * @param {string} transactionId - ID de transacción
+   * @param {string|Function} message - Mensaje principal
+   * @param {...any} args - Argumentos adicionales
+   */
+  withTransaction(level, transactionId, message, ...args) {
+    if (this.#shouldLog(level)) {
+      const prefixedMessage = typeof message === 'function' 
+        ? () => `[TXN:${transactionId}] ${message()}`
+        : `[TXN:${transactionId}] ${message}`;
+      
+      const { formattedMessage, args: formattedArgs } = this.#formatMessage(level, prefixedMessage, args);
+      const logMethod = level === 'error' ? console.error : 
+                       level === 'warn' ? console.warn : console.log;
+      logMethod(formattedMessage, ...formattedArgs);
+    }
+  }
+
+  /**
+   * Limpia el cache de ubicaciones para liberar memoria
+   */
+  clearCache() {
+    this.#sourceLocationCache.clear();
+  }
+
+  /**
+   * Obtiene estadísticas del logger
+   * @returns {Object} Estadísticas de uso
+   */
+  getStats() {
+    return {
+      cacheSize: this.#sourceLocationCache.size,
+      logLevel: this.#logLevel,
+      sourceTracking: this.#enableSourceTracking,
+      isProduction: this.#isProduction
+    };
   }
 }
 

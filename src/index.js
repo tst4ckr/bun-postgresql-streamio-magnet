@@ -99,12 +99,18 @@ class MagnetAddon {
   }
 
   /**
-   * Crea un logger mejorado con seguimiento de archivos fuente.
-   * @returns {EnhancedLogger} Logger con trazabilidad completa.
+   * Crea un logger mejorado con configuración optimizada para producción.
+   * @returns {EnhancedLogger} Logger con trazabilidad completa y overhead mínimo.
    */
   #createLogger() {
-    const { logLevel } = this.#config.logging;
-    return new EnhancedLogger(logLevel, true);
+    const { logLevel, enableDetailedLogging, production } = this.#config.logging;
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    // En producción, usar configuración optimizada
+    const sourceTracking = isProduction ? false : enableDetailedLogging;
+    const productionConfig = isProduction ? production : {};
+    
+    return new EnhancedLogger(logLevel, sourceTracking, productionConfig);
   }
 }
 

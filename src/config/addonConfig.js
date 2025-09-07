@@ -59,11 +59,18 @@ const config = {
     metadataCacheMaxAge: process.env.CACHE_METADATA_MAX_AGE || 86400, // 1 día
   },
   logging: {
-    logLevel: process.env.LOG_LEVEL || 'info', // 'debug', 'info', 'warn', 'error'
-    enableDetailedLogging: process.env.ENABLE_DETAILED_LOGGING === 'true' || true,
-    logFormat: process.env.LOG_FORMAT || 'detailed', // 'simple', 'detailed', 'json'
+    // Optimización para producción: usar 'warn' por defecto en producción, 'info' en desarrollo
+    logLevel: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'warn' : 'info'),
+    enableDetailedLogging: process.env.ENABLE_DETAILED_LOGGING === 'true' || (process.env.NODE_ENV !== 'production'),
+    logFormat: process.env.LOG_FORMAT || (process.env.NODE_ENV === 'production' ? 'simple' : 'detailed'),
     logToFile: process.env.LOG_TO_FILE === 'true' || false,
-    logFilePath: process.env.LOG_FILE_PATH || resolvePath('logs/addon.log')
+    logFilePath: process.env.LOG_FILE_PATH || resolvePath('logs/addon.log'),
+    // Configuración específica para producción
+    production: {
+      disableSourceTracking: true,
+      minimalOutput: true,
+      errorOnly: process.env.PRODUCTION_ERROR_ONLY === 'true' || false
+    }
   },
   repository: {
     primaryCsvPath: process.env.PRIMARY_CSV_PATH || resolvePath('data/magnets.csv'),

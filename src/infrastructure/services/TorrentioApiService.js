@@ -166,7 +166,18 @@ export class TorrentioApiService {
       return magnets;
       
     } catch (error) {
-      this.#log('error', `Error al consultar API Torrentio para ${contentId}:`, error);
+      // Preservar stack trace completo del error de API
+      const apiError = {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        contentId,
+        type: detectedType,
+        operation: 'api_search',
+        url: streamUrl
+      };
+      
+      this.#log('error', 'Error en búsqueda de API Torrentio:', apiError);
       return [];
     }
   }
