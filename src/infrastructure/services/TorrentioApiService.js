@@ -28,10 +28,6 @@ export class TorrentioApiService {
   #torPort;
   #torControlPort;
   #torControlHost;
-  #providerConfigs;
-  #torrentioFilePath;
-  #manifestCache;
-  #manifestCacheExpiry;
   #maxRetries;
   #retryDelay;
 
