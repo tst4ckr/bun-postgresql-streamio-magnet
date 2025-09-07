@@ -3,7 +3,7 @@
  * Maneja consultas externas y persistencia de resultados en torrentio.csv.
  */
 
-import { writeFileSync, appendFileSync, existsSync, mkdirSync } from 'fs';
+import { writeFileSync, appendFileSync, existsSync, mkdirSync, readFileSync } from 'fs';
 import { dirname } from 'path';
 import net from 'net';
 import { Magnet } from '../../domain/entities/Magnet.js';
@@ -702,12 +702,72 @@ export class TorrentioApiService {
     }
     
     try {
-      for (const magnet of magnets) {
+      // Verificar permisos de escritura antes de intentar escribir
+      const fileDir = dirname(this.#torrentioFilePath);
+      if (!existsSync(fileDir)) {
+        this.#logger.warn(`Directorio ${fileDir} no existe, creando...`);
+        mkdirSync(fileDir, { recursive: true });
+      }
+      
+      // Leer archivo existente para evitar duplicados
+      const existingMagnets = new Set();
+      if (existsSync(this.#torrentioFilePath)) {
+        const existingContent = readFileSync(this.#torrentioFilePath, 'utf8');
+        const lines = existingContent.split('\n').slice(1); // Omitir header
+        for (const line of lines) {
+          if (line.trim()) {
+            const fields = line.split(',');
+            if (fields.length >= 3) {
+              // Usar content_id + magnet como clave única
+              const key = `${fields[0]}|${fields[2]}`;
+              existingMagnets.add(key);
+            }
+          }
+        }
+      }
+      
+      // Filtrar magnets duplicados antes de guardar
+      const newMagnets = magnets.filter(magnet => {
+        const key = `${magnet.content_id}|${magnet.magnet}`;
+        return !existingMagnets.has(key);
+      });
+      
+      if (newMagnets.length === 0) {
+        this.#logger.debug('Todos los magnets ya existen en el archivo, omitiendo guardado');
+        return;
+      }
+      
+      for (const magnet of newMagnets) {
         const csvLine = this.#magnetToCsvLine(magnet);
         appendFileSync(this.#torrentioFilePath, csvLine + '\n', 'utf8');
       }
+      
+      this.#logger.info(`Guardados ${newMagnets.length} magnets nuevos (${magnets.length - newMagnets.length} duplicados omitidos)`);
     } catch (error) {
-      this.#log('error', 'Error al guardar magnets en torrentio.csv:', error);
+      // Crear objeto de error detallado para debugging
+      const fileError = {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        code: error.code,
+        errno: error.errno,
+        syscall: error.syscall,
+        path: error.path || this.#torrentioFilePath,
+        operation: 'saveMagnetsToFile',
+        magnetCount: magnets.length,
+        timestamp: new Date().toISOString()
+      };
+      
+      this.#log('error', 'Error al guardar magnets en torrentio.csv:', fileError);
+      
+      // En caso de error de permisos, continuar sin interrumpir el flujo
+      if (error.code === 'EACCES') {
+        this.#logger.warn('Permisos insuficientes para escribir archivo CSV. Continuando sin guardar.');
+      } else if (error.code === 'ENOENT') {
+        this.#logger.warn('Archivo o directorio no encontrado. Continuando sin guardar.');
+      } else {
+        this.#logger.warn(`Error de sistema (${error.code}). Continuando sin guardar.`);
+      }
     }
   }
 
