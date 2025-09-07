@@ -1,0 +1,8 @@
+services:
+  app:
+    build: .
+    ports:
+      - "7000:7000"
+      - "9050:9050"
+    volumes:
+      - .:/app

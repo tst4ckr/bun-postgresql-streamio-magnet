@@ -1,23 +1,53 @@
-FROM oven/bun:1
+# Usar la imagen oficial de Bun basada en Debian
+FROM oven/bun:debian
+
+# Instalar Tor y dependencias
+RUN apt-get update && \
+    apt-get install -y tor && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Crear directorio para configuración de Tor
+RUN mkdir -p /etc/tor
+
+# Crear archivo de configuración de Tor
+RUN echo "SocksPort 0.0.0.0:9050" > /etc/tor/torrc && \
+    echo "ControlPort 0.0.0.0:9051" >> /etc/tor/torrc && \
+    echo "DataDirectory /var/lib/tor" >> /etc/tor/torrc && \
+    echo "Log notice stdout" >> /etc/tor/torrc && \
+    echo "RunAsDaemon 1" >> /etc/tor/torrc && \
+    echo "MaxCircuitDirtiness 300" >> /etc/tor/torrc && \
+    echo "NewCircuitPeriod 300" >> /etc/tor/torrc && \
+    echo "CircuitBuildTimeout 60" >> /etc/tor/torrc
+
+# Crear directorio de datos para Tor
+RUN mkdir -p /var/lib/tor && \
+    chown -R debian-tor:debian-tor /var/lib/tor && \
+    chmod 700 /var/lib/tor
 
 WORKDIR /app
 
-# Instalar dependencias primero (aprovecha la caché de capas)
+# Copiar archivos de la aplicación
 COPY package.json bun.lock ./
 RUN bun install
-
-# Copiar el resto del proyecto
 COPY . .
 
-# Variables de entorno por defecto seguras para contenedores
+# Dar permisos de ejecución al script de inicio
+RUN chmod +x start.sh
+
+# Variables de entorno
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV CONTAINER_ENV=true
 
-# El addon expone por defecto el puerto 7000 (usará $PORT si está definido en el entorno)
-EXPOSE 7000
+# Exponer puertos
+EXPOSE 7000 9050
 
-# Comando de arranque en producción
-CMD ["bun", "run", "start:prod"]
+# Comando de arranque
+CMD ["./start.sh"]
+
+# Healthcheck para verificar que Tor está funcionando
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD nc -z localhost 9050 || exit 1
 
 
