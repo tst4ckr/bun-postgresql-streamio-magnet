@@ -25,6 +25,12 @@ export class IdDetectorService {
         description: 'Kitsu ID format (optional kitsu: prefix followed by digits)',
         validator: (id) => this.#validateKitsuFormat(id)
       }],
+      ['kitsu_series', {
+        pattern: /^kitsu:\d+:\d+$/,
+        prefix: 'kitsu:',
+        description: 'Kitsu series episode format (kitsu:id:episode)',
+        validator: (id) => this.#validateKitsuSeriesFormat(id)
+      }],
       ['mal', {
         pattern: /^(mal:)?\d+$/,
         prefix: 'mal:',
@@ -139,6 +145,23 @@ export class IdDetectorService {
   #validateKitsuFormat(id) {
     const cleanId = id.replace(/^kitsu:/, '');
     return /^\d+$/.test(cleanId) && parseInt(cleanId) > 0;
+  }
+
+  /**
+   * Valida formato de ID de serie Kitsu
+   * @param {string} id - ID a validar
+   * @returns {boolean} True si es válido
+   */
+  #validateKitsuSeriesFormat(id) {
+    const parts = id.split(':');
+    if (parts.length !== 3 || parts[0] !== 'kitsu') {
+      return false;
+    }
+    
+    const animeId = parseInt(parts[1]);
+    const episode = parseInt(parts[2]);
+    
+    return !isNaN(animeId) && animeId >= 1 && !isNaN(episode) && episode >= 1;
   }
 
   /**

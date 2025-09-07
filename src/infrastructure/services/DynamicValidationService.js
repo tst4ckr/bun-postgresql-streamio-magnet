@@ -39,6 +39,14 @@ export class DynamicValidationService {
           this.#validateKitsuBusinessRules.bind(this)
         ]
       }],
+      ['kitsu_series', {
+        minLength: 3,
+        maxLength: 25,
+        allowedChars: /^kitsu:\d+:\d+$/,
+        businessRules: [
+          this.#validateKitsuSeriesBusinessRules.bind(this)
+        ]
+      }],
       ['mal', {
         minLength: 1,
         maxLength: 10,
@@ -69,13 +77,13 @@ export class DynamicValidationService {
     this.validationContexts = new Map([
       ['stream_request', {
         description: 'Validación para peticiones de stream',
-        requiredTypes: ['imdb', 'imdb_series', 'kitsu', 'mal', 'anilist', 'anidb'],
+        requiredTypes: ['imdb', 'imdb_series', 'kitsu', 'kitsu_series', 'mal', 'anilist', 'anidb'],
         allowConversion: false,
         strictMode: false
       }],
       ['api_endpoint', {
         description: 'Validación para endpoints de API',
-        requiredTypes: ['imdb', 'imdb_series', 'kitsu', 'mal', 'anilist', 'anidb'],
+        requiredTypes: ['imdb', 'imdb_series', 'kitsu', 'kitsu_series', 'mal', 'anilist', 'anidb'],
         allowConversion: false,
         strictMode: true
       }],
@@ -436,6 +444,62 @@ export class DynamicValidationService {
       businessRule: 'imdb_series_format',
       imdbId: imdbPart,
       season,
+      episode,
+      context: context.description
+    });
+  }
+
+  /**
+   * Reglas de negocio para IDs de Kitsu series
+   * @param {Object} detection - Detección
+   * @param {Object} context - Contexto
+   * @param {Object} options - Opciones
+   * @returns {Promise<Object>} Resultado de validación
+   */
+  async #validateKitsuSeriesBusinessRules(detection, context, options) {
+    const parts = detection.id.split(':');
+    if (parts.length !== 3) {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'Formato de ID de serie Kitsu inválido',
+        expected: 'kitsu:id:episode',
+        actual: detection.id
+      });
+    }
+
+    const [prefix, kitsuId, episodePart] = parts;
+    const animeId = parseInt(kitsuId);
+    const episode = parseInt(episodePart);
+
+    // Validar prefijo
+    if (prefix !== 'kitsu') {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'Prefijo inválido para ID de serie Kitsu',
+        expected: 'kitsu',
+        actual: prefix
+      });
+    }
+
+    // Validar ID de anime
+    if (isNaN(animeId) || animeId < 1) {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'ID de anime Kitsu inválido',
+        kitsuId,
+        validRange: 'entero positivo'
+      });
+    }
+
+    // Validar número de episodio
+    if (isNaN(episode) || episode < 1 || episode > 9999) {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'Número de episodio inválido',
+        episode: episodePart,
+        validRange: '1-9999'
+      });
+    }
+
+    return this.#createValidationResult(true, detection.id, {
+      businessRule: 'kitsu_series_format',
+      kitsuId: animeId,
       episode,
       context: context.description
     });
