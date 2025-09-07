@@ -17,8 +17,7 @@ RUN mkdir -p /etc/tor
 RUN echo "SocksPort 127.0.0.1:9050" > /etc/tor/torrc && \
     echo "ControlPort 127.0.0.1:9051" >> /etc/tor/torrc && \
     echo "DataDirectory /var/lib/tor" >> /etc/tor/torrc && \
-    echo "Log notice stdout" >> /etc/tor/torrc && \
-    echo "RunAsDaemon 1" >> /etc/tor/torrc
+    echo "Log notice stdout" >> /etc/tor/torrc
 
 # Crear y asegurar el directorio de datos de Tor
 RUN mkdir -p /var/lib/tor && \
@@ -42,9 +41,6 @@ ENV CONTAINER_ENV=true
 
 # Exponer puertos
 EXPOSE 7000
-
-# Cambiar al usuario de la aplicación
-USER appuser
 
 # Comando de arranque
 CMD ["./start.sh"]

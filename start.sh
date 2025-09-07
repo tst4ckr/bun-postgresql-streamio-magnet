@@ -2,7 +2,7 @@
 set -e
 
 # Iniciar Tor como el usuario debian-tor en segundo plano
-/usr/bin/tor -f /etc/tor/torrc --runasdaemon 1 --user debian-tor
+gosu debian-tor /usr/bin/tor -f /etc/tor/torrc &
 
 # Esperar a que Tor se inicialice
 sleep 5
