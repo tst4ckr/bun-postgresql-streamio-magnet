@@ -31,6 +31,11 @@ COPY --chown=appuser:appuser package.json bun.lock ./
 RUN bun install
 COPY --chown=appuser:appuser . .
 
+# Asegurar permisos de escritura en el directorio data
+RUN mkdir -p /app/data && \
+    chown -R appuser:appuser /app/data && \
+    chmod -R 755 /app/data
+
 # Dar permisos de ejecución al script de inicio
 RUN chmod +x start.sh
 
