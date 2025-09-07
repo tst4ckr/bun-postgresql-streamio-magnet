@@ -8,4 +8,4 @@ gosu debian-tor /usr/bin/tor -f /etc/tor/torrc &
 sleep 5
 
 # Ejecutar la aplicación bun como appuser
-exec gosu appuser bun run start:prod
+exec gosu appuser bun run start
