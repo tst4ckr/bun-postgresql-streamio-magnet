@@ -9,7 +9,7 @@ import net from 'net';
 import { Magnet } from '../../domain/entities/Magnet.js';
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 import { addonConfig } from '../../config/addonConfig.js';
-import torRequest from 'tor-request';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 
 /**
  * Servicio para integración con la API de Torrentio de Stremio.
@@ -26,6 +26,12 @@ export class TorrentioApiService {
   #torEnabled;
   #torHost;
   #torPort;
+  #torControlPort;
+  #torControlHost;
+  #providerConfigs;
+  #torrentioFilePath;
+  #manifestCache;
+  #manifestCacheExpiry;
   #maxRetries;
   #retryDelay;
 
@@ -1092,53 +1098,26 @@ export class TorrentioApiService {
     try {
       this.#log('info', `Intento ${attempt}/${this.#maxRetries} - Consultando vía Tor: ${url}`);
       
-      const response = await new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          reject(new Error(`Timeout de ${this.#timeout}ms excedido para: ${url}`));
-        }, this.#timeout);
+      const agent = new SocksProxyAgent(`socks5h://${this.#torHost}:${this.#torPort}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.#timeout);
 
-        torRequest.request({
-          url: url,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; rv:102.0) Gecko/20100101 Firefox/102.0',
-            'Accept': 'application/json'
-          },
-          timeout: this.#timeout
-        }, (error, response, body) => {
-          clearTimeout(timeoutId);
-          
-          if (error) {
-            reject(error);
-            return;
-          }
-
-          // Crear objeto compatible con fetch API
-          const fetchResponse = {
-            ok: response.statusCode >= 200 && response.statusCode < 300,
-            status: response.statusCode,
-            statusText: response.statusMessage || '',
-            headers: response.headers,
-            json: async () => {
-              try {
-                return JSON.parse(body);
-              } catch (parseError) {
-                throw new Error(`Error parsing JSON: ${parseError.message}`);
-              }
-            },
-            text: async () => body
-          };
-          
-          resolve(fetchResponse);
-        });
+      const response = await fetch(url, {
+        agent: agent,
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; rv:102.0) Gecko/20100101 Firefox/102.0',
+          'Accept': 'application/json'
+        }
       });
 
-      // Si la respuesta es exitosa, devolverla
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         this.#log('info', `Respuesta exitosa vía Tor (${response.status}) en intento ${attempt}`);
         return response;
       }
 
-      // Si es error 502 y tenemos reintentos disponibles, rotar sesión y reintentar
       if (response.status === 502 && attempt < this.#maxRetries) {
         this.#log('warn', `Error 502 detectado, rotando sesión Tor e intentando nuevamente (${attempt}/${this.#maxRetries})`);
         await this.#rotateTorSession();
@@ -1146,18 +1125,19 @@ export class TorrentioApiService {
         return this.#fetchWithTor(url, attempt + 1);
       }
 
-      // Si es otro error o se agotaron los reintentos, devolver la respuesta
       this.#log('warn', `Respuesta no exitosa vía Tor: ${response.status} en intento ${attempt}`);
       return response;
 
     } catch (error) {
-      // Si es error de conexión a Tor, usar fallback inmediatamente
-      if (error.code === 'ECONNREFUSED' && error.address === '127.0.0.1' && error.port === 9050) {
+      if (error.name === 'AbortError') {
+        error = new Error(`Timeout de ${this.#timeout}ms excedido para: ${url}`);
+      }
+
+      if (error.code === 'ECONNREFUSED') {
         this.#log('warn', `Tor no está ejecutándose en ${this.#torHost}:${this.#torPort}, usando fallback sin proxy`);
         return this.#fetchWithTimeout(url);
       }
-
-      // En caso de otros errores de conexión y tenemos reintentos disponibles
+      
       if (attempt < this.#maxRetries && (error.code === 'ETIMEDOUT' || error.message.includes('Timeout'))) {
         this.#log('warn', `Error de conexión, rotando sesión Tor e intentando nuevamente (${attempt}/${this.#maxRetries}): ${error.message}`);
         await this.#rotateTorSession();
@@ -1206,22 +1186,29 @@ export class TorrentioApiService {
    * @private
    */
   async #rotateTorSession() {
-    try {
-      await new Promise((resolve, reject) => {
-        torRequest.newTorSession((error) => {
-          if (error) {
-            this.#log('warn', `Error al rotar sesión Tor: ${error.message}`);
-            reject(error);
-          } else {
-            this.#log('info', 'Sesión Tor rotada exitosamente - nueva IP obtenida');
-            resolve();
-          }
-        });
+    return new Promise((resolve) => {
+      const socket = net.createConnection({ port: this.#torControlPort, host: this.#torControlHost }, () => {
+        socket.write('AUTHENTICATE ""\r\n');
+        socket.write('SIGNAL NEWNYM\r\n');
+        socket.write('QUIT\r\n');
       });
-    } catch (error) {
-      this.#log('warn', `No se pudo rotar sesión Tor: ${error.message}`);
-      // No lanzar error, continuar con la sesión actual
-    }
+
+      socket.on('data', (data) => {
+        const response = data.toString();
+        if (response.includes('250 OK')) {
+          this.#log('info', 'Sesión Tor rotada exitosamente - nueva IP obtenida');
+        }
+      });
+
+      socket.on('end', () => {
+        resolve();
+      });
+
+      socket.on('error', (err) => {
+        this.#log('warn', `No se pudo rotar sesión Tor: ${err.message}`);
+        resolve(); // Resolve anyway to not block the process
+      });
+    });
   }
 
   /**
