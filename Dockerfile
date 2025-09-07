@@ -50,10 +50,7 @@ ENV CONTAINER_ENV=true
 # Exponer puertos
 EXPOSE 7000
 
-# Cambiar al usuario no privilegiado
-USER appuser
-
-# Comando de arranque
+# Comando de arranque (ejecutar como root para permitir gosu)
 CMD ["./start.sh"]
 
 # Healthcheck para verificar que Tor está funcionando
