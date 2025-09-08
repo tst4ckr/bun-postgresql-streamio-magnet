@@ -38,24 +38,27 @@ export class CascadingMagnetRepository extends MagnetRepository {
       // Fallback a console si no hay logger disponible
       const timestamp = new Date().toISOString();
       const formattedMessage = `[${level.toUpperCase()}] ${timestamp} [CascadingMagnetRepository] - ${message}`;
-      console[level] ? console[level](formattedMessage, data || '') : console.log(formattedMessage, data || '');
+      console[level] ? console[level](formattedMessage) : console.log(formattedMessage);
       return;
     }
 
-    // Usar logging estructurado si el logger lo soporta
+    // Usar logging estructurado si hay datos y el logger lo soporta
     if (typeof this.#logger.structured === 'function' && data !== null && data !== undefined) {
       this.#logger.structured(level, message, {
         component: 'CascadingMagnetRepository',
         ...data
       });
-    } else if (typeof this.#logger[level] === 'function') {
-      // Usar método de nivel específico
-      this.#logger[level](message, data);
+      return;
+    }
+
+    // Usar método de nivel específico sin pasar data como argumento adicional
+    if (typeof this.#logger[level] === 'function') {
+      this.#logger[level](message);
     } else {
       // Fallback final
       const timestamp = new Date().toISOString();
       const formattedMessage = `[${level.toUpperCase()}] ${timestamp} [CascadingMagnetRepository] - ${message}`;
-      console[level] ? console[level](formattedMessage, data || '') : console.log(formattedMessage, data || '');
+      console[level] ? console[level](formattedMessage) : console.log(formattedMessage);
     }
   }
 

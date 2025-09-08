@@ -56,19 +56,22 @@ export class TorrentioApiService {
       return;
     }
 
-    // Usar logging estructurado si el logger lo soporta
+    // Usar logging estructurado si hay datos y el logger lo soporta
     if (typeof this.#logger.structured === 'function' && data !== null && data !== undefined) {
       this.#logger.structured(level, message, {
         component: 'TorrentioApiService',
         ...data
       });
-    } else if (typeof this.#logger[level] === 'function') {
-      // Usar método de nivel específico
-      this.#logger[level](message, data);
+      return;
+    }
+
+    // Usar método de nivel específico sin pasar data como argumento adicional
+    if (typeof this.#logger[level] === 'function') {
+      this.#logger[level](message);
     } else {
       // Fallback final con EnhancedLogger
       const fallbackLogger = new EnhancedLogger('info', true);
-      fallbackLogger[level](message, data);
+      fallbackLogger[level](message);
     }
   }
 
