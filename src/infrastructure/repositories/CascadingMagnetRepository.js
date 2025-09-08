@@ -335,9 +335,9 @@ export class CascadingMagnetRepository extends MagnetRepository {
         return finalResults;
       }
       
-      // Paso final: Buscar en API de Torrentio
-      this.#log('info', `No se encontraron magnets locales, consultando API Torrentio para ${contentId} (${type})`);
-      const apiResults = await this.#torrentioApiService.searchMagnetsById(contentId, type);
+      // Paso final: Buscar en API de Torrentio con fallback de idioma
+      this.#log('info', `No se encontraron magnets locales, consultando API Torrentio con fallback de idioma para ${contentId} (${type})`);
+      const apiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFallback(contentId, type);
       
       if (apiResults.length > 0) {
         this.#log('info', `Encontrados ${apiResults.length} magnets en API Torrentio para ${contentId}`);
