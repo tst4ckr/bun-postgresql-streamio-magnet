@@ -118,13 +118,27 @@ class MagnetAddon {
  * Función principal para ejecutar el addon.
  */
 async function main() {
+  let logger;
   try {
+    // Crear logger para errores fatales
+    logger = new EnhancedLogger('error', false, {
+      errorOnly: true,
+      minimalOutput: true
+    });
+    
     const addon = new MagnetAddon();
     await addon.start();
   } catch (error) {
-    console.error('❌ Error fatal al iniciar el addon:', error.message || error);
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Stack trace:', error.stack);
+    if (logger) {
+      logger.error('❌ Error fatal al iniciar el addon', {
+        error: error.message || error,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    } else {
+      console.error('❌ Error fatal al iniciar el addon:', error.message || error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Stack trace:', error.stack);
+      }
     }
     process.exit(1);
   }

@@ -6,6 +6,7 @@
 
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 import { addonConfig } from '../../config/addonConfig.js';
+import { CONSTANTS } from '../../config/constants.js';
 
 export class CacheService {
   constructor() {
@@ -22,7 +23,7 @@ export class CacheService {
     // Configuración de cache desde addonConfig
     this.config = {
       defaultTTL: addonConfig.cache?.defaultTTL || 3600000, // 1 hora
-      maxSize: addonConfig.cache?.maxSize || 1000,
+      maxSize: addonConfig.cache?.maxSize || CONSTANTS.CACHE.MAX_CACHE_SIZE,
       cleanupInterval: addonConfig.cache?.cleanupInterval || 300000, // 5 minutos
       enableStats: addonConfig.cache?.enableStats !== false
     };

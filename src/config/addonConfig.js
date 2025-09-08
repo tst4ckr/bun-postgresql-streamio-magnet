@@ -6,6 +6,7 @@
 import dotenv from 'dotenv';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { CONSTANTS } from './constants.js';
 
 dotenv.config();
 
@@ -47,16 +48,16 @@ const config = {
     idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
   },
   server: {
-    port: process.env.PORT || 7000,
+    port: process.env.PORT || CONSTANTS.NETWORK.DEFAULT_SERVER_PORT,
   },
   cache: {
-    streamCacheMaxAge: process.env.CACHE_STREAM_MAX_AGE || 3600, // 1 hora
-    streamStaleRevalidate: process.env.CACHE_STREAM_STALE_REVALIDATE || 3600,
-    streamStaleError: process.env.CACHE_STREAM_STALE_ERROR || 86400, // 1 día
-    // Cache específico para anime (más largo debido a menor frecuencia de cambios)
-    animeCacheMaxAge: process.env.CACHE_ANIME_MAX_AGE || 7200, // 2 horas
+    streamCacheMaxAge: process.env.CACHE_STREAM_MAX_AGE || CONSTANTS.CACHE.STREAM_MAX_AGE,
+    streamStaleRevalidate: process.env.CACHE_STREAM_STALE_REVALIDATE || CONSTANTS.CACHE.STREAM_STALE_REVALIDATE,
+    streamStaleError: process.env.CACHE_STREAM_STALE_ERROR || CONSTANTS.CACHE.STREAM_STALE_ERROR,
+    // Cache específico para anime (más tiempo debido a menor frecuencia de cambios)
+    animeCacheMaxAge: process.env.CACHE_ANIME_MAX_AGE || CONSTANTS.CACHE.ANIME_MAX_AGE,
     // Cache para metadatos
-    metadataCacheMaxAge: process.env.CACHE_METADATA_MAX_AGE || 86400, // 1 día
+    metadataCacheMaxAge: process.env.CACHE_METADATA_MAX_AGE || CONSTANTS.CACHE.METADATA_MAX_AGE
   },
   logging: {
     // Optimización para producción: usar 'warn' por defecto en producción, 'info' en desarrollo
@@ -77,28 +78,28 @@ const config = {
     secondaryCsvPath: process.env.SECONDARY_CSV_PATH || resolvePath('data/torrentio.csv'),
     animeCsvPath: process.env.ANIME_CSV_PATH || resolvePath('data/anime.csv'),
     torrentioApiUrl: process.env.TORRENTIO_API_URL || 'https://torrentio.strem.fun/',
-    timeout: parseInt(process.env.CSV_TIMEOUT) || 30000
+    timeout: parseInt(process.env.CSV_TIMEOUT) || CONSTANTS.TIME.DEFAULT_TIMEOUT
   },
   tor: {
     enabled: process.env.TOR_ENABLED === 'true' || false, // Por defecto false, se activa explícitamente con TOR_ENABLED=true
-    host: process.env.TOR_HOST || '127.0.0.1',
-    port: parseInt(process.env.TOR_PORT) || 9050
+    host: process.env.TOR_HOST || CONSTANTS.NETWORK.TOR_DEFAULT_HOST,
+    port: parseInt(process.env.TOR_PORT) || CONSTANTS.NETWORK.TOR_DEFAULT_PORT
   },
   torrentio: {
     movie: {
-      providers: process.env.TORRENTIO_MOVIE_PROVIDERS || 'mejortorrent,wolfmax4k,cinecalidad',
+      providers: process.env.TORRENTIO_MOVIE_PROVIDERS || CONSTANTS.PROVIDER.MOVIE_PROVIDERS.SPANISH,
       sort: process.env.TORRENTIO_MOVIE_SORT || 'seeders',
-      qualityFilter: process.env.TORRENTIO_MOVIE_QUALITY_FILTER || 'scr,cam,unknown',
-      limit: parseInt(process.env.TORRENTIO_MOVIE_LIMIT) || 10,
-      priorityLanguage: process.env.TORRENTIO_MOVIE_LANGUAGE || 'spanish',
+      qualityFilter: process.env.TORRENTIO_MOVIE_QUALITY_FILTER || CONSTANTS.QUALITY.DEFAULT_MOVIE_QUALITY_FILTER,
+      limit: parseInt(process.env.TORRENTIO_MOVIE_LIMIT) || CONSTANTS.LIMIT.DEFAULT_MOVIE_LIMIT,
+      priorityLanguage: process.env.TORRENTIO_MOVIE_LANGUAGE || CONSTANTS.LANGUAGE.DEFAULT_MOVIE_LANGUAGE,
       // Configuraciones por idioma para búsqueda en cascada
       languageConfigs: {
         spanish: {
-          providers: process.env.TORRENTIO_MOVIE_PROVIDERS_ES || 'mejortorrent,wolfmax4k,cinecalidad',
+          providers: process.env.TORRENTIO_MOVIE_PROVIDERS_ES || CONSTANTS.PROVIDER.MOVIE_PROVIDERS.SPANISH,
           priorityLanguage: 'spanish'
         },
         combined: {
-          providers: process.env.TORRENTIO_MOVIE_PROVIDERS_COMBINED || 'mejortorrent,wolfmax4k,cinecalidad,yts,eztv,rarbg,1337x,thepiratebay',
+          providers: process.env.TORRENTIO_MOVIE_PROVIDERS_COMBINED || CONSTANTS.PROVIDER.MOVIE_PROVIDERS.COMBINED,
           priorityLanguage: 'spanish'
         }
       }
@@ -106,40 +107,40 @@ const config = {
     series: {
       providers: process.env.TORRENTIO_SERIES_PROVIDERS || 'horriblesubs,nyaasi,tokyotosho,anidex,mejortorrent,wolfmax4k,cinecalidad',
       sort: process.env.TORRENTIO_SERIES_SORT || 'seeders',
-      qualityFilter: process.env.TORRENTIO_SERIES_QUALITY_FILTER || 'scr,cam,unknown',
-      limit: parseInt(process.env.TORRENTIO_SERIES_LIMIT) || 10,
-      priorityLanguage: process.env.TORRENTIO_SERIES_LANGUAGE || 'spanish',
+      qualityFilter: process.env.TORRENTIO_SERIES_QUALITY_FILTER || CONSTANTS.QUALITY.DEFAULT_SERIES_QUALITY_FILTER,
+      limit: parseInt(process.env.TORRENTIO_SERIES_LIMIT) || CONSTANTS.LIMIT.DEFAULT_SERIES_LIMIT,
+      priorityLanguage: process.env.TORRENTIO_SERIES_LANGUAGE || CONSTANTS.LANGUAGE.DEFAULT_SERIES_LANGUAGE,
       // Configuraciones por idioma para búsqueda en cascada
       languageConfigs: {
         spanish: {
-          providers: process.env.TORRENTIO_SERIES_PROVIDERS_ES || 'mejortorrent,wolfmax4k,cinecalidad',
+          providers: process.env.TORRENTIO_SERIES_PROVIDERS_ES || CONSTANTS.PROVIDER.SERIES_PROVIDERS.SPANISH,
           priorityLanguage: 'spanish'
         },
         combined: {
-          providers: process.env.TORRENTIO_SERIES_PROVIDERS_COMBINED || 'mejortorrent,wolfmax4k,cinecalidad,eztv,rarbg,1337x,thepiratebay,horriblesubs,nyaasi',
+          providers: process.env.TORRENTIO_SERIES_PROVIDERS_COMBINED || CONSTANTS.PROVIDER.SERIES_PROVIDERS.COMBINED,
           priorityLanguage: 'spanish'
         }
       }
     },
     anime: {
-      providers: process.env.TORRENTIO_ANIME_PROVIDERS || 'horriblesubs,nyaasi,tokyotosho,anidex,subsplease,erai-raws',
+      providers: process.env.TORRENTIO_ANIME_PROVIDERS || CONSTANTS.PROVIDER.ANIME_PROVIDERS.DEFAULT,
       sort: process.env.TORRENTIO_ANIME_SORT || 'seeders',
-      qualityFilter: process.env.TORRENTIO_ANIME_QUALITY_FILTER || 'unknown',
-      limit: parseInt(process.env.TORRENTIO_ANIME_LIMIT) || 15, // Más resultados para anime
-      priorityLanguage: process.env.TORRENTIO_ANIME_LANGUAGE || 'japanese',
+      qualityFilter: process.env.TORRENTIO_ANIME_QUALITY_FILTER || CONSTANTS.QUALITY.DEFAULT_ANIME_QUALITY_FILTER,
+      limit: parseInt(process.env.TORRENTIO_ANIME_LIMIT) || CONSTANTS.LIMIT.DEFAULT_ANIME_LIMIT,
+      priorityLanguage: process.env.TORRENTIO_ANIME_LANGUAGE || CONSTANTS.LANGUAGE.DEFAULT_ANIME_LANGUAGE,
       // Configuraciones específicas para anime
       enableSubtitles: process.env.TORRENTIO_ANIME_SUBTITLES === 'true' || true,
-      preferredFansubs: process.env.TORRENTIO_ANIME_FANSUBS || 'horriblesubs,subsplease,erai-raws',
+      preferredFansubs: process.env.TORRENTIO_ANIME_FANSUBS || CONSTANTS.PROVIDER.ANIME_PROVIDERS.PREFERRED_FANSUBS,
       qualityPriority: process.env.TORRENTIO_ANIME_QUALITY_PRIORITY || '1080p,720p,480p',
       enableBatch: process.env.TORRENTIO_ANIME_BATCH === 'true' || false,
       // Configuraciones por idioma para búsqueda en cascada
       languageConfigs: {
         spanish: {
-          providers: process.env.TORRENTIO_ANIME_PROVIDERS_ES || 'mejortorrent,wolfmax4k,cinecalidad',
+          providers: process.env.TORRENTIO_ANIME_PROVIDERS_ES || CONSTANTS.PROVIDER.ANIME_PROVIDERS.SPANISH,
           priorityLanguage: 'spanish'
         },
         combined: {
-          providers: process.env.TORRENTIO_ANIME_PROVIDERS_COMBINED || 'horriblesubs,nyaasi,tokyotosho,anidex,subsplease,erai-raws,mejortorrent,wolfmax4k,cinecalidad',
+          providers: process.env.TORRENTIO_ANIME_PROVIDERS_COMBINED || CONSTANTS.PROVIDER.ANIME_PROVIDERS.COMBINED,
           priorityLanguage: 'japanese'
         }
       }
@@ -151,13 +152,13 @@ const config = {
     strategy: process.env.MAGNET_SELECTION_STRATEGY || 'seeders',
     // Pesos para estrategia 'balanced'
     balancedWeights: {
-      seeders: parseInt(process.env.MAGNET_SEEDERS_WEIGHT) || 70,
-      quality: parseInt(process.env.MAGNET_QUALITY_WEIGHT) || 30
+      seeders: parseInt(process.env.MAGNET_SEEDERS_WEIGHT) || CONSTANTS.LIMIT.BALANCED_WEIGHTS.SEEDERS,
+      quality: parseInt(process.env.MAGNET_QUALITY_WEIGHT) || CONSTANTS.LIMIT.BALANCED_WEIGHTS.QUALITY
     },
-    // Mínimo de seeders requerido
-    minSeeders: parseInt(process.env.MAGNET_MIN_SEEDERS) || 0,
+    // Filtros de calidad
+    minSeeders: parseInt(process.env.MAGNET_MIN_SEEDERS) || CONSTANTS.LIMIT.MIN_SEEDERS,
     // Calidades preferidas en orden de prioridad (array)
-    qualityPriority: (process.env.MAGNET_QUALITY_PRIORITY || '4K,2160p,1080p,720p,480p').split(','),
+    qualityPriority: (process.env.MAGNET_QUALITY_PRIORITY || CONSTANTS.QUALITY.QUALITY_PRIORITIES.join(',')).split(','),
     // Habilitar logging detallado de selección
     enableSelectionLogging: process.env.MAGNET_SELECTION_LOGGING === 'true' || false
   },
@@ -165,21 +166,21 @@ const config = {
   metadata: {
     // Configuración para películas
     movie: {
-      requiredFields: ['title', 'year', 'imdbId'],
-      optionalFields: ['genre', 'director', 'cast', 'plot', 'poster', 'rating'],
-      cacheExpiry: 86400000 // 1 día en ms
+      requiredFields: CONSTANTS.METADATA.REQUIRED_FIELDS.movie,
+      optionalFields: CONSTANTS.METADATA.OPTIONAL_FIELDS.movie,
+      cacheExpiry: CONSTANTS.CACHE.MOVIE_METADATA_EXPIRY
     },
-    // Configuración para series
+    // Metadatos para series
     series: {
-      requiredFields: ['title', 'year', 'imdbId'],
-      optionalFields: ['genre', 'creator', 'cast', 'plot', 'poster', 'rating', 'seasons', 'episodes'],
-      cacheExpiry: 86400000 // 1 día en ms
+      requiredFields: CONSTANTS.METADATA.REQUIRED_FIELDS.series,
+      optionalFields: CONSTANTS.METADATA.OPTIONAL_FIELDS.series,
+      cacheExpiry: CONSTANTS.CACHE.SERIES_METADATA_EXPIRY
     },
-    // Configuración específica para anime
+    // Metadatos para anime
     anime: {
-      requiredFields: ['title', 'year'],
-      optionalFields: ['genre', 'studio', 'director', 'cast', 'plot', 'poster', 'rating', 'episodes', 'status', 'source'],
-      cacheExpiry: 604800000, // 1 semana en ms (anime cambia menos frecuentemente)
+      requiredFields: CONSTANTS.METADATA.REQUIRED_FIELDS.anime,
+      optionalFields: CONSTANTS.METADATA.OPTIONAL_FIELDS.anime,
+      cacheExpiry: CONSTANTS.CACHE.ANIME_METADATA_EXPIRY,
       // Campos específicos de anime
       animeSpecificFields: {
         malId: 'MyAnimeList ID',
@@ -198,24 +199,20 @@ const config = {
       },
       // Proveedores de metadatos para anime
       metadataProviders: {
-        primary: process.env.ANIME_METADATA_PRIMARY || 'kitsu',
-        secondary: process.env.ANIME_METADATA_SECONDARY || 'mal,anilist',
-        fallback: process.env.ANIME_METADATA_FALLBACK || 'anidb'
+        primary: process.env.ANIME_METADATA_PRIMARY || CONSTANTS.METADATA.ANIME_METADATA_PROVIDERS.PRIMARY,
+        secondary: process.env.ANIME_METADATA_SECONDARY || CONSTANTS.METADATA.ANIME_METADATA_PROVIDERS.SECONDARY,
+        fallback: process.env.ANIME_METADATA_FALLBACK || CONSTANTS.METADATA.ANIME_METADATA_PROVIDERS.FALLBACK
       }
     }
   },
   // Configuración del sistema de búsqueda en cascada
   cascadeSearch: {
     enabled: process.env.CASCADE_SEARCH_ENABLED === 'true' || true,
-    maxRetries: parseInt(process.env.CASCADE_MAX_RETRIES) || 3,
-    retryDelay: parseInt(process.env.CASCADE_RETRY_DELAY) || 1000, // ms
-    timeout: parseInt(process.env.CASCADE_TIMEOUT) || 30000, // ms
+    maxRetries: parseInt(process.env.CASCADE_MAX_RETRIES) || CONSTANTS.CASCADE.MAX_RETRIES,
+    retryDelay: parseInt(process.env.CASCADE_RETRY_DELAY) || CONSTANTS.CASCADE.RETRY_DELAY,
+    timeout: parseInt(process.env.CASCADE_TIMEOUT) || CONSTANTS.CASCADE.TIMEOUT,
     // Prioridades por tipo de contenido
-    priorities: {
-      movie: ['torrentio', 'primary', 'anime'], // Para películas, priorizar torrentio
-      series: ['torrentio', 'primary', 'anime'], // Para series, priorizar torrentio
-      anime: ['anime', 'torrentio', 'primary'] // Para anime, priorizar repositorio de anime
-    },
+    priorities: CONSTANTS.CASCADE.SEARCH_PRIORITIES,
     // Configuración de logging para cascada
     logging: {
       logSearchStart: true,
@@ -229,7 +226,7 @@ const config = {
 // Cache para el manifest generado
 let manifestCache = null;
 let manifestCacheTimestamp = null;
-const MANIFEST_CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutos
+const MANIFEST_CACHE_EXPIRY = CONSTANTS.TIME.MANIFEST_CACHE_SHORT_EXPIRY;
 
 /**
  * Genera el manifiesto del addon a partir de la configuración con cache.

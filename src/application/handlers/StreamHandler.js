@@ -8,6 +8,7 @@ import { parseMagnet } from 'parse-magnet-uri';
 import { unifiedIdService } from '../../infrastructure/services/UnifiedIdService.js';
 import { dynamicValidationService } from '../../infrastructure/services/DynamicValidationService.js';
 import { cacheService } from '../../infrastructure/services/CacheService.js';
+import { ConfigurationCommandFactory } from '../../infrastructure/patterns/ConfigurationCommand.js';
 
 /**
  * Handler para peticiones de streams de magnets.
@@ -22,6 +23,7 @@ export class StreamHandler {
   #logger;
   #idService;
   #validationService;
+  #configInvoker;
 
   /**
    * @param {Object} magnetRepository - Repositorio de magnets.
@@ -35,12 +37,60 @@ export class StreamHandler {
     this.#logger = logger;
     this.#idService = idService;
     this.#validationService = validationService;
+    this.#configInvoker = ConfigurationCommandFactory.createInvoker(this.#logger);
   }
 
   /**
-   * Configura el idioma prioritario para las búsquedas de torrents.
+   * Configura el idioma prioritario temporalmente usando patrón Command/Memento.
+   * @param {string} language - Código de idioma (spanish, latino, english, etc.)
+   * @param {string} type - Tipo de contenido (movie, series, anime)
+   * @returns {Function|null} Función para revertir el cambio, o null si falla
+   * @public
+   */
+  setPriorityLanguageTemporary(language, type = 'movie') {
+    if (!this.#magnetRepository || typeof this.#magnetRepository.setPriorityLanguage !== 'function') {
+      this.#logger.warn('El repositorio no soporta configuración de idioma prioritario');
+      return null;
+    }
+
+    try {
+      // Crear comando para cambio temporal de idioma
+      const languageConfig = {
+        providers: this.#config.torrentio[type]?.languageConfigs?.spanish?.providers || this.#config.torrentio[type]?.providers,
+        priorityLanguage: language
+      };
+
+      const command = ConfigurationCommandFactory.createLanguageCommand(
+        this.#magnetRepository,
+        type,
+        languageConfig,
+        this.#logger
+      );
+
+      // Ejecutar comando
+      if (this.#configInvoker.executeCommand(command)) {
+        this.#logger.info(`Idioma prioritario configurado temporalmente en StreamHandler: ${language} para ${type}`);
+        
+        // Retornar función para revertir
+        return () => {
+          this.#configInvoker.undoLastCommand();
+          this.#logger.info(`Configuración de idioma revertida para ${type}`);
+        };
+      } else {
+        this.#logger.error('No se pudo aplicar la configuración temporal de idioma');
+        return null;
+      }
+    } catch (error) {
+      this.#logger.error('Error al configurar idioma prioritario temporal:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Configura el idioma prioritario de forma permanente (método legacy).
    * @param {string} language - Código de idioma (spanish, latino, english, etc.)
    * @public
+   * @deprecated Usar setPriorityLanguageTemporary para cambios temporales
    */
   setPriorityLanguage(language) {
     if (this.#magnetRepository && typeof this.#magnetRepository.setPriorityLanguage === 'function') {
@@ -182,12 +232,25 @@ export class StreamHandler {
    * @returns {Promise<Object>} Resultado de validación
    */
   async #validateStreamRequest(args) {
-    if (!args?.type || !['movie', 'series', 'anime'].includes(args.type)) {
-      throw new Error('Tipo de contenido (movie/series/anime) requerido');
+    // Validación de entrada con early returns
+    if (!args || typeof args !== 'object') {
+      throw new Error('Argumentos de stream requeridos y deben ser objeto');
+    }
+
+    if (!args.type || typeof args.type !== 'string') {
+      throw new Error('Tipo de contenido requerido y debe ser string');
+    }
+
+    if (!['movie', 'series', 'anime'].includes(args.type)) {
+      throw new Error('Tipo de contenido debe ser movie, series o anime');
     }
     
-    if (!args.id) {
-      throw new Error('ID de contenido requerido');
+    if (!args.id || typeof args.id !== 'string') {
+      throw new Error('ID de contenido requerido y debe ser string');
+    }
+
+    if (args.id.trim().length === 0) {
+      throw new Error('ID de contenido no puede estar vacío');
     }
 
     try {

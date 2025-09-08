@@ -6,6 +6,7 @@
 
 import { idDetectorService } from './IdDetectorService.js';
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
+import { CONSTANTS } from '../../config/constants.js';
 
 export class UnifiedIdService {
   constructor(detectorService) {
@@ -14,7 +15,7 @@ export class UnifiedIdService {
     
     // Cache para optimizar conversiones repetidas
     this.conversionCache = new Map();
-    this.cacheExpiry = 24 * 60 * 60 * 1000; // 24 horas
+    this.cacheExpiry = CONSTANTS.CACHE.UNIFIED_ID_CACHE_EXPIRY; // 24 horas
   }
 
   /**

@@ -9,7 +9,9 @@ import net from 'net';
 import { Magnet } from '../../domain/entities/Magnet.js';
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 import { addonConfig } from '../../config/addonConfig.js';
+import { CONSTANTS } from '../../config/constants.js';
 import { SocksProxyAgent } from 'socks-proxy-agent';
+import { ConfigurationCommandFactory } from '../patterns/ConfigurationCommand.js';
 
 /**
  * Servicio para integración con la API de Torrentio de Stremio.
@@ -31,29 +33,42 @@ export class TorrentioApiService {
     #torRotationInterval;
   #maxRetries;
   #retryDelay;
+  #configInvoker;
 
   /**
-   * Método auxiliar para logging seguro con seguimiento de archivos fuente
+   * Método auxiliar para logging optimizado con contexto estructurado
    * @param {string} level - Nivel de log (info, warn, error, debug)
    * @param {string} message - Mensaje a loggear
-   * @param {any} data - Datos adicionales
+   * @param {any} data - Datos adicionales para contexto estructurado
    */
   #log(level, message, data = null) {
-    // Si tenemos un logger personalizado, usarlo
-    if (this.#logger && typeof this.#logger[level] === 'function') {
-      if (data !== null && data !== undefined) {
-        this.#logger[level](message, data);
-      } else {
-        this.#logger[level](message);
-      }
-    } else {
-      // Fallback a EnhancedLogger si no hay logger personalizado
+    if (!this.#logger) {
+      // Crear logger temporal si no existe
       const fallbackLogger = new EnhancedLogger('info', true);
       if (data !== null && data !== undefined) {
-        fallbackLogger[level](message, data);
+        fallbackLogger.structured(level, message, {
+          component: 'TorrentioApiService',
+          ...data
+        });
       } else {
         fallbackLogger[level](message);
       }
+      return;
+    }
+
+    // Usar logging estructurado si el logger lo soporta
+    if (typeof this.#logger.structured === 'function' && data !== null && data !== undefined) {
+      this.#logger.structured(level, message, {
+        component: 'TorrentioApiService',
+        ...data
+      });
+    } else if (typeof this.#logger[level] === 'function') {
+      // Usar método de nivel específico
+      this.#logger[level](message, data);
+    } else {
+      // Fallback final con EnhancedLogger
+      const fallbackLogger = new EnhancedLogger('info', true);
+      fallbackLogger[level](message, data);
     }
   }
 
@@ -64,7 +79,7 @@ export class TorrentioApiService {
    * @param {number} timeout - Timeout para peticiones HTTP
    * @param {Object} torConfig - Configuración de Tor {enabled: boolean, host: string, port: number, maxRetries: number, retryDelay: number}
    */
-  constructor(baseUrl, torrentioFilePath, logger = console, timeout = 30000, torConfig = {}) {
+  constructor(baseUrl, torrentioFilePath, logger = console, timeout = CONSTANTS.TIME.DEFAULT_TIMEOUT, torConfig = {}) {
     this.#baseUrl = baseUrl;
     this.#torrentioFilePath = torrentioFilePath;
     this.#logger = logger;
@@ -72,16 +87,19 @@ export class TorrentioApiService {
     
     // Configuración de Tor con valores por defecto
     this.#torEnabled = torConfig.enabled ?? true;
-    this.#torHost = torConfig.host ?? '127.0.0.1';
-    this.#torPort = torConfig.port ?? 9050;
-    this.#torControlHost = torConfig.controlHost ?? '127.0.0.1';
-    this.#torControlPort = torConfig.controlPort ?? 9051;
-    this.#maxRetries = torConfig.maxRetries ?? 3;
-    this.#retryDelay = torConfig.retryDelay ?? 2000;
+    this.#torHost = torConfig.host ?? CONSTANTS.NETWORK.TOR_DEFAULT_HOST;
+    this.#torPort = torConfig.port ?? CONSTANTS.NETWORK.TOR_DEFAULT_PORT;
+    this.#torControlHost = torConfig.controlHost ?? CONSTANTS.NETWORK.TOR_CONTROL_DEFAULT_HOST;
+    this.#torControlPort = torConfig.controlPort ?? CONSTANTS.NETWORK.TOR_CONTROL_DEFAULT_PORT;
+    this.#maxRetries = torConfig.maxRetries ?? CONSTANTS.NETWORK.MAX_RETRIES;
+    this.#retryDelay = torConfig.retryDelay ?? CONSTANTS.TIME.TOR_RETRY_DELAY;
+    
+    // Inicializar invoker de comandos para configuración temporal
+    this.#configInvoker = ConfigurationCommandFactory.createInvoker(this.#logger);
     
     this.#providerConfigs = this.#initializeProviderConfigs();
     this.#manifestCache = new Map();
-    this.#manifestCacheExpiry = 24 * 60 * 60 * 1000; // 24 horas en milisegundos
+    this.#manifestCacheExpiry = CONSTANTS.TIME.MANIFEST_CACHE_EXPIRY;
     this.#torRotationInterval = null;
     this.#ensureTorrentioFileExists();
     this.#startTorRotation();
@@ -291,7 +309,7 @@ export class TorrentioApiService {
   }
 
   /**
-   * Realiza búsqueda con una configuración de idioma específica
+   * Realiza búsqueda con una configuración de idioma específica usando patrón Command
    * @private
    * @param {string} contentId - ID del contenido
    * @param {string} type - Tipo de contenido
@@ -301,40 +319,37 @@ export class TorrentioApiService {
    * @returns {Promise<Array>} Array de magnets
    */
   async #searchWithLanguageConfig(contentId, type, languageConfig, season = null, episode = null) {
+    // Crear comando para cambio temporal de configuración
+    const command = ConfigurationCommandFactory.createLanguageCommand(
+      this,
+      type,
+      languageConfig,
+      this.#logger
+    );
+
     try {
-      // Guardar configuración actual
-      const originalProviders = this.#providerConfigs[type]?.providers;
-      const originalPriorityLanguage = this.#providerConfigs[type]?.priorityLanguage;
-      
-      // Aplicar configuración temporal
-      if (!this.#providerConfigs[type]) {
-        this.#providerConfigs[type] = {};
+      // Ejecutar comando (aplicar configuración temporal)
+      if (!this.#configInvoker.executeCommand(command)) {
+        throw new Error('No se pudo aplicar la configuración temporal');
       }
-      this.#providerConfigs[type].providers = languageConfig.providers;
-      this.#providerConfigs[type].priorityLanguage = languageConfig.priorityLanguage;
-      
+
       this.#log('debug', `Usando configuración temporal:`, {
         type,
         providers: languageConfig.providers,
         priorityLanguage: languageConfig.priorityLanguage
       });
-      
+
       // Realizar búsqueda
       const results = await this.searchMagnetsById(contentId, type, season, episode);
-      
-      // Restaurar configuración original
-      if (originalProviders !== undefined) {
-        this.#providerConfigs[type].providers = originalProviders;
-      }
-      if (originalPriorityLanguage !== undefined) {
-        this.#providerConfigs[type].priorityLanguage = originalPriorityLanguage;
-      }
-      
+
       return results;
-      
+
     } catch (error) {
       this.#log('error', `Error en búsqueda con configuración de idioma:`, error);
       throw error;
+    } finally {
+      // Siempre restaurar configuración original
+      this.#configInvoker.undoLastCommand();
     }
   }
 
@@ -696,7 +711,7 @@ export class TorrentioApiService {
     
     // Para peers, Torrentio no los muestra directamente, pero podemos estimarlos
     // basándose en patrones comunes o usar seeders como aproximación
-    result.peers = result.seeders > 0 ? Math.floor(result.seeders * 0.3) : 0;
+    result.peers = result.seeders > 0 ? Math.floor(result.seeders * CONSTANTS.CONVERSION.PEERS_TO_SEEDERS_RATIO) : 0;
     
     return result;
   }
@@ -1070,11 +1085,20 @@ export class TorrentioApiService {
    * @returns {Object} Objeto con el ID procesado y el tipo detectado
    */
   #processContentId(contentId) {
+    // Validación de entrada con early returns
     if (!contentId) {
       throw new Error('ID de contenido no proporcionado');
     }
 
+    if (typeof contentId !== 'string') {
+      throw new Error('ID de contenido debe ser string');
+    }
+
     const originalId = contentId.trim();
+    
+    if (originalId.length === 0) {
+      throw new Error('ID de contenido no puede estar vacío');
+    }
     
     // Detectar el tipo de ID basado en patrones
     let processedId = originalId;
@@ -1263,7 +1287,7 @@ export class TorrentioApiService {
         this.#logger.info(`Directorio creado: ${dir}`);
       }
       
-      const headers = 'content_id,name,magnet,quality,size,source,fileIdx,filename,provider,seeders,peers,season,episode,imdb_id,id_type\n';
+      const headers = CONSTANTS.FILE.CSV_HEADERS;
       writeFileSync(this.#torrentioFilePath, headers, 'utf8');
       this.#logger.info(`Archivo torrentio.csv creado en: ${this.#torrentioFilePath}`);
     }
@@ -1360,7 +1384,7 @@ export class TorrentioApiService {
         agent: agent,
         signal: controller.signal,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; rv:102.0) Gecko/20100101 Firefox/102.0',
+          'User-Agent': CONSTANTS.NETWORK.FIREFOX_USER_AGENT,
           'Accept': 'application/json'
         }
       });
@@ -1418,7 +1442,7 @@ export class TorrentioApiService {
         this.#log('warn', 'Timeout al verificar Tor - considerando no disponible');
         socket.destroy();
         resolve(false);
-      }, 3000); // 3 segundos de timeout
+      }, CONSTANTS.NETWORK.TOR_CHECK_TIMEOUT); // 3 segundos de timeout
       
       socket.connect(this.#torPort, this.#torHost, () => {
         this.#log('info', 'Tor detectado y disponible');
@@ -1528,7 +1552,7 @@ export class TorrentioApiService {
       const response = await fetch(url, {
         signal: controller.signal,
         headers: {
-          'User-Agent': 'Stremio-Magnet-Search-Addon/1.0.0',
+          'User-Agent': CONSTANTS.NETWORK.USER_AGENT,
           'Accept': 'application/json'
         }
       });

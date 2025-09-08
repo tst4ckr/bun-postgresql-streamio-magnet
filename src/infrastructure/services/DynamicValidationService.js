@@ -6,6 +6,7 @@
 
 import { idDetectorService } from './IdDetectorService.js';
 import { unifiedIdService } from './UnifiedIdService.js';
+import { CONSTANTS } from '../../config/constants.js';
 
 export class DynamicValidationService {
   constructor(detectorService, unifiedService) {
@@ -104,6 +105,34 @@ export class DynamicValidationService {
    * @returns {Promise<Object>} Resultado de validación
    */
   async validateContentId(contentId, context = 'stream_request', options = {}) {
+    // Validación de entrada con early returns
+    if (!contentId || typeof contentId !== 'string') {
+      return this.#createValidationResult(false, contentId, {
+        error: 'ID de contenido requerido y debe ser string',
+        provided: typeof contentId
+      });
+    }
+
+    if (contentId.trim().length === 0) {
+      return this.#createValidationResult(false, contentId, {
+        error: 'ID de contenido no puede estar vacío'
+      });
+    }
+
+    if (!context || typeof context !== 'string') {
+      return this.#createValidationResult(false, contentId, {
+        error: 'Contexto de validación requerido y debe ser string',
+        provided: typeof context
+      });
+    }
+
+    if (!options || typeof options !== 'object') {
+      return this.#createValidationResult(false, contentId, {
+        error: 'Opciones deben ser un objeto',
+        provided: typeof options
+      });
+    }
+
     try {
       // Obtener contexto de validación
       const validationContext = this.validationContexts.get(context);
@@ -174,10 +203,54 @@ export class DynamicValidationService {
    * @returns {Promise<Object>} Resultado de validación por tipo
    */
   async #validateByType(detection, context, options) {
+    // Validación de entrada con early returns
+    if (!detection || typeof detection !== 'object') {
+      return this.#createValidationResult(false, null, {
+        error: 'Resultado de detección requerido y debe ser objeto',
+        provided: typeof detection
+      });
+    }
+
+    if (!detection.type || typeof detection.type !== 'string') {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'Tipo de detección requerido y debe ser string',
+        provided: typeof detection.type
+      });
+    }
+
+    if (!detection.id || typeof detection.id !== 'string') {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'ID de detección requerido y debe ser string',
+        provided: typeof detection.id
+      });
+    }
+
+    if (!context || typeof context !== 'object') {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'Contexto de validación requerido y debe ser objeto',
+        provided: typeof context
+      });
+    }
+
+    if (!options || typeof options !== 'object') {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'Opciones deben ser un objeto',
+        provided: typeof options
+      });
+    }
+
     const rules = this.validationRules.get(detection.type);
     if (!rules) {
       return this.#createValidationResult(false, detection.id, {
         error: `No hay reglas de validación para tipo '${detection.type}'`
+      });
+    }
+
+    // Validar estructura de reglas
+    if (!rules.minLength || !rules.maxLength || !rules.allowedChars || !Array.isArray(rules.businessRules)) {
+      return this.#createValidationResult(false, detection.id, {
+        error: `Reglas de validación malformadas para tipo '${detection.type}'`,
+        rulesStructure: Object.keys(rules)
       });
     }
 
@@ -200,6 +273,13 @@ export class DynamicValidationService {
 
     // Aplicar reglas de negocio específicas
     for (const businessRule of rules.businessRules) {
+      if (typeof businessRule !== 'function') {
+        return this.#createValidationResult(false, detection.id, {
+          error: `Regla de negocio inválida para tipo '${detection.type}' - debe ser función`,
+          ruleType: typeof businessRule
+        });
+      }
+
       const ruleResult = await businessRule(detection, context, options);
       if (!ruleResult.isValid) {
         return ruleResult;
@@ -365,9 +445,9 @@ export class DynamicValidationService {
 
     // Rangos razonables según el servicio
     const maxRanges = {
-      mal: 60000,
+      mal: CONSTANTS.NETWORK.PROVIDER_TIMEOUTS.MAL,
       anilist: 200000,
-      anidb: 30000
+      anidb: CONSTANTS.NETWORK.PROVIDER_TIMEOUTS.ANIDB
     };
 
     if (context.strictMode && numericValue > maxRanges[type]) {
@@ -516,7 +596,7 @@ export class DynamicValidationService {
       });
     }
 
-    if (context.strictMode && detection.confidence < 1.0) {
+    if (context.strictMode && detection.confidence < CONSTANTS.CONVERSION.PERFECT_CONFIDENCE) {
       recommendations.push({
         type: 'confidence',
         message: 'Confianza de detección baja en modo estricto',

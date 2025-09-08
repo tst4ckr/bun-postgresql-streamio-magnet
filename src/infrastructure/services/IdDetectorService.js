@@ -120,21 +120,26 @@ export class IdDetectorService {
    * @returns {boolean} True si es válido
    */
   #validateImdbSeriesFormat(id) {
+    // Validación de entrada
+    if (!id || typeof id !== 'string') return false;
+    
     const parts = id.split(':');
     if (parts.length !== 3) return false;
     
     const [imdbPart, seasonPart, episodePart] = parts;
     
-    // Validar parte IMDb
-    if (!imdbPart.startsWith('tt') || !/^\d+$/.test(imdbPart.slice(2))) {
-      return false;
-    }
+    // Validar parte IMDb con early return
+    if (!imdbPart || !imdbPart.startsWith('tt')) return false;
+    if (!/^\d+$/.test(imdbPart.slice(2))) return false;
     
-    // Validar temporada y episodio
+    // Validar temporada y episodio con early returns
     const season = parseInt(seasonPart);
-    const episode = parseInt(episodePart);
+    if (isNaN(season) || season < 1) return false;
     
-    return !isNaN(season) && season >= 1 && !isNaN(episode) && episode >= 1;
+    const episode = parseInt(episodePart);
+    if (isNaN(episode) || episode < 1) return false;
+    
+    return true;
   }
 
   /**
@@ -143,8 +148,16 @@ export class IdDetectorService {
    * @returns {boolean} True si es válido
    */
   #validateKitsuFormat(id) {
+    // Validación de entrada
+    if (!id || typeof id !== 'string') return false;
+    
     const cleanId = id.replace(/^kitsu:/, '');
-    return /^\d+$/.test(cleanId) && parseInt(cleanId) > 0;
+    if (!/^\d+$/.test(cleanId)) return false;
+    
+    const numericId = parseInt(cleanId);
+    if (isNaN(numericId) || numericId <= 0) return false;
+    
+    return true;
   }
 
   /**
@@ -153,15 +166,20 @@ export class IdDetectorService {
    * @returns {boolean} True si es válido
    */
   #validateKitsuSeriesFormat(id) {
+    // Validación de entrada
+    if (!id || typeof id !== 'string') return false;
+    
     const parts = id.split(':');
-    if (parts.length !== 3 || parts[0] !== 'kitsu') {
-      return false;
-    }
+    if (parts.length !== 3) return false;
+    if (parts[0] !== 'kitsu') return false;
     
     const animeId = parseInt(parts[1]);
-    const episode = parseInt(parts[2]);
+    if (isNaN(animeId) || animeId < 1) return false;
     
-    return !isNaN(animeId) && animeId >= 1 && !isNaN(episode) && episode >= 1;
+    const episode = parseInt(parts[2]);
+    if (isNaN(episode) || episode < 1) return false;
+    
+    return true;
   }
 
   /**
@@ -171,8 +189,17 @@ export class IdDetectorService {
    * @returns {boolean} True si es válido
    */
   #validateNumericFormat(id, prefix) {
+    // Validación de entrada
+    if (!id || typeof id !== 'string') return false;
+    if (!prefix || typeof prefix !== 'string') return false;
+    
     const cleanId = id.replace(new RegExp(`^${prefix}:`), '');
-    return /^\d+$/.test(cleanId) && parseInt(cleanId) > 0;
+    if (!/^\d+$/.test(cleanId)) return false;
+    
+    const numericId = parseInt(cleanId);
+    if (isNaN(numericId) || numericId <= 0) return false;
+    
+    return true;
   }
 
   /**

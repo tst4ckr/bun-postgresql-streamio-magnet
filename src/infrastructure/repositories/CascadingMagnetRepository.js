@@ -9,6 +9,7 @@ import { TorrentioApiService } from '../services/TorrentioApiService.js';
 import { unifiedIdService } from '../services/UnifiedIdService.js';
 import { metadataService } from '../services/MetadataService.js';
 import { cacheService } from '../services/CacheService.js';
+import { ConfigurationCommandFactory } from '../patterns/ConfigurationCommand.js';
 
 /**
  * Repositorio que implementa búsqueda en cascada con fallback automático.
@@ -24,29 +25,37 @@ export class CascadingMagnetRepository extends MagnetRepository {
   #secondaryCsvPath;
   #animeCsvPath;
   #idService;
+  #configInvoker;
 
   /**
-   * Método auxiliar para logging seguro con formato detallado
-   * @param {string} level - Nivel de log (info, warn, error)
+   * Método auxiliar para logging optimizado con contexto estructurado
+   * @param {string} level - Nivel de log (info, warn, error, debug)
    * @param {string} message - Mensaje a loggear
-   * @param {any} data - Datos adicionales
+   * @param {any} data - Datos adicionales para contexto estructurado
    */
   #log(level, message, data = null) {
-    const timestamp = new Date().toISOString();
-    const formattedMessage = `[${level.toUpperCase()}] ${timestamp} [repositories/CascadingMagnetRepository.js] - ${message}`;
-    
-    if (this.#logger && typeof this.#logger[level] === 'function') {
-      if (data !== null && data !== undefined) {
-        this.#logger[level](formattedMessage, data);
-      } else {
-        this.#logger[level](formattedMessage);
-      }
+    if (!this.#logger) {
+      // Fallback a console si no hay logger disponible
+      const timestamp = new Date().toISOString();
+      const formattedMessage = `[${level.toUpperCase()}] ${timestamp} [CascadingMagnetRepository] - ${message}`;
+      console[level] ? console[level](formattedMessage, data || '') : console.log(formattedMessage, data || '');
+      return;
+    }
+
+    // Usar logging estructurado si el logger lo soporta
+    if (typeof this.#logger.structured === 'function' && data !== null && data !== undefined) {
+      this.#logger.structured(level, message, {
+        component: 'CascadingMagnetRepository',
+        ...data
+      });
+    } else if (typeof this.#logger[level] === 'function') {
+      // Usar método de nivel específico
+      this.#logger[level](message, data);
     } else {
-      if (data !== null && data !== undefined) {
-        console[level](formattedMessage, data);
-      } else {
-        console[level](formattedMessage);
-      }
+      // Fallback final
+      const timestamp = new Date().toISOString();
+      const formattedMessage = `[${level.toUpperCase()}] ${timestamp} [CascadingMagnetRepository] - ${message}`;
+      console[level] ? console[level](formattedMessage, data || '') : console.log(formattedMessage, data || '');
     }
   }
 
@@ -82,6 +91,9 @@ export class CascadingMagnetRepository extends MagnetRepository {
       timeout,
       torConfig
     );
+    
+    // Inicializar invoker de comandos de configuración
+    this.#configInvoker = ConfigurationCommandFactory.createInvoker(this.#logger);
   }
 
   /**
@@ -210,6 +222,39 @@ export class CascadingMagnetRepository extends MagnetRepository {
    * @returns {Promise<Magnet[]>} Array de magnets encontrados
    */
   async getMagnetsByContentId(contentId, type = 'movie', options = {}) {
+    // Validación de entrada con early returns
+    if (!contentId || typeof contentId !== 'string') {
+      throw new RepositoryError('ID de contenido requerido y debe ser string', {
+        provided: typeof contentId,
+        value: contentId
+      });
+    }
+
+    if (contentId.trim().length === 0) {
+      throw new RepositoryError('ID de contenido no puede estar vacío');
+    }
+
+    if (!type || typeof type !== 'string') {
+      throw new RepositoryError('Tipo de contenido requerido y debe ser string', {
+        provided: typeof type,
+        value: type
+      });
+    }
+
+    if (!['movie', 'series', 'anime'].includes(type)) {
+      throw new RepositoryError('Tipo de contenido debe ser movie, series o anime', {
+        provided: type,
+        validTypes: ['movie', 'series', 'anime']
+      });
+    }
+
+    if (!options || typeof options !== 'object') {
+      throw new RepositoryError('Opciones deben ser un objeto', {
+        provided: typeof options,
+        value: options
+      });
+    }
+
     if (!this.#isInitialized) {
       await this.initialize();
     }
@@ -392,8 +437,49 @@ export class CascadingMagnetRepository extends MagnetRepository {
   }
 
   /**
-   * Configura el idioma prioritario para búsquedas de torrents.
+   * Configura el idioma prioritario temporalmente usando patrón Command/Memento.
    * @param {string} language - Idioma a configurar (ej: 'spanish', 'english')
+   * @param {string} type - Tipo de contenido (movie, series, anime)
+   * @returns {Function|null} Función para revertir el cambio, o null si falla
+   */
+  setPriorityLanguageTemporary(language, type = 'movie') {
+    try {
+      // Crear comando para cambio temporal de idioma en el servicio API
+      const languageConfig = {
+        providers: this.#getProvidersForLanguage(language, type),
+        priorityLanguage: language
+      };
+
+      const command = ConfigurationCommandFactory.createLanguageCommand(
+        this.#torrentioApiService,
+        type,
+        languageConfig,
+        this.#logger
+      );
+
+      // Ejecutar comando
+      if (this.#configInvoker.executeCommand(command)) {
+        this.#log('info', `Idioma prioritario configurado temporalmente: ${language} para ${type}`);
+        
+        // Retornar función para revertir
+        return () => {
+          this.#configInvoker.undoLastCommand();
+          this.#log('info', `Configuración de idioma revertida para ${type}`);
+        };
+      } else {
+        this.#log('error', 'No se pudo aplicar la configuración temporal de idioma');
+        return null;
+      }
+    } catch (error) {
+      this.#log('error', 'Error al configurar idioma prioritario temporal:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Configura el idioma prioritario de forma permanente (método legacy).
+   * @param {string} language - Idioma a configurar (ej: 'spanish', 'english')
+   * @deprecated Usar setPriorityLanguageTemporary para cambios temporales
    */
   setPriorityLanguage(language) {
     this.#torrentioApiService.setPriorityLanguage(language);
@@ -405,6 +491,33 @@ export class CascadingMagnetRepository extends MagnetRepository {
    */
   getPriorityLanguage() {
     return this.#torrentioApiService.getPriorityLanguage();
+  }
+
+  /**
+   * Obtiene los proveedores apropiados para un idioma y tipo de contenido.
+   * @private
+   * @param {string} language - Idioma solicitado
+   * @param {string} type - Tipo de contenido
+   * @returns {string} Lista de proveedores separados por coma
+   */
+  #getProvidersForLanguage(language, type) {
+    // Mapeo básico de idiomas a configuraciones de proveedores
+    const languageProviderMap = {
+      spanish: {
+        movie: 'mejortorrent,wolfmax4k,cinecalidad',
+        series: 'mejortorrent,wolfmax4k,cinecalidad',
+        anime: 'mejortorrent,wolfmax4k,cinecalidad'
+      },
+      english: {
+        movie: 'yts,eztv,rarbg,1337x,thepiratebay',
+        series: 'eztv,rarbg,1337x,thepiratebay,horriblesubs,nyaasi',
+        anime: 'horriblesubs,nyaasi,tokyotosho,anidex,subsplease,erai-raws'
+      }
+    };
+
+    return languageProviderMap[language]?.[type] || 
+           languageProviderMap.spanish[type] || 
+           'mejortorrent,wolfmax4k,cinecalidad';
   }
 
   /**
