@@ -22,6 +22,7 @@ export class TorrentioApiService {
   #timeout;
   #logger;
   #torrentioFilePath;
+  #englishFilePath;
   #providerConfigs;
   #manifestCache;
   #manifestCacheExpiry;
@@ -81,10 +82,12 @@ export class TorrentioApiService {
    * @param {Object} logger - Logger para trazabilidad
    * @param {number} timeout - Timeout para peticiones HTTP
    * @param {Object} torConfig - Configuración de Tor {enabled: boolean, host: string, port: number, maxRetries: number, retryDelay: number}
+   * @param {string} englishFilePath - Ruta del archivo english.csv para contenido en inglés
    */
-  constructor(baseUrl, torrentioFilePath, logger = console, timeout = CONSTANTS.TIME.DEFAULT_TIMEOUT, torConfig = {}) {
+  constructor(baseUrl, torrentioFilePath, logger = console, timeout = CONSTANTS.TIME.DEFAULT_TIMEOUT, torConfig = {}, englishFilePath = null) {
     this.#baseUrl = baseUrl;
     this.#torrentioFilePath = torrentioFilePath;
+    this.#englishFilePath = englishFilePath || torrentioFilePath.replace('torrentio.csv', 'english.csv');
     this.#logger = logger;
     this.#timeout = timeout;
     
@@ -257,7 +260,7 @@ export class TorrentioApiService {
         const resultsWithSeeds = this.#filterResultsWithSeeds(spanishResults);
         if (resultsWithSeeds.length > 0) {
           this.#log('info', `Encontrados ${resultsWithSeeds.length} resultados con seeds en trackers españoles`);
-          await this.#saveMagnetsToFile(resultsWithSeeds);
+          await this.#saveMagnetsToFile(resultsWithSeeds, 'spanish');
           return resultsWithSeeds;
         } else {
           this.#log('warn', `Encontrados ${spanishResults.length} resultados en español pero sin seeds disponibles`);
@@ -278,7 +281,7 @@ export class TorrentioApiService {
         const resultsWithSeeds = this.#filterResultsWithSeeds(combinedResults);
         if (resultsWithSeeds.length > 0) {
           this.#log('info', `Encontrados ${resultsWithSeeds.length} resultados con seeds en trackers combinados`);
-          await this.#saveMagnetsToFile(resultsWithSeeds);
+          await this.#saveMagnetsToFile(resultsWithSeeds, 'spanish');
           return resultsWithSeeds;
         } else {
           this.#log('warn', `Encontrados ${combinedResults.length} resultados combinados pero sin seeds disponibles`);
@@ -290,6 +293,58 @@ export class TorrentioApiService {
       
     } catch (error) {
       this.#log('error', `Error en búsqueda con fallback de idioma para ${contentId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Busca magnets específicamente en inglés y los guarda en english.csv.
+   * @param {string} contentId - ID del contenido
+   * @param {string} type - Tipo de contenido (movie, series, anime)
+   * @param {number} season - Temporada (para series)
+   * @param {number} episode - Episodio (para series)
+   * @returns {Promise<Magnet[]>} Array de magnets encontrados
+   */
+  async searchMagnetsInEnglish(contentId, type = 'auto', season = null, episode = null) {
+    this.#log('info', `Iniciando búsqueda en inglés para ${contentId}`, { type, season, episode });
+    
+    try {
+      // Detectar tipo de contenido si es 'auto'
+      const detectedType = type === 'auto' ? this.#detectContentType(contentId, season, episode) : type;
+      
+      // Obtener configuraciones de idioma para el tipo de contenido
+      const typeConfig = addonConfig.torrentio[detectedType];
+      if (!typeConfig || !typeConfig.languageConfigs) {
+        this.#log('warn', `No hay configuraciones de idioma para tipo: ${detectedType}`);
+        return this.searchMagnetsById(contentId, detectedType, season, episode);
+      }
+      
+      // Buscar solo en trackers en inglés
+      this.#log('info', `Búsqueda en trackers ingleses para ${contentId}`);
+      const englishResults = await this.#searchWithLanguageConfig(
+        contentId, 
+        detectedType, 
+        typeConfig.languageConfigs.combined, // Usar configuración combinada que incluye trackers ingleses
+        season, 
+        episode
+      );
+      
+      if (englishResults && englishResults.length > 0) {
+        const resultsWithSeeds = this.#filterResultsWithSeeds(englishResults);
+        if (resultsWithSeeds.length > 0) {
+          this.#log('info', `Encontrados ${resultsWithSeeds.length} resultados con seeds en trackers ingleses`);
+          await this.#saveMagnetsToFile(resultsWithSeeds, 'english');
+          return resultsWithSeeds;
+        } else {
+          this.#log('warn', `Encontrados ${englishResults.length} resultados en inglés pero sin seeds disponibles`);
+        }
+      }
+      
+      this.#log('warn', `No se encontraron resultados en inglés para ${contentId}`);
+      return [];
+      
+    } catch (error) {
+      this.#log('error', `Error en búsqueda en inglés para ${contentId}:`, error);
       throw error;
     }
   }
@@ -900,16 +955,20 @@ export class TorrentioApiService {
    * @private
    * @param {Magnet[]} magnets - Magnets a guardar
    */
-  async #saveMagnetsToFile(magnets) {
+  async #saveMagnetsToFile(magnets, language = 'spanish') {
+    // Determinar archivo de destino según el idioma
+    const targetFilePath = language === 'english' ? this.#englishFilePath : this.#torrentioFilePath;
+    const fileName = language === 'english' ? 'english.csv' : 'torrentio.csv';
+    
     // Si no hay ruta de archivo especificada, omitir el guardado
-    if (!this.#torrentioFilePath || this.#torrentioFilePath.trim() === '') {
-      this.#logger.debug('No se especificó ruta para archivo torrentio.csv, omitiendo guardado');
+    if (!targetFilePath || targetFilePath.trim() === '') {
+      this.#logger.debug(`No se especificó ruta para archivo ${fileName}, omitiendo guardado`);
       return;
     }
     
     try {
       // Verificar permisos de escritura antes de intentar escribir
-      const fileDir = dirname(this.#torrentioFilePath);
+      const fileDir = dirname(targetFilePath);
       if (!existsSync(fileDir)) {
         this.#logger.warn(`Directorio ${fileDir} no existe, creando...`);
         mkdirSync(fileDir, { recursive: true });
@@ -917,8 +976,8 @@ export class TorrentioApiService {
       
       // Leer archivo existente para evitar duplicados
       const existingMagnets = new Set();
-      if (existsSync(this.#torrentioFilePath)) {
-        const existingContent = readFileSync(this.#torrentioFilePath, 'utf8');
+      if (existsSync(targetFilePath)) {
+        const existingContent = readFileSync(targetFilePath, 'utf8');
         const lines = existingContent.split('\n').slice(1); // Omitir header
         for (const line of lines) {
           if (line.trim()) {
@@ -939,16 +998,16 @@ export class TorrentioApiService {
       });
       
       if (newMagnets.length === 0) {
-        this.#logger.debug('Todos los magnets ya existen en el archivo, omitiendo guardado');
+        this.#logger.debug(`Todos los magnets ya existen en ${fileName}, omitiendo guardado`);
         return;
       }
       
       for (const magnet of newMagnets) {
         const csvLine = this.#magnetToCsvLine(magnet);
-        appendFileSync(this.#torrentioFilePath, csvLine + '\n', 'utf8');
+        appendFileSync(targetFilePath, csvLine + '\n', 'utf8');
       }
       
-      this.#logger.info(`Guardados ${newMagnets.length} magnets nuevos (${magnets.length - newMagnets.length} duplicados omitidos)`);
+      this.#logger.info(`Guardados ${newMagnets.length} magnets nuevos en ${fileName} (${magnets.length - newMagnets.length} duplicados omitidos)`);
     } catch (error) {
       // Crear objeto de error detallado para debugging
       const fileError = {
@@ -961,10 +1020,12 @@ export class TorrentioApiService {
         path: error.path || this.#torrentioFilePath,
         operation: 'saveMagnetsToFile',
         magnetCount: magnets.length,
+        language: language,
+        targetFile: fileName,
         timestamp: new Date().toISOString()
       };
       
-      this.#log('error', 'Error al guardar magnets en torrentio.csv:', fileError);
+      this.#log('error', `Error al guardar magnets en ${fileName}:`, fileError);
       
       // En caso de error de permisos, continuar sin interrumpir el flujo
       if (error.code === 'EACCES') {
