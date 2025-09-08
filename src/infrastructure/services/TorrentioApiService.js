@@ -1263,6 +1263,34 @@ export class TorrentioApiService {
   }
 
   /**
+   * Obtiene la configuración de proveedores para un tipo específico
+   * @param {string} type - Tipo de contenido (movie, series, anime)
+   * @returns {Object} Configuración de proveedores
+   * @public
+   */
+  getProviderConfig(type) {
+    return this.#providerConfigs[type] || null;
+  }
+
+  /**
+   * Establece la configuración de proveedores para un tipo específico
+   * @param {string} type - Tipo de contenido (movie, series, anime)
+   * @param {Object} config - Nueva configuración
+   * @public
+   */
+  setProviderConfig(type, config) {
+    if (!this.#providerConfigs[type]) {
+      this.#logger.warn(`Tipo de contenido no válido: ${type}`);
+      return;
+    }
+    
+    this.#providerConfigs[type] = {
+      ...this.#providerConfigs[type],
+      ...config
+    };
+  }
+
+  /**
    * Obtiene el idioma prioritario actual.
    * @returns {string|null} Idioma prioritario configurado
    * @public
