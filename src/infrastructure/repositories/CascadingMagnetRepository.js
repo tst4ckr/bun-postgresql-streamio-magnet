@@ -10,6 +10,8 @@ import { unifiedIdService } from '../services/UnifiedIdService.js';
 import { metadataService } from '../services/MetadataService.js';
 import { cacheService } from '../services/CacheService.js';
 import { ConfigurationCommandFactory } from '../patterns/ConfigurationCommand.js';
+import { CsvFileInitializer } from '../utils/CsvFileInitializer.js';
+import { dirname } from 'path';
 
 /**
  * Repositorio que implementa búsqueda en cascada con fallback automático.
@@ -115,6 +117,10 @@ export class CascadingMagnetRepository extends MagnetRepository {
     
     try {
       this.#log('info', 'Inicializando repositorios en cascada...');
+      
+      // Inicializar archivos CSV automáticamente
+      const dataDirectory = dirname(this.#secondaryCsvPath);
+      CsvFileInitializer.initializeAllCsvFiles(dataDirectory);
       
       // Inicializar repositorio principal
       await this.#initializeRepository(this.#primaryRepository, 'magnets.csv');
