@@ -457,14 +457,17 @@ export class TorrentioApiService {
           ? { season, episode }
           : this.#extractEpisodeInfo(streamTitle, type);
         
-        // Extraer solo el ID base (sin temporada:episodio)
-        const baseContentId = contentId.split(':')[0];
+        // Para Kitsu, preservar información completa (ID:temporada:episodio)
+        // Para otros IDs, extraer solo el ID base
+        const isKitsuId = contentId.startsWith('kitsu:');
+        const finalContentId = isKitsuId ? contentId : contentId.split(':')[0];
         
         // Detectar tipo de ID y asignar campos apropiados
-        const { idType, imdbId } = this.#extractIdInfo(baseContentId);
+        const baseIdForDetection = contentId.split(':')[0];
+        const { idType, imdbId } = this.#extractIdInfo(baseIdForDetection);
         
         const magnetData = {
-          content_id: baseContentId,
+          content_id: finalContentId,
           name: fullName,
           magnet: magnetUri,
           quality: quality || 'unknown',
