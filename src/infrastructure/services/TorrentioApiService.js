@@ -457,14 +457,25 @@ export class TorrentioApiService {
           ? { season, episode }
           : this.#extractEpisodeInfo(streamTitle, type);
         
+        // Procesar content_id para mantener compatibilidad con todos los tipos de ID
+        const processedInfo = this.#processContentId(contentId.split(':')[0]);
+        
         // Para Kitsu, preservar información completa (ID:temporada:episodio)
-        // Para otros IDs, extraer solo el ID base
-        const isKitsuId = contentId.startsWith('kitsu:');
-        const finalContentId = isKitsuId ? contentId : contentId.split(':')[0];
+        // Para otros IDs, usar el formato estándar con prefijo del tipo
+        let finalContentId;
+        if (processedInfo.idType === 'kitsu') {
+          // Para Kitsu, mantener formato completo con temporada/episodio si existe
+          finalContentId = contentId.includes(':') ? contentId : `kitsu:${processedInfo.processedId}`;
+        } else if (processedInfo.idType === 'imdb') {
+          // Para IMDb, usar el ID tal como viene (ya tiene formato tt123456)
+          finalContentId = processedInfo.processedId;
+        } else {
+          // Para otros tipos (tmdb, tvdb, anilist, mal), usar formato con prefijo
+          finalContentId = `${processedInfo.idType}:${processedInfo.processedId}`;
+        }
         
         // Detectar tipo de ID y asignar campos apropiados
-        const baseIdForDetection = contentId.split(':')[0];
-        const { idType, imdbId } = this.#extractIdInfo(baseIdForDetection);
+        const { idType, imdbId } = this.#extractIdInfo(processedInfo.processedId);
         
         const magnetData = {
           content_id: finalContentId,
@@ -1091,25 +1102,14 @@ export class TorrentioApiService {
     if (contentId.match(/^tt\d+$/i)) {
       return { idType: 'imdb', imdbId: contentId };
     }
-    // TMDB ID (solo números, opcionalmente con prefijo tmdb:)
-    else if (contentId.match(/^(?:tmdb:)?\d+$/i)) {
+    // Solo números - podría ser TMDB, TVDB, AniList, MAL o Kitsu
+    else if (contentId.match(/^\d+$/i)) {
+      // Sin más contexto, asumir TMDB por defecto para números
       return { idType: 'tmdb', imdbId: undefined };
     }
-    // TVDB ID (solo números, opcionalmente con prefijo tvdb:)
-    else if (contentId.match(/^(?:tvdb:)?\d+$/i)) {
-      return { idType: 'tvdb', imdbId: undefined };
-    }
-    // Kitsu ID (números o slug, opcionalmente con prefijo kitsu:)
-    else if (contentId.match(/^(?:kitsu:)?(?:\d+|[\w-]+)$/i)) {
+    // Slug o texto - probablemente Kitsu
+    else if (contentId.match(/^[\w-]+$/i)) {
       return { idType: 'kitsu', imdbId: undefined };
-    }
-    // AniList ID (solo números, opcionalmente con prefijo anilist:)
-    else if (contentId.match(/^(?:anilist:)?\d+$/i)) {
-      return { idType: 'anilist', imdbId: undefined };
-    }
-    // MAL ID (solo números, opcionalmente con prefijo mal:)
-    else if (contentId.match(/^(?:mal:)?\d+$/i)) {
-      return { idType: 'mal', imdbId: undefined };
     }
     
     // Por defecto, asumir IMDb
