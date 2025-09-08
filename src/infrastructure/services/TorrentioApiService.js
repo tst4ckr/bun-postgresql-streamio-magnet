@@ -233,9 +233,14 @@ export class TorrentioApiService {
       );
       
       if (spanishResults && spanishResults.length > 0) {
-        this.#log('info', `Encontrados ${spanishResults.length} resultados en trackers españoles`);
-        await this.#saveMagnetsToFile(spanishResults);
-        return spanishResults;
+        const resultsWithSeeds = this.#filterResultsWithSeeds(spanishResults);
+        if (resultsWithSeeds.length > 0) {
+          this.#log('info', `Encontrados ${resultsWithSeeds.length} resultados con seeds en trackers españoles`);
+          await this.#saveMagnetsToFile(resultsWithSeeds);
+          return resultsWithSeeds;
+        } else {
+          this.#log('warn', `Encontrados ${spanishResults.length} resultados en español pero sin seeds disponibles`);
+        }
       }
       
       // Segunda búsqueda: trackers combinados (español + inglés)
@@ -249,9 +254,14 @@ export class TorrentioApiService {
       );
       
       if (combinedResults && combinedResults.length > 0) {
-        this.#log('info', `Encontrados ${combinedResults.length} resultados en trackers combinados`);
-        await this.#saveMagnetsToFile(combinedResults);
-        return combinedResults;
+        const resultsWithSeeds = this.#filterResultsWithSeeds(combinedResults);
+        if (resultsWithSeeds.length > 0) {
+          this.#log('info', `Encontrados ${resultsWithSeeds.length} resultados con seeds en trackers combinados`);
+          await this.#saveMagnetsToFile(resultsWithSeeds);
+          return resultsWithSeeds;
+        } else {
+          this.#log('warn', `Encontrados ${combinedResults.length} resultados combinados pero sin seeds disponibles`);
+        }
       }
       
       this.#log('warn', `No se encontraron resultados en ninguna configuración de idioma para ${contentId}`);
@@ -261,6 +271,23 @@ export class TorrentioApiService {
       this.#log('error', `Error en búsqueda con fallback de idioma para ${contentId}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Filtra resultados que tienen seeds disponibles
+   * @private
+   * @param {Array} results - Array de magnets
+   * @returns {Array} Array de magnets con seeds > 0
+   */
+  #filterResultsWithSeeds(results) {
+    if (!results || !Array.isArray(results)) {
+      return [];
+    }
+    
+    return results.filter(magnet => {
+      const seeders = parseInt(magnet.seeders) || 0;
+      return seeders > 0;
+    });
   }
 
   /**

@@ -73,12 +73,14 @@ const apiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFall
    │   ├── mejortorrent
    │   ├── wolfmax4k
    │   └── cinecalidad
+   │   └── ✅ Filtrar solo resultados con seeds > 0
    │
-   └── Si no hay resultados → Segunda búsqueda: Trackers combinados
+   └── Si no hay resultados CON SEEDS → Segunda búsqueda: Trackers combinados
        ├── Trackers en español (mejortorrent, wolfmax4k, cinecalidad)
-       └── Trackers en inglés (yts, eztv, rarbg, 1337x, thepiratebay, etc.)
+       ├── Trackers en inglés (yts, eztv, rarbg, 1337x, thepiratebay, etc.)
+       └── ✅ Filtrar solo resultados con seeds > 0
 
-3. Guardar resultados en CSV correspondiente
+3. Guardar resultados en CSV correspondiente (solo con seeds)
 ```
 
 ## Configuraciones por Tipo de Contenido
@@ -95,13 +97,49 @@ const apiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFall
 - **Español**: `mejortorrent,wolfmax4k,cinecalidad`
 - **Combinado**: `horriblesubs,nyaasi,tokyotosho,anidex,subsplease,erai-raws,mejortorrent,wolfmax4k,cinecalidad`
 
+## Filtro de Seeds Automático
+
+### Funcionalidad
+
+El sistema incluye un filtro automático que garantiza que solo se retornen torrents con seeders activos:
+
+- **Verificación automática**: Cada resultado se verifica para asegurar `seeders > 0`
+- **Fallback inteligente**: Si los resultados en español no tienen seeds, continúa automáticamente con la búsqueda combinada
+- **Calidad garantizada**: Solo se guardan y retornan magnets con actividad de seeding
+
+### Lógica de Filtrado
+
+```javascript
+// Ejemplo de filtrado
+const resultsWithSeeds = results.filter(magnet => {
+  const seeders = parseInt(magnet.seeders) || 0;
+  return seeders > 0;
+});
+```
+
+### Logging del Filtro
+
+```
+[INFO] Encontrados 8 resultados en trackers españoles
+[INFO] Encontrados 5 resultados con seeds en trackers españoles
+```
+
+O en caso de fallback por falta de seeds:
+
+```
+[WARN] Encontrados 3 resultados en español pero sin seeds disponibles
+[INFO] Segunda búsqueda: trackers combinados para tt1234567
+[INFO] Encontrados 12 resultados con seeds en trackers combinados
+```
+
 ## Beneficios
 
 1. **Priorización de contenido en español**: Los usuarios obtienen primero resultados en su idioma preferido
-2. **Fallback robusto**: Si no hay contenido en español, se amplía la búsqueda automáticamente
-3. **Configuración flexible**: Cada tipo de contenido puede tener diferentes proveedores
-4. **Variables de entorno**: Fácil personalización sin modificar código
-5. **Compatibilidad**: Mantiene toda la funcionalidad existente
+2. **Fallback robusto**: Si no hay contenido en español con seeds, se amplía la búsqueda automáticamente
+3. **Calidad garantizada**: Solo se retornan torrents con seeders activos
+4. **Configuración flexible**: Cada tipo de contenido puede tener diferentes proveedores
+5. **Variables de entorno**: Fácil personalización sin modificar código
+6. **Compatibilidad**: Mantiene toda la funcionalidad existente
 
 ## Logging y Monitoreo
 
@@ -125,8 +163,22 @@ O en caso de fallback:
 
 Se incluyen scripts de prueba:
 
-- `test/simple-config-test.js`: Verificación de configuraciones
-- `test/language-fallback-test.js`: Pruebas completas del flujo
+- `test/simple-config-test.js`: Verificación de configuraciones de idioma
+- `test/language-fallback-test.js`: Pruebas completas del flujo de fallback
+- `test/seeds-filter-test.js`: Verificación del filtro de seeds automático
+
+### Ejecutar Pruebas
+
+```bash
+# Verificar configuraciones
+node test/simple-config-test.js
+
+# Probar flujo completo de fallback
+node test/language-fallback-test.js
+
+# Verificar filtro de seeds
+node test/seeds-filter-test.js
+```
 
 ## Compatibilidad
 
