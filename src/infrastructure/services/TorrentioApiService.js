@@ -201,6 +201,117 @@ export class TorrentioApiService {
   }
 
   /**
+   * Busca magnets con fallback de idioma: primero en español, luego combinado
+   * @param {string} contentId - ID del contenido
+   * @param {string} type - Tipo de contenido ('movie', 'series', 'anime')
+   * @param {number} season - Temporada (para series/anime)
+   * @param {number} episode - Episodio (para series/anime)
+   * @returns {Promise<Array>} Array de magnets
+   */
+  async searchMagnetsWithLanguageFallback(contentId, type = 'auto', season = null, episode = null) {
+    this.#log('info', `Iniciando búsqueda con fallback de idioma para ${contentId}`, { type, season, episode });
+    
+    try {
+      // Detectar tipo de contenido si es 'auto'
+      const detectedType = type === 'auto' ? this.#detectContentType(contentId, season, episode) : type;
+      
+      // Obtener configuraciones de idioma para el tipo de contenido
+      const typeConfig = addonConfig.torrentio[detectedType];
+      if (!typeConfig || !typeConfig.languageConfigs) {
+        this.#log('warn', `No hay configuraciones de idioma para tipo: ${detectedType}`);
+        return this.searchMagnetsById(contentId, detectedType, season, episode);
+      }
+      
+      // Primera búsqueda: solo en español
+      this.#log('info', `Primera búsqueda: trackers en español para ${contentId}`);
+      const spanishResults = await this.#searchWithLanguageConfig(
+        contentId, 
+        detectedType, 
+        typeConfig.languageConfigs.spanish,
+        season, 
+        episode
+      );
+      
+      if (spanishResults && spanishResults.length > 0) {
+        this.#log('info', `Encontrados ${spanishResults.length} resultados en trackers españoles`);
+        await this.#saveMagnetsToFile(spanishResults);
+        return spanishResults;
+      }
+      
+      // Segunda búsqueda: trackers combinados (español + inglés)
+      this.#log('info', `Segunda búsqueda: trackers combinados para ${contentId}`);
+      const combinedResults = await this.#searchWithLanguageConfig(
+        contentId, 
+        detectedType, 
+        typeConfig.languageConfigs.combined,
+        season, 
+        episode
+      );
+      
+      if (combinedResults && combinedResults.length > 0) {
+        this.#log('info', `Encontrados ${combinedResults.length} resultados en trackers combinados`);
+        await this.#saveMagnetsToFile(combinedResults);
+        return combinedResults;
+      }
+      
+      this.#log('warn', `No se encontraron resultados en ninguna configuración de idioma para ${contentId}`);
+      return [];
+      
+    } catch (error) {
+      this.#log('error', `Error en búsqueda con fallback de idioma para ${contentId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Realiza búsqueda con una configuración de idioma específica
+   * @private
+   * @param {string} contentId - ID del contenido
+   * @param {string} type - Tipo de contenido
+   * @param {Object} languageConfig - Configuración de idioma (providers, priorityLanguage)
+   * @param {number} season - Temporada
+   * @param {number} episode - Episodio
+   * @returns {Promise<Array>} Array de magnets
+   */
+  async #searchWithLanguageConfig(contentId, type, languageConfig, season = null, episode = null) {
+    try {
+      // Guardar configuración actual
+      const originalProviders = this.#providerConfigs[type]?.providers;
+      const originalPriorityLanguage = this.#providerConfigs[type]?.priorityLanguage;
+      
+      // Aplicar configuración temporal
+      if (!this.#providerConfigs[type]) {
+        this.#providerConfigs[type] = {};
+      }
+      this.#providerConfigs[type].providers = languageConfig.providers;
+      this.#providerConfigs[type].priorityLanguage = languageConfig.priorityLanguage;
+      
+      this.#log('debug', `Usando configuración temporal:`, {
+        type,
+        providers: languageConfig.providers,
+        priorityLanguage: languageConfig.priorityLanguage
+      });
+      
+      // Realizar búsqueda
+      const results = await this.searchMagnetsById(contentId, type, season, episode);
+      
+      // Restaurar configuración original
+      if (originalProviders !== undefined) {
+        this.#providerConfigs[type].providers = originalProviders;
+      }
+      if (originalPriorityLanguage !== undefined) {
+        this.#providerConfigs[type].priorityLanguage = originalPriorityLanguage;
+      }
+      
+      return results;
+      
+    } catch (error) {
+      this.#log('error', `Error en búsqueda con configuración de idioma:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Convierte streams de Torrentio a objetos Magnet.
    * @private
    * @param {Array} streams - Streams de la respuesta de Torrentio

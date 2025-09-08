@@ -90,14 +90,36 @@ const config = {
       sort: process.env.TORRENTIO_MOVIE_SORT || 'seeders',
       qualityFilter: process.env.TORRENTIO_MOVIE_QUALITY_FILTER || 'scr,cam,unknown',
       limit: parseInt(process.env.TORRENTIO_MOVIE_LIMIT) || 10,
-      priorityLanguage: process.env.TORRENTIO_MOVIE_LANGUAGE || 'spanish'
+      priorityLanguage: process.env.TORRENTIO_MOVIE_LANGUAGE || 'spanish',
+      // Configuraciones por idioma para búsqueda en cascada
+      languageConfigs: {
+        spanish: {
+          providers: process.env.TORRENTIO_MOVIE_PROVIDERS_ES || 'mejortorrent,wolfmax4k,cinecalidad',
+          priorityLanguage: 'spanish'
+        },
+        combined: {
+          providers: process.env.TORRENTIO_MOVIE_PROVIDERS_COMBINED || 'mejortorrent,wolfmax4k,cinecalidad,yts,eztv,rarbg,1337x,thepiratebay',
+          priorityLanguage: 'spanish'
+        }
+      }
     },
     series: {
       providers: process.env.TORRENTIO_SERIES_PROVIDERS || 'horriblesubs,nyaasi,tokyotosho,anidex,mejortorrent,wolfmax4k,cinecalidad',
       sort: process.env.TORRENTIO_SERIES_SORT || 'seeders',
       qualityFilter: process.env.TORRENTIO_SERIES_QUALITY_FILTER || 'scr,cam,unknown',
       limit: parseInt(process.env.TORRENTIO_SERIES_LIMIT) || 10,
-      priorityLanguage: process.env.TORRENTIO_SERIES_LANGUAGE || 'spanish'
+      priorityLanguage: process.env.TORRENTIO_SERIES_LANGUAGE || 'spanish',
+      // Configuraciones por idioma para búsqueda en cascada
+      languageConfigs: {
+        spanish: {
+          providers: process.env.TORRENTIO_SERIES_PROVIDERS_ES || 'mejortorrent,wolfmax4k,cinecalidad',
+          priorityLanguage: 'spanish'
+        },
+        combined: {
+          providers: process.env.TORRENTIO_SERIES_PROVIDERS_COMBINED || 'mejortorrent,wolfmax4k,cinecalidad,eztv,rarbg,1337x,thepiratebay,horriblesubs,nyaasi',
+          priorityLanguage: 'spanish'
+        }
+      }
     },
     anime: {
       providers: process.env.TORRENTIO_ANIME_PROVIDERS || 'horriblesubs,nyaasi,tokyotosho,anidex,subsplease,erai-raws',
@@ -109,7 +131,18 @@ const config = {
       enableSubtitles: process.env.TORRENTIO_ANIME_SUBTITLES === 'true' || true,
       preferredFansubs: process.env.TORRENTIO_ANIME_FANSUBS || 'horriblesubs,subsplease,erai-raws',
       qualityPriority: process.env.TORRENTIO_ANIME_QUALITY_PRIORITY || '1080p,720p,480p',
-      enableBatch: process.env.TORRENTIO_ANIME_BATCH === 'true' || false
+      enableBatch: process.env.TORRENTIO_ANIME_BATCH === 'true' || false,
+      // Configuraciones por idioma para búsqueda en cascada
+      languageConfigs: {
+        spanish: {
+          providers: process.env.TORRENTIO_ANIME_PROVIDERS_ES || 'mejortorrent,wolfmax4k,cinecalidad',
+          priorityLanguage: 'spanish'
+        },
+        combined: {
+          providers: process.env.TORRENTIO_ANIME_PROVIDERS_COMBINED || 'horriblesubs,nyaasi,tokyotosho,anidex,subsplease,erai-raws,mejortorrent,wolfmax4k,cinecalidad',
+          priorityLanguage: 'japanese'
+        }
+      }
     }
   },
   // Configuración para selección de magnets
