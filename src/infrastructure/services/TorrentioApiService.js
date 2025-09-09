@@ -1214,7 +1214,7 @@ export class TorrentioApiService {
    */
   static #ID_PATTERNS = {
     imdb: {
-      pattern: /^tt\d+$/i,
+      pattern: /^tt\d+(?::\d+)?(?::\d+)?$/i,
       processor: (id) => id,
       preservePrefix: true
     },
