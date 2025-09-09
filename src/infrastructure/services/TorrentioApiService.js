@@ -483,7 +483,7 @@ export class TorrentioApiService {
           : this.#extractEpisodeInfo(streamTitle, type);
         
         // Procesar content_id para mantener compatibilidad con todos los tipos de ID
-        const processedInfo = this.#processContentId(contentId.split(':')[0]);
+        const processedInfo = this.#processContentId(contentId);
         
         // Para Kitsu, preservar información completa (ID:temporada:episodio)
         // Para otros IDs, usar el formato estándar con prefijo del tipo
