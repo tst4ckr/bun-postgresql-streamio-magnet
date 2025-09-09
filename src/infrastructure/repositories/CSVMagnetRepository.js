@@ -32,9 +32,13 @@ export class CSVMagnetRepository extends MagnetRepository {
     
     for await (const row of stream) {
       try {
+        // Preservar content_id original para construcción de URLs
+        const originalContentId = row.content_id || row.imdb_id;
+        
         // Mapear campos para compatibilidad con el nuevo esquema
         const magnetData = {
-          content_id: row.imdb_id || row.content_id, // Compatibilidad hacia atrás
+          content_id: originalContentId, // Preservar ID original
+          original_content_id: originalContentId, // Campo adicional para referencia
           name: row.name,
           magnet: row.magnet,
           quality: row.quality,

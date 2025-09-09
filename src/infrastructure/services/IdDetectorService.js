@@ -20,9 +20,9 @@ export class IdDetectorService {
         validator: (id) => this.#validateImdbSeriesFormat(id)
       }],
       ['kitsu', {
-        pattern: /^(kitsu:)?\d+$/,
+        pattern: /^kitsu:\d+$/,
         prefix: 'kitsu:',
-        description: 'Kitsu ID format (optional kitsu: prefix followed by digits)',
+        description: 'Kitsu ID format (kitsu: prefix required followed by digits)',
         validator: (id) => this.#validateKitsuFormat(id)
       }],
       ['kitsu_series', {
@@ -32,21 +32,21 @@ export class IdDetectorService {
         validator: (id) => this.#validateKitsuSeriesFormat(id)
       }],
       ['mal', {
-        pattern: /^(mal:)?\d+$/,
+        pattern: /^mal:\d+$/,
         prefix: 'mal:',
-        description: 'MyAnimeList ID format (optional mal: prefix followed by digits)',
+        description: 'MyAnimeList ID format (mal: prefix required followed by digits)',
         validator: (id) => this.#validateNumericFormat(id, 'mal')
       }],
       ['anilist', {
-        pattern: /^(anilist:)?\d+$/,
+        pattern: /^anilist:\d+$/,
         prefix: 'anilist:',
-        description: 'AniList ID format (optional anilist: prefix followed by digits)',
+        description: 'AniList ID format (anilist: prefix required followed by digits)',
         validator: (id) => this.#validateNumericFormat(id, 'anilist')
       }],
       ['anidb', {
-        pattern: /^(anidb:)?\d+$/,
+        pattern: /^anidb:\d+$/,
         prefix: 'anidb:',
-        description: 'AniDB ID format (optional anidb: prefix followed by digits)',
+        description: 'AniDB ID format (anidb: prefix required followed by digits)',
         validator: (id) => this.#validateNumericFormat(id, 'anidb')
       }]
     ]);
@@ -76,10 +76,10 @@ export class IdDetectorService {
   }
 
   /**
-   * Extrae el ID limpio sin prefijos
+   * Extrae el ID preservando formato original para URLs
    * @param {string} id - ID original
-   * @param {string} type - Tipo detectado
-   * @returns {string} ID limpio
+   * @param {string} type - Tipo de ID detectado
+   * @returns {string} ID preservado para construcción de URLs
    */
   #extractCleanId(id, type) {
     const config = this.detectionPatterns.get(type);
@@ -91,13 +91,13 @@ export class IdDetectorService {
       case 'imdb_series':
         return id; // Series IMDb mantienen formato completo ttXXXXXXX:season:episode
       case 'kitsu':
-        return id.replace(/^kitsu:/, ''); // Remover prefijo 'kitsu:' si existe
+        return id; // Preservar formato completo 'kitsu:XXXXX' para URLs
       case 'mal':
-        return id.replace(/^mal:/, ''); // Remover prefijo 'mal:' si existe
+        return id; // Preservar formato completo 'mal:XXXXX' para URLs
       case 'anilist':
-        return id.replace(/^anilist:/, ''); // Remover prefijo 'anilist:' si existe
+        return id; // Preservar formato completo 'anilist:XXXXX' para URLs
       case 'anidb':
-        return id.replace(/^anidb:/, ''); // Remover prefijo 'anidb:' si existe
+        return id; // Preservar formato completo 'anidb:XXXXX' para URLs
       default:
         return id;
     }
