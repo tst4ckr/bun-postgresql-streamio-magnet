@@ -250,7 +250,7 @@ export class TorrentioApiService {
   }
 
   /**
-   * Busca magnets con fallback de idioma: primero en español, luego combinado
+   * Busca magnets con fallback de idioma: primero en español, luego combinado si es necesario
    * @param {string} contentId - ID del contenido
    * @param {string} type - Tipo de contenido ('movie', 'series', 'anime')
    * @param {number} season - Temporada (para series/anime)
@@ -271,12 +271,40 @@ export class TorrentioApiService {
         return this.searchMagnetsById(contentId, detectedType, season, episode);
       }
       
+      // Verificar si las configuraciones son idénticas para evitar búsquedas duplicadas
+      const spanishConfig = typeConfig.languageConfigs.spanish;
+      const combinedConfig = typeConfig.languageConfigs.combined;
+      const configsAreIdentical = JSON.stringify(spanishConfig) === JSON.stringify(combinedConfig);
+      
+      if (configsAreIdentical) {
+        this.#log('info', `Configuraciones español y combinado son idénticas, ejecutando búsqueda única para ${contentId}`);
+        const results = await this.#searchWithLanguageConfig(
+          contentId, 
+          detectedType, 
+          spanishConfig,
+          season, 
+          episode
+        );
+        
+        if (results && results.length > 0) {
+          const resultsWithSeeds = this.#filterResultsWithSeeds(results);
+          if (resultsWithSeeds.length > 0) {
+            this.#log('info', `Encontrados ${resultsWithSeeds.length} resultados con seeds`);
+            await this.#saveMagnetsToFile(resultsWithSeeds, 'spanish');
+            return resultsWithSeeds;
+          }
+        }
+        
+        this.#log('warn', `No se encontraron resultados para ${contentId}`);
+        return [];
+      }
+      
       // Primera búsqueda: solo en español
       this.#log('info', `Primera búsqueda: trackers en español para ${contentId}`);
       const spanishResults = await this.#searchWithLanguageConfig(
         contentId, 
         detectedType, 
-        typeConfig.languageConfigs.spanish,
+        spanishConfig,
         season, 
         episode
       );
@@ -292,12 +320,12 @@ export class TorrentioApiService {
         }
       }
       
-      // Segunda búsqueda: trackers combinados (español + inglés)
+      // Segunda búsqueda: trackers combinados (español + inglés) solo si no hay resultados españoles
       this.#log('info', `Segunda búsqueda: trackers combinados para ${contentId}`);
       const combinedResults = await this.#searchWithLanguageConfig(
         contentId, 
         detectedType, 
-        typeConfig.languageConfigs.combined,
+        combinedConfig,
         season, 
         episode
       );
