@@ -287,8 +287,11 @@ export class EnhancedLogger {
         // En producción, usar JSON compacto
         console.log(JSON.stringify(structuredData));
       } else {
-        // En desarrollo, usar formato legible
-        console.log(formattedMessage, '\nMetadata:', structuredData);
+        // En desarrollo, usar formato compacto en una línea
+        const metadataStr = Object.entries(metadata)
+          .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+          .join(' ');
+        console.log(`${formattedMessage} | ${metadataStr}`);
       }
     }
   }
