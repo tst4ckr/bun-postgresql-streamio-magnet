@@ -168,17 +168,31 @@ export class TorrentioApiService {
         return [];
       }
       
+      // Extraer season y episode del contentId si son null
+      let finalSeason = season;
+      let finalEpisode = episode;
+      let baseContentId = contentId;
+      
+      if ((season === null || episode === null) && contentId.includes(':')) {
+        const parts = contentId.split(':');
+        if (parts.length >= 3) {
+          baseContentId = parts[0]; // Solo el ID base (ej: tt9999999)
+          finalSeason = season === null ? parseInt(parts[1]) : season;
+          finalEpisode = episode === null ? parseInt(parts[2]) : episode;
+        }
+      }
+      
       // Detectar tipo automáticamente si es necesario
-      const detectedType = type === 'auto' ? this.#detectContentType(contentId, season, episode) : type;
-      this.#log('info', `Buscando magnets en API Torrentio para: ${contentId} (${detectedType})`);
+      const detectedType = type === 'auto' ? this.#detectContentType(baseContentId, finalSeason, finalEpisode) : type;
+      this.#log('info', `Buscando magnets en API Torrentio para: ${contentId} | component: TorrentioApiService, type: ${detectedType}, season: ${finalSeason}, episode: ${finalEpisode}`);
       
       // Procesar el ID para obtener el formato correcto para Torrentio
-      const { finalContentId } = this.#processContentId(contentId);
+      const { finalContentId } = this.#processContentId(baseContentId);
       
       // Construir ID según el tipo de contenido
       let finalStreamId = finalContentId;
-      if ((detectedType === 'series' || detectedType === 'anime') && season !== null && episode !== null) {
-        finalStreamId = `${finalContentId}:${season}:${episode}`;
+      if ((detectedType === 'series' || detectedType === 'anime') && finalSeason !== null && finalEpisode !== null) {
+        finalStreamId = `${finalContentId}:${finalSeason}:${finalEpisode}`;
         this.#log('info', `Formato de serie/anime: ${finalStreamId}`);
       }
       
@@ -258,17 +272,27 @@ export class TorrentioApiService {
    * @returns {Promise<Array>} Array de magnets
    */
   async searchMagnetsWithLanguageFallback(contentId, type = 'auto', season = null, episode = null) {
-    this.#log('info', `Iniciando búsqueda con fallback de idioma para ${contentId}`, { type, season, episode });
+    // Extraer season y episode del contentId si no se proporcionan y el ID tiene formato series
+    const { finalContentId, extractedSeason, extractedEpisode } = this.#processContentId(contentId);
+    const finalSeason = season !== null ? season : extractedSeason;
+    const finalEpisode = episode !== null ? episode : extractedEpisode;
+    
+    this.#log('info', `Iniciando búsqueda con fallback de idioma para ${contentId}`, { 
+      component: 'TorrentioApiService', 
+      type, 
+      season: finalSeason, 
+      episode: finalEpisode 
+    });
     
     try {
       // Detectar tipo de contenido si es 'auto'
-      const detectedType = type === 'auto' ? this.#detectContentType(contentId, season, episode) : type;
+      const detectedType = type === 'auto' ? this.#detectContentType(finalContentId, finalSeason, finalEpisode) : type;
       
       // Obtener configuraciones de idioma para el tipo de contenido
       const typeConfig = addonConfig.torrentio[detectedType];
       if (!typeConfig || !typeConfig.languageConfigs) {
         this.#log('warn', `No hay configuraciones de idioma para tipo: ${detectedType}`);
-        return this.searchMagnetsById(contentId, detectedType, season, episode);
+        return this.searchMagnetsById(finalContentId, detectedType, finalSeason, finalEpisode);
       }
       
       // Obtener configuraciones de idioma
@@ -281,11 +305,11 @@ export class TorrentioApiService {
       if (configsAreIdentical) {
         this.#log('info', `Configuraciones español y combinado son idénticas, ejecutando búsqueda única para ${contentId}`);
         const results = await this.#searchWithLanguageConfig(
-          contentId, 
+          finalContentId, 
           detectedType, 
           spanishConfig,
-          season, 
-          episode
+          finalSeason, 
+          finalEpisode
         );
         
         if (results && results.length > 0) {
@@ -307,11 +331,11 @@ export class TorrentioApiService {
       // Primera búsqueda: solo en español
       this.#log('info', `Primera búsqueda: trackers en español para ${contentId}`);
       const spanishResults = await this.#searchWithLanguageConfig(
-        contentId, 
+        finalContentId, 
         detectedType, 
         spanishConfig,
-        season, 
-        episode
+        finalSeason, 
+        finalEpisode
       );
       
       if (spanishResults && spanishResults.length > 0) {
@@ -330,11 +354,11 @@ export class TorrentioApiService {
       // Segunda búsqueda: trackers combinados (español + inglés) solo si no hay suficientes resultados españoles
       this.#log('info', `Segunda búsqueda: trackers combinados para ${contentId}`);
       const combinedResults = await this.#searchWithLanguageConfig(
-        contentId, 
+        finalContentId, 
         detectedType, 
         combinedConfig,
-        season, 
-        episode
+        finalSeason, 
+        finalEpisode
       );
       
       if (combinedResults && combinedResults.length > 0) {
@@ -382,27 +406,41 @@ export class TorrentioApiService {
    * @returns {Promise<Magnet[]>} Array de magnets encontrados
    */
   async searchMagnetsInEnglish(contentId, type = 'auto', season = null, episode = null) {
-    this.#log('info', `Búsqueda inglés: ${contentId} (${type}${season ? `:S${season}` : ''}${episode ? `E${episode}` : ''})`);
+    // Extraer season y episode del contentId si son null
+    let finalContentId = contentId;
+    let finalSeason = season;
+    let finalEpisode = episode;
+    
+    if ((season === null || episode === null) && contentId.includes(':')) {
+      const parts = contentId.split(':');
+      if (parts.length >= 3) {
+        finalContentId = parts[0]; // Solo el ID base (ej: tt9999999)
+        finalSeason = season === null ? parseInt(parts[1]) : season;
+        finalEpisode = episode === null ? parseInt(parts[2]) : episode;
+      }
+    }
+    
+    this.#log('info', `Búsqueda inglés: ${contentId} | component: TorrentioApiService, type: ${type}, season: ${finalSeason}, episode: ${finalEpisode}`);
     
     try {
       // Detectar tipo de contenido si es 'auto'
-      const detectedType = type === 'auto' ? this.#detectContentType(contentId, season, episode) : type;
+      const detectedType = type === 'auto' ? this.#detectContentType(finalContentId, finalSeason, finalEpisode) : type;
       
       // Obtener configuraciones de idioma para el tipo de contenido
       const typeConfig = addonConfig.torrentio[detectedType];
       if (!typeConfig || !typeConfig.languageConfigs) {
         this.#log('warn', `No hay configuraciones de idioma para tipo: ${detectedType}`);
-        return this.searchMagnetsById(contentId, detectedType, season, episode);
+        return this.searchMagnetsById(finalContentId, detectedType, finalSeason, finalEpisode);
       }
       
       // Buscar solo en trackers en inglés
       this.#log('info', `Búsqueda en trackers ingleses para ${contentId}`);
       const englishResults = await this.#searchWithLanguageConfig(
-        contentId, 
+        finalContentId, 
         detectedType, 
         typeConfig.languageConfigs.combined, // Usar configuración combinada que incluye trackers ingleses
-        season, 
-        episode
+        finalSeason, 
+        finalEpisode
       );
       
       if (englishResults && englishResults.length > 0) {
@@ -1352,10 +1390,13 @@ export class TorrentioApiService {
   #processImdbId(contentId, detectedType) {
     const cleanId = contentId.startsWith('tt') ? contentId : `tt${contentId}`;
     
+    // Extraer solo el ID base para imdbId (sin season:episode)
+    const baseImdbId = cleanId.split(':')[0];
+    
     return {
       finalContentId: cleanId,
       idType: 'imdb',
-      imdbId: cleanId,
+      imdbId: baseImdbId,
       isValid: true
     };
   }
