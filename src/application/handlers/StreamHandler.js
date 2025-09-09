@@ -5,7 +5,6 @@
 
 import { MagnetNotFoundError } from '../../domain/repositories/MagnetRepository.js';
 import { parseMagnet } from 'parse-magnet-uri';
-import { unifiedIdService } from '../../infrastructure/services/UnifiedIdService.js';
 import { dynamicValidationService } from '../../infrastructure/services/DynamicValidationService.js';
 import { cacheService } from '../../infrastructure/services/CacheService.js';
 import { ConfigurationCommandFactory } from '../../infrastructure/patterns/ConfigurationCommand.js';
@@ -21,7 +20,6 @@ export class StreamHandler {
   #magnetRepository;
   #config;
   #logger;
-  #idService;
   #validationService;
   #configInvoker;
 
@@ -29,13 +27,12 @@ export class StreamHandler {
    * @param {Object} magnetRepository - Repositorio de magnets.
    * @param {Object} config - Configuración del addon.
    * @param {Object} logger - Logger para trazabilidad.
-   * @param {Object} idService - Servicio unificado de IDs (opcional, usa singleton por defecto).
+   * @param {Object} validationService - Servicio de validación dinámica (opcional, usa singleton por defecto).
    */
-  constructor(magnetRepository, config, logger = console, idService = unifiedIdService, validationService = dynamicValidationService) {
+  constructor(magnetRepository, config, logger = console, validationService = dynamicValidationService) {
     this.#magnetRepository = magnetRepository;
     this.#config = config;
     this.#logger = logger;
-    this.#idService = idService;
     this.#validationService = validationService;
     this.#configInvoker = ConfigurationCommandFactory.createInvoker(this.#logger);
   }
@@ -159,7 +156,6 @@ export class StreamHandler {
   async #handleStreamRequest(args) {
     const { type, id } = args;
     const startTime = Date.now();
-    const timestamp = new Date().toISOString();
     
     // Log detallado del inicio de la petición
     this.#log('info', `Petición de stream iniciada para content ID: ${id} (${type})`);

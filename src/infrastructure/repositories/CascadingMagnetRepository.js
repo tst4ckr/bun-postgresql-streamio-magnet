@@ -1015,18 +1015,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
     return Math.floor(baseTTL);
   }
 
-  /**
-   * Método de depuración para acceder a los repositorios internos.
-   * @returns {Object} Repositorios internos para depuración
-   */
-  getInternalRepositories() {
-    return {
-      primary: this.#primaryRepository,
-      secondary: this.#secondaryRepository,
-      anime: this.#animeRepository,
-      torrentioApi: this.#torrentioApiService
-    };
-  }
+
 }
 
 export default CascadingMagnetRepository;
