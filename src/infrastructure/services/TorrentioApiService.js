@@ -271,9 +271,11 @@ export class TorrentioApiService {
         return this.searchMagnetsById(contentId, detectedType, season, episode);
       }
       
-      // Verificar si las configuraciones son idénticas para evitar búsquedas duplicadas
+      // Obtener configuraciones de idioma
       const spanishConfig = typeConfig.languageConfigs.spanish;
       const combinedConfig = typeConfig.languageConfigs.combined;
+      
+      // Verificar si las configuraciones son idénticas para evitar búsquedas duplicadas
       const configsAreIdentical = JSON.stringify(spanishConfig) === JSON.stringify(combinedConfig);
       
       if (configsAreIdentical) {
@@ -299,6 +301,9 @@ export class TorrentioApiService {
         return [];
       }
       
+      // Definir umbral mínimo de resultados satisfactorios según el tipo de contenido
+      const minSatisfactoryResults = detectedType === 'anime' ? 2 : 1;
+      
       // Primera búsqueda: solo en español
       this.#log('info', `Primera búsqueda: trackers en español para ${contentId}`);
       const spanishResults = await this.#searchWithLanguageConfig(
@@ -311,16 +316,18 @@ export class TorrentioApiService {
       
       if (spanishResults && spanishResults.length > 0) {
         const resultsWithSeeds = this.#filterResultsWithSeeds(spanishResults);
-        if (resultsWithSeeds.length > 0) {
-          this.#log('info', `Encontrados ${resultsWithSeeds.length} resultados con seeds en trackers españoles`);
+        if (resultsWithSeeds.length >= minSatisfactoryResults) {
+          this.#log('info', `Encontrados ${resultsWithSeeds.length} resultados con seeds en trackers españoles (suficientes, omitiendo búsqueda combinada)`);
           await this.#saveMagnetsToFile(resultsWithSeeds, 'spanish');
           return resultsWithSeeds;
+        } else if (resultsWithSeeds.length > 0) {
+          this.#log('info', `Encontrados ${resultsWithSeeds.length} resultados con seeds en trackers españoles (insuficientes, continuando con búsqueda combinada)`);
         } else {
           this.#log('warn', `Encontrados ${spanishResults.length} resultados en español pero sin seeds disponibles`);
         }
       }
       
-      // Segunda búsqueda: trackers combinados (español + inglés) solo si no hay resultados españoles
+      // Segunda búsqueda: trackers combinados (español + inglés) solo si no hay suficientes resultados españoles
       this.#log('info', `Segunda búsqueda: trackers combinados para ${contentId}`);
       const combinedResults = await this.#searchWithLanguageConfig(
         contentId, 
@@ -331,11 +338,27 @@ export class TorrentioApiService {
       );
       
       if (combinedResults && combinedResults.length > 0) {
-        const resultsWithSeeds = this.#filterResultsWithSeeds(combinedResults);
-        if (resultsWithSeeds.length > 0) {
-          this.#log('info', `Encontrados ${resultsWithSeeds.length} resultados con seeds en trackers combinados`);
-          await this.#saveMagnetsToFile(resultsWithSeeds, 'spanish');
-          return resultsWithSeeds;
+        const combinedResultsWithSeeds = this.#filterResultsWithSeeds(combinedResults);
+        
+        // Si ya teníamos algunos resultados españoles, combinarlos con los nuevos
+        if (spanishResults && spanishResults.length > 0) {
+          const spanishResultsWithSeeds = this.#filterResultsWithSeeds(spanishResults);
+          const allResults = [...spanishResultsWithSeeds, ...combinedResultsWithSeeds];
+          
+          // Eliminar duplicados basándose en infoHash
+          const uniqueResults = allResults.filter((result, index, self) => 
+            index === self.findIndex(r => r.infoHash === result.infoHash)
+          );
+          
+          if (uniqueResults.length > 0) {
+            this.#log('info', `Encontrados ${uniqueResults.length} resultados únicos combinando español (${spanishResultsWithSeeds.length}) y combinado (${combinedResultsWithSeeds.length})`);
+            await this.#saveMagnetsToFile(uniqueResults, 'spanish');
+            return uniqueResults;
+          }
+        } else if (combinedResultsWithSeeds.length > 0) {
+          this.#log('info', `Encontrados ${combinedResultsWithSeeds.length} resultados con seeds en trackers combinados`);
+          await this.#saveMagnetsToFile(combinedResultsWithSeeds, 'spanish');
+          return combinedResultsWithSeeds;
         } else {
           this.#log('warn', `Encontrados ${combinedResults.length} resultados combinados pero sin seeds disponibles`);
         }
