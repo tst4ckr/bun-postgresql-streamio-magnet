@@ -1407,7 +1407,8 @@ export class TorrentioApiService {
    */
   #processKitsuId(contentId, detectedType) {
     // Kitsu mantiene formato completo con temporada/episodio
-    const finalId = contentId.startsWith('kitsu:') ? contentId : `kitsu:${contentId}`;
+    // El contentId ya viene con el prefijo correcto desde la detección
+    const finalId = contentId;
     
     return {
       finalContentId: finalId,
