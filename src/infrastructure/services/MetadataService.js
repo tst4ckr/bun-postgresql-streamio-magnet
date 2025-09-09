@@ -170,8 +170,6 @@ export class MetadataService {
   async #getAnimeMetadata(contentId) {
     this.logger.debug(`Obteniendo metadatos de anime para ${contentId}`);
     
-    const animeConfig = this.config.anime;
-    
     const metadata = {
       id: contentId,
       type: 'anime',

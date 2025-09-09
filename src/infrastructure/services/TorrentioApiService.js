@@ -499,8 +499,9 @@ export class TorrentioApiService {
           finalContentId = `${processedInfo.idType}:${processedInfo.processedId}`;
         }
         
-        // Detectar tipo de ID y asignar campos apropiados
-        const { idType, imdbId } = this.#extractIdInfo(processedInfo.processedId);
+        // Usar información ya procesada del ID
+        const idType = processedInfo.type;
+        const imdbId = processedInfo.type === 'imdb' ? processedInfo.processedId : undefined;
         
         const magnetData = {
           content_id: finalContentId,
@@ -1110,35 +1111,6 @@ export class TorrentioApiService {
       escapeCsv(magnet.imdb_id || ''),
       escapeCsv(magnet.id_type || '')
     ].join(',');
-  }
-
-  /**
-   * Extrae información del ID para determinar tipo y campos de compatibilidad.
-   * @private
-   * @param {string} contentId - ID del contenido
-   * @returns {Object} Objeto con idType e imdbId
-   */
-  #extractIdInfo(contentId) {
-    if (!contentId) {
-      return { idType: 'imdb', imdbId: undefined };
-    }
-
-    // IMDb ID (tt + números)
-    if (contentId.match(/^tt\d+$/i)) {
-      return { idType: 'imdb', imdbId: contentId };
-    }
-    // Solo números - podría ser TMDB, TVDB, AniList, MAL o Kitsu
-    else if (contentId.match(/^\d+$/i)) {
-      // Sin más contexto, asumir TMDB por defecto para números
-      return { idType: 'tmdb', imdbId: undefined };
-    }
-    // Slug o texto - probablemente Kitsu
-    else if (contentId.match(/^[\w-]+$/i)) {
-      return { idType: 'kitsu', imdbId: undefined };
-    }
-    
-    // Por defecto, asumir IMDb
-    return { idType: 'imdb', imdbId: undefined };
   }
 
   /**

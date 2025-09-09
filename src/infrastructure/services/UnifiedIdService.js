@@ -170,66 +170,16 @@ export class UnifiedIdService {
       };
     }
     
-    // Usar el servicio unificado de mapeo para conversión directa
-    const imdbId = this.fallbackService.getImdbIdFromAny(fullId);
-    if (imdbId) {
-      const result = {
-        success: true,
-        convertedId: imdbId,
-        method: 'unified_mapping',
-        metadata: { 
-          source: 'Servicio de mapeo unificado',
-          originalId: fullId,
-          sourceType: sourceType
-        }
-      };
-      this.#setCachedConversion(cacheKey, imdbId, result.metadata);
-      return result;
-    }
-
-    // No se encontró mapeo
+    // Conversión directa no disponible - servicios de mapeo no implementados
     return {
       success: false,
       convertedId: null,
-      method: 'none',
+      method: 'not_supported',
       metadata: { 
-        error: `No se encontró mapeo ${sourceType.toUpperCase()}→IMDb`,
-        note: 'Verificar mapeos disponibles en el servicio unificado'
+        error: `Conversión ${sourceType.toUpperCase()}→IMDb no disponible`,
+        note: 'Servicios de mapeo unificado no implementados'
       }
     };
-  }
-
-  /**
-   * Obtiene mapeo directo a IMDb para servicios de anime usando conversión cruzada
-   * @param {string} animeId - ID del servicio de anime
-   * @param {string} sourceType - Tipo de servicio (mal, anilist, anidb)
-   * @returns {Promise<string|null>} IMDb ID o null
-   */
-  async #getDirectImdbMapping(animeId, sourceType) {
-    try {
-      // Mapeo de tipos de servicio a sitios externos en Kitsu
-      const siteMapping = {
-        'mal': 'myanimelist',
-        'anilist': 'anilist',
-        'anidb': 'anidb'
-      };
-
-      const externalSite = siteMapping[sourceType];
-      if (!externalSite) {
-        this.enhancedLogger.warn(`Tipo de servicio no soportado: ${sourceType}`);
-        return null;
-      }
-
-      this.enhancedLogger.info(`Buscando mapeo ${sourceType.toUpperCase()}→Kitsu→IMDb para ID: ${animeId}`);
-      
-      // Servicios Kitsu eliminados - conversión no disponible
-      this.enhancedLogger.warn(`Conversión ${sourceType.toUpperCase()}→IMDb no disponible - servicios Kitsu eliminados`);
-      return null;
-
-    } catch (error) {
-      this.enhancedLogger.error(`Error en mapeo ${sourceType.toUpperCase()}→IMDb para ${animeId}:`, error.message);
-      return null;
-    }
   }
 
   /**
@@ -301,8 +251,7 @@ export class UnifiedIdService {
   getStats() {
     return {
       cacheSize: this.conversionCache.size,
-      supportedTypes: this.detectorService.getSupportedTypes(),
-      fallbackMappings: this.fallbackService.getStats()
+      supportedTypes: this.detectorService.getSupportedTypes()
     };
   }
 
