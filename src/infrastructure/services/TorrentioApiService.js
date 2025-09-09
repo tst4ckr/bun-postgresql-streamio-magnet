@@ -1200,13 +1200,28 @@ export class TorrentioApiService {
       processor: (id) => id.replace(/^anilist:/i, ''),
       preservePrefix: false
     },
+    anilist_series: {
+      pattern: /^(?:anilist:)?\d+:\d+:\d+$/i,
+      processor: (id) => id.replace(/^anilist:/i, ''),
+      preservePrefix: false
+    },
     mal: {
       pattern: /^(?:mal:)?\d+$/i,
       processor: (id) => id.replace(/^mal:/i, ''),
       preservePrefix: false
     },
+    mal_series: {
+      pattern: /^(?:mal:)?\d+:\d+:\d+$/i,
+      processor: (id) => id.replace(/^mal:/i, ''),
+      preservePrefix: false
+    },
     anidb: {
       pattern: /^(?:anidb:)?\d+$/i,
+      processor: (id) => id.replace(/^anidb:/i, ''),
+      preservePrefix: false
+    },
+    anidb_series: {
+      pattern: /^(?:anidb:)?\d+:\d+:\d+$/i,
       processor: (id) => id.replace(/^anidb:/i, ''),
       preservePrefix: false
     }
