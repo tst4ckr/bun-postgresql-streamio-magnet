@@ -1192,8 +1192,8 @@ export class TorrentioApiService {
     },
     kitsu: {
       pattern: /^(?:kitsu:)?(?:\d+|[\w-]+)(?::\d+)?(?::\d+)?$/i,
-      processor: (id) => id.replace(/^kitsu:/i, ''),
-      preservePrefix: false
+      processor: (id) => id.startsWith('kitsu:') ? id : `kitsu:${id}`,
+      preservePrefix: true
     },
     anilist: {
       pattern: /^(?:anilist:)?\d+$/i,
@@ -1203,6 +1203,11 @@ export class TorrentioApiService {
     mal: {
       pattern: /^(?:mal:)?\d+$/i,
       processor: (id) => id.replace(/^mal:/i, ''),
+      preservePrefix: false
+    },
+    anidb: {
+      pattern: /^(?:anidb:)?\d+$/i,
+      processor: (id) => id.replace(/^anidb:/i, ''),
       preservePrefix: false
     }
   };

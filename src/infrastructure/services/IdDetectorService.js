@@ -32,22 +32,40 @@ export class IdDetectorService {
         validator: (id) => this.#validateKitsuSeriesFormat(id)
       }],
       ['mal', {
-        pattern: /^mal:\d+$/,
+        pattern: /^(?:mal:)?\d+$/,
         prefix: 'mal:',
-        description: 'MyAnimeList ID format (mal: prefix required followed by digits)',
+        description: 'MyAnimeList ID format (mal: prefix optional followed by digits)',
         validator: (id) => this.#validateNumericFormat(id, 'mal')
       }],
+      ['mal_series', {
+        pattern: /^(?:mal:)?\d+:\d+:\d+$/,
+        prefix: 'mal:',
+        description: 'MyAnimeList series episode format (mal:id:season:episode)',
+        validator: (id) => this.#validateAnimeSeriesFormat(id, 'mal')
+      }],
       ['anilist', {
-        pattern: /^anilist:\d+$/,
+        pattern: /^(?:anilist:)?\d+$/,
         prefix: 'anilist:',
-        description: 'AniList ID format (anilist: prefix required followed by digits)',
+        description: 'AniList ID format (anilist: prefix optional followed by digits)',
         validator: (id) => this.#validateNumericFormat(id, 'anilist')
       }],
+      ['anilist_series', {
+        pattern: /^(?:anilist:)?\d+:\d+:\d+$/,
+        prefix: 'anilist:',
+        description: 'AniList series episode format (anilist:id:season:episode)',
+        validator: (id) => this.#validateAnimeSeriesFormat(id, 'anilist')
+      }],
       ['anidb', {
-        pattern: /^anidb:\d+$/,
+        pattern: /^(?:anidb:)?\d+$/,
         prefix: 'anidb:',
-        description: 'AniDB ID format (anidb: prefix required followed by digits)',
+        description: 'AniDB ID format (anidb: prefix optional followed by digits)',
         validator: (id) => this.#validateNumericFormat(id, 'anidb')
+      }],
+      ['anidb_series', {
+        pattern: /^(?:anidb:)?\d+:\d+:\d+$/,
+        prefix: 'anidb:',
+        description: 'AniDB series episode format (anidb:id:season:episode)',
+        validator: (id) => this.#validateAnimeSeriesFormat(id, 'anidb')
       }]
     ]);
   }
@@ -198,6 +216,46 @@ export class IdDetectorService {
     
     const numericId = parseInt(cleanId);
     if (isNaN(numericId) || numericId <= 0) return false;
+    
+    return true;
+  }
+
+  /**
+   * Valida formato de series de anime genérico
+   * @param {string} id - ID a validar
+   * @param {string} prefix - Prefijo esperado (mal, anilist, anidb)
+   * @returns {boolean} True si es válido
+   */
+  #validateAnimeSeriesFormat(id, prefix) {
+    // Validación de entrada
+    if (!id || typeof id !== 'string') return false;
+    if (!prefix || typeof prefix !== 'string') return false;
+    
+    const parts = id.split(':');
+    const prefixName = prefix.replace(':', '');
+    
+    // Verificar si tiene prefijo
+    if (parts.length === 4 && parts[0] === prefixName) {
+      // Formato: prefix:id:season:episode
+      const animeId = parseInt(parts[1]);
+      const season = parseInt(parts[2]);
+      const episode = parseInt(parts[3]);
+      
+      if (isNaN(animeId) || animeId < 1) return false;
+      if (isNaN(season) || season < 1) return false;
+      if (isNaN(episode) || episode < 1) return false;
+    } else if (parts.length === 3) {
+      // Formato sin prefijo: id:season:episode
+      const animeId = parseInt(parts[0]);
+      const season = parseInt(parts[1]);
+      const episode = parseInt(parts[2]);
+      
+      if (isNaN(animeId) || animeId < 1) return false;
+      if (isNaN(season) || season < 1) return false;
+      if (isNaN(episode) || episode < 1) return false;
+    } else {
+      return false;
+    }
     
     return true;
   }

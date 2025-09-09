@@ -71,6 +71,30 @@ export class DynamicValidationService {
         businessRules: [
           this.#validateAnimeIdBusinessRules.bind(this, 'anidb')
         ]
+      }],
+      ['mal_series', {
+        minLength: 3,
+        maxLength: 25,
+        allowedChars: /^(mal:)?\d+:\d+:\d+$/,
+        businessRules: [
+          this.#validateAnimeSeriesBusinessRules.bind(this, 'mal')
+        ]
+      }],
+      ['anilist_series', {
+        minLength: 3,
+        maxLength: 25,
+        allowedChars: /^(anilist:)?\d+:\d+:\d+$/,
+        businessRules: [
+          this.#validateAnimeSeriesBusinessRules.bind(this, 'anilist')
+        ]
+      }],
+      ['anidb_series', {
+        minLength: 3,
+        maxLength: 25,
+        allowedChars: /^(anidb:)?\d+:\d+:\d+$/,
+        businessRules: [
+          this.#validateAnimeSeriesBusinessRules.bind(this, 'anidb')
+        ]
       }]
     ]);
     
@@ -78,19 +102,19 @@ export class DynamicValidationService {
     this.validationContexts = new Map([
       ['stream_request', {
         description: 'Validación para peticiones de stream',
-        requiredTypes: ['imdb', 'imdb_series', 'kitsu', 'kitsu_series', 'mal', 'anilist', 'anidb'],
+        requiredTypes: ['imdb', 'imdb_series', 'kitsu', 'kitsu_series', 'mal', 'mal_series', 'anilist', 'anilist_series', 'anidb', 'anidb_series'],
         allowConversion: false,
         strictMode: false
       }],
       ['api_endpoint', {
         description: 'Validación para endpoints de API',
-        requiredTypes: ['imdb', 'imdb_series', 'kitsu', 'kitsu_series', 'mal', 'anilist', 'anidb'],
+        requiredTypes: ['imdb', 'imdb_series', 'kitsu', 'kitsu_series', 'mal', 'mal_series', 'anilist', 'anilist_series', 'anidb', 'anidb_series'],
         allowConversion: false,
         strictMode: true
       }],
       ['diagnostic', {
         description: 'Validación para herramientas de diagnóstico',
-        requiredTypes: ['imdb', 'imdb_series', 'kitsu', 'mal', 'anilist', 'anidb'],
+        requiredTypes: ['imdb', 'imdb_series', 'kitsu', 'kitsu_series', 'mal', 'mal_series', 'anilist', 'anilist_series', 'anidb', 'anidb_series'],
         allowConversion: true,
         strictMode: false
       }]
@@ -523,6 +547,73 @@ export class DynamicValidationService {
     return this.#createValidationResult(true, detection.id, {
       businessRule: 'imdb_series_format',
       imdbId: imdbPart,
+      season,
+      episode,
+      context: context.description
+    });
+  }
+
+  /**
+   * Reglas de negocio para IDs de series de anime genérico
+   * @param {string} prefix - Prefijo del tipo de anime (mal, anilist, anidb)
+   * @param {Object} detection - Detección
+   * @param {Object} context - Contexto
+   * @param {Object} options - Opciones
+   * @returns {Promise<Object>} Resultado de validación
+   */
+  async #validateAnimeSeriesBusinessRules(prefix, detection, context, options) {
+    const parts = detection.id.split(':');
+    let animeId, season, episode;
+    
+    // Verificar si tiene prefijo
+    if (parts.length === 4 && parts[0] === prefix) {
+      // Formato: prefix:id:season:episode
+      animeId = parseInt(parts[1]);
+      season = parseInt(parts[2]);
+      episode = parseInt(parts[3]);
+    } else if (parts.length === 3) {
+      // Formato: id:season:episode
+      animeId = parseInt(parts[0]);
+      season = parseInt(parts[1]);
+      episode = parseInt(parts[2]);
+    } else {
+      return this.#createValidationResult(false, detection.id, {
+        error: `Formato de ID de serie ${prefix} inválido`,
+        expected: `${prefix}:id:season:episode o id:season:episode`,
+        actual: detection.id
+      });
+    }
+
+    // Validar ID de anime
+    if (isNaN(animeId) || animeId < 1) {
+      return this.#createValidationResult(false, detection.id, {
+        error: `ID de anime ${prefix} inválido`,
+        animeId: parts[0],
+        validRange: 'entero positivo'
+      });
+    }
+
+    // Validar temporada
+    if (isNaN(season) || season < 1 || season > 99) {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'Número de temporada inválido',
+        season: parts[1],
+        validRange: '1-99'
+      });
+    }
+
+    // Validar número de episodio
+    if (isNaN(episode) || episode < 1 || episode > 9999) {
+      return this.#createValidationResult(false, detection.id, {
+        error: 'Número de episodio inválido',
+        episode: parts[2],
+        validRange: '1-9999'
+      });
+    }
+
+    return this.#createValidationResult(true, detection.id, {
+      businessRule: `${prefix}_series_format`,
+      animeId,
       season,
       episode,
       context: context.description
