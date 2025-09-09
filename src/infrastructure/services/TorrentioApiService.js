@@ -14,6 +14,31 @@ import { SocksProxyAgent } from 'socks-proxy-agent';
 import { ConfigurationCommandFactory } from '../patterns/ConfigurationCommand.js';
 
 /**
+ * Clase de error específica para TorrentioApiService
+ */
+class TorrentioApiError extends Error {
+  constructor(message, code = 'TORRENTIO_ERROR', originalError = null, context = {}) {
+    super(message);
+    this.name = 'TorrentioApiError';
+    this.code = code;
+    this.originalError = originalError;
+    this.context = context;
+    this.timestamp = new Date().toISOString();
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      code: this.code,
+      context: this.context,
+      timestamp: this.timestamp,
+      stack: this.stack
+    };
+  }
+}
+
+/**
  * Servicio para integración con la API de Torrentio de Stremio.
  * Implementa el patrón Service con responsabilidad única para consultas externas.
  */
@@ -1125,19 +1150,40 @@ export class TorrentioApiService {
    * @param {number} episode - Episodio
    * @returns {string} Tipo detectado ('movie', 'series', 'anime')
    */
+  /**
+   * Detecta el tipo de contenido usando múltiples heurísticas avanzadas
+   * @private
+   * @param {string} id - ID del contenido
+   * @param {number|null} season - Temporada
+   * @param {number|null} episode - Episodio
+   * @returns {string} Tipo de contenido: 'anime', 'series', 'movie'
+   */
   #detectContentType(id, season, episode) {
-    // Detectar anime por cualquier ID que contenga indicadores de anime
+    // 1. Detección basada en tipo de ID (más precisa)
+    const idInfo = this.#processContentId(id);
+    
+    // IDs específicos de anime tienen prioridad
+    if (['kitsu', 'anilist', 'mal'].includes(idInfo.idType)) {
+      return 'anime';
+    }
+    
+    // 2. Detección por indicadores en el ID
     if (this.#isKitsuDerivedContent(id)) {
       return 'anime';
     }
     
-    // Si tiene temporada y episodio, es serie o anime
+    // 3. Análisis de estructura episódica
     if (season !== null && episode !== null) {
-      // Usar heurísticas adicionales para detectar anime
+      // Usar heurísticas mejoradas para detectar anime
       if (this.#isLikelyAnimeContent(id, season, episode)) {
         return 'anime';
       }
       
+      return 'series';
+    }
+    
+    // 4. Detección por temporada sin episodio (serie completa)
+    if (season !== null && episode === null) {
       return 'series';
     }
     
@@ -1151,6 +1197,44 @@ export class TorrentioApiService {
    * @param {string} contentId - ID del contenido (puede ser cualquier tipo)
    * @returns {Object} Objeto con el ID procesado y el tipo detectado
    */
+  /**
+   * Mapa de patrones para detección eficiente de tipos de ID
+   * @private
+   * @static
+   */
+  static #ID_PATTERNS = {
+    imdb: {
+      pattern: /^tt\d+$/i,
+      processor: (id) => id,
+      preservePrefix: true
+    },
+    tmdb: {
+      pattern: /^(?:tmdb:)?\d+$/i,
+      processor: (id) => id.replace(/^tmdb:/i, ''),
+      preservePrefix: false
+    },
+    tvdb: {
+      pattern: /^(?:tvdb:)?\d+$/i,
+      processor: (id) => id.replace(/^tvdb:/i, ''),
+      preservePrefix: false
+    },
+    kitsu: {
+      pattern: /^(?:kitsu:)?(?:\d+|[\w-]+)$/i,
+      processor: (id) => id.replace(/^kitsu:/i, ''),
+      preservePrefix: false
+    },
+    anilist: {
+      pattern: /^(?:anilist:)?\d+$/i,
+      processor: (id) => id.replace(/^anilist:/i, ''),
+      preservePrefix: false
+    },
+    mal: {
+      pattern: /^(?:mal:)?\d+$/i,
+      processor: (id) => id.replace(/^mal:/i, ''),
+      preservePrefix: false
+    }
+  };
+
   #processContentId(contentId) {
     // Validación de entrada con early returns
     if (!contentId) {
@@ -1167,46 +1251,24 @@ export class TorrentioApiService {
       throw new Error('ID de contenido no puede estar vacío');
     }
     
-    // Detectar el tipo de ID basado en patrones
-    let processedId = originalId;
-    let idType = 'imdb'; // Por defecto
-
-    // IMDb ID (tt + números)
-    if (originalId.match(/^tt\d+$/i)) {
-      processedId = originalId;
-      idType = 'imdb';
-    }
-    // TMDB ID (solo números, opcionalmente con prefijo tmdb:)
-    else if (originalId.match(/^(?:tmdb:)?\d+$/i)) {
-      processedId = originalId.replace(/^tmdb:/i, '');
-      idType = 'tmdb';
-    }
-    // TVDB ID (solo números, opcionalmente con prefijo tvdb:)
-    else if (originalId.match(/^(?:tvdb:)?\d+$/i)) {
-      processedId = originalId.replace(/^tvdb:/i, '');
-      idType = 'tvdb';
-    }
-    // Kitsu ID (números o slug, opcionalmente con prefijo kitsu:)
-    else if (originalId.match(/^(?:kitsu:)?(?:\d+|[\w-]+)$/i)) {
-      processedId = originalId.replace(/^kitsu:/i, '');
-      idType = 'kitsu';
-    }
-    // AniList ID (solo números, opcionalmente con prefijo anilist:)
-    else if (originalId.match(/^(?:anilist:)?\d+$/i)) {
-      processedId = originalId.replace(/^anilist:/i, '');
-      idType = 'anilist';
-    }
-    // MyAnimeList ID (solo números, opcionalmente con prefijo mal:)
-    else if (originalId.match(/^(?:mal:)?\d+$/i)) {
-      processedId = originalId.replace(/^mal:/i, '');
-      idType = 'mal';
+    // Detectar tipo de ID usando mapa de patrones optimizado
+    for (const [idType, config] of Object.entries(TorrentioApiService.#ID_PATTERNS)) {
+      if (config.pattern.test(originalId)) {
+        return {
+          originalId,
+          processedId: config.processor(originalId),
+          idType,
+          isValid: true
+        };
+      }
     }
 
+    // Fallback para IDs no reconocidos
     return {
       originalId,
-      processedId,
-      idType,
-      isValid: true
+      processedId: originalId,
+      idType: 'unknown',
+      isValid: false
     };
   }
 
@@ -1216,13 +1278,28 @@ export class TorrentioApiService {
    * @param {string} id - ID del contenido
    * @returns {boolean} True si es contenido derivado de Kitsu
    */
+  /**
+   * Verifica si el contenido proviene de Kitsu o tiene indicadores de anime
+   * @private
+   * @param {string} id - ID del contenido
+   * @returns {boolean} True si es contenido derivado de Kitsu/anime
+   */
   #isKitsuDerivedContent(id) {
-    // Verificar si el ID original era de Kitsu (puede estar en metadatos)
-    return id && (id.includes('kitsu') || id.includes('anime'));
+    if (!id) return false;
+    
+    const lowerCaseId = id.toLowerCase();
+    
+    // Indicadores directos de anime
+    const animeIndicators = [
+      'kitsu', 'anime', 'anilist', 'mal', 'myanimelist',
+      'crunchyroll', 'funimation', 'animeflv'
+    ];
+    
+    return animeIndicators.some(indicator => lowerCaseId.includes(indicator));
   }
 
   /**
-   * Aplica heurísticas para detectar contenido anime en IMDb IDs.
+   * Aplica heurísticas avanzadas para detectar contenido anime
    * @private
    * @param {string} id - ID del contenido
    * @param {number} season - Temporada
@@ -1230,18 +1307,34 @@ export class TorrentioApiService {
    * @returns {boolean} True si probablemente es anime
    */
   #isLikelyAnimeContent(id, season, episode) {
-    // Heurísticas para detectar anime:
-    // 1. Temporadas con muchos episodios (típico de anime)
-    if (episode > 24) {
+    // Heurísticas mejoradas para detectar anime:
+    
+    // 1. Episodios muy altos (típico de anime de larga duración)
+    if (episode > 50) {
       return true;
     }
     
-    // 2. Patrones de temporadas típicos de anime (1-4 temporadas, 12-26 episodios)
-    if (season <= 4 && episode >= 12 && episode <= 26) {
+    // 2. Patrones estándar de anime (12, 13, 24, 25, 26 episodios)
+    const standardAnimeLengths = [12, 13, 24, 25, 26];
+    if (standardAnimeLengths.includes(episode)) {
       return true;
     }
     
-    // Por defecto, no es anime
+    // 3. Temporadas cortas con episodios en rango anime
+    if (season <= 5 && episode >= 10 && episode <= 30) {
+      return true;
+    }
+    
+    // 4. Patrones específicos de anime estacional
+    if (season === 1 && (episode === 12 || episode === 13)) {
+      return true;
+    }
+    
+    // 5. Series con muchas temporadas cortas (típico de anime)
+    if (season > 3 && episode <= 26) {
+      return true;
+    }
+    
     return false;
   }
 
