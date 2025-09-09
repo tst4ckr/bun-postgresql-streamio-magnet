@@ -500,8 +500,8 @@ export class TorrentioApiService {
         }
         
         // Usar información ya procesada del ID
-        const idType = processedInfo.type;
-        const imdbId = processedInfo.type === 'imdb' ? processedInfo.processedId : undefined;
+        const idType = processedInfo.idType === 'unknown' ? 'imdb' : processedInfo.idType;
+        const imdbId = processedInfo.idType === 'imdb' ? processedInfo.processedId : undefined;
         
         const magnetData = {
           content_id: finalContentId,
@@ -1191,7 +1191,7 @@ export class TorrentioApiService {
       preservePrefix: false
     },
     kitsu: {
-      pattern: /^(?:kitsu:)?(?:\d+|[\w-]+)$/i,
+      pattern: /^(?:kitsu:)?(?:\d+|[\w-]+)(?::\d+)?(?::\d+)?$/i,
       processor: (id) => id.replace(/^kitsu:/i, ''),
       preservePrefix: false
     },
