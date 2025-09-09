@@ -222,81 +222,7 @@ export class IdDetectorService {
     };
   }
 
-  /**
-   * Verifica si un ID es de tipo IMDb
-   * @param {string} contentId - ID a verificar
-   * @returns {boolean} True si es IMDb
-   */
-  isImdbId(contentId) {
-    const result = this.detectIdType(contentId);
-    return result.type === 'imdb' && result.isValid;
-  }
 
-  /**
-   * Verifica si un ID es de tipo Kitsu
-   * @param {string} contentId - ID a verificar
-   * @returns {boolean} True si es Kitsu
-   */
-  isKitsuId(contentId) {
-    const result = this.detectIdType(contentId);
-    return result.type === 'kitsu' && result.isValid;
-  }
-
-  /**
-   * Verifica si un ID es de tipo MyAnimeList
-   * @param {string} contentId - ID a verificar
-   * @returns {boolean} True si es MyAnimeList
-   */
-  isMalId(contentId) {
-    const result = this.detectIdType(contentId);
-    return result.type === 'mal' && result.isValid;
-  }
-
-  /**
-   * Verifica si un ID es de tipo AniList
-   * @param {string} contentId - ID a verificar
-   * @returns {boolean} True si es AniList
-   */
-  isAnilistId(contentId) {
-    const result = this.detectIdType(contentId);
-    return result.type === 'anilist' && result.isValid;
-  }
-
-  /**
-   * Verifica si un ID es de tipo AniDB
-   * @param {string} contentId - ID a verificar
-   * @returns {boolean} True si es AniDB
-   */
-  isAnidbId(contentId) {
-    const result = this.detectIdType(contentId);
-    return result.type === 'anidb' && result.isValid;
-  }
-
-  /**
-   * Normaliza un ID según su tipo detectado
-   * @param {string} contentId - ID a normalizar
-   * @returns {Object} ID normalizado con metadatos
-   */
-  normalizeId(contentId) {
-    const detection = this.detectIdType(contentId);
-    
-    if (!detection.isValid) {
-      return {
-        normalized: contentId,
-        type: 'unknown',
-        isValid: false,
-        error: detection.message
-      };
-    }
-
-    return {
-      normalized: detection.id,
-      type: detection.type,
-      isValid: true,
-      originalFormat: contentId,
-      detectionInfo: detection
-    };
-  }
 
   /**
    * Obtiene estadísticas de tipos de ID soportados
@@ -314,23 +240,7 @@ export class IdDetectorService {
     return types;
   }
 
-  /**
-   * Agrega un nuevo patrón de detección de forma dinámica
-   * @param {string} type - Tipo de ID
-   * @param {Object} config - Configuración del patrón
-   */
-  addDetectionPattern(type, config) {
-    if (!config.pattern || !config.validator) {
-      throw new Error('Configuración de patrón inválida: se requiere pattern y validator');
-    }
-    
-    this.detectionPatterns.set(type, {
-      pattern: config.pattern,
-      prefix: config.prefix || '',
-      description: config.description || `Patrón personalizado para ${type}`,
-      validator: config.validator
-    });
-  }
+
 }
 
 // Instancia singleton

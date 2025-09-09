@@ -186,29 +186,7 @@ export class CacheService {
     return cleaned;
   }
 
-  /**
-   * Obtiene información detallada de una entrada del cache
-   * @param {string} key - Clave a inspeccionar
-   * @returns {Object|null} Información de la entrada o null
-   */
-  inspect(key) {
-    const entry = this.cache.get(key);
-    if (!entry) return null;
-    
-    const now = Date.now();
-    return {
-      key,
-      hasValue: entry.value !== undefined,
-      valueType: typeof entry.value,
-      createdAt: new Date(entry.createdAt).toISOString(),
-      expiresAt: new Date(entry.expiresAt).toISOString(),
-      lastAccessed: new Date(entry.lastAccessed).toISOString(),
-      accessCount: entry.accessCount,
-      ttl: entry.ttl,
-      remainingTTL: Math.max(0, entry.expiresAt - now),
-      isExpired: now > entry.expiresAt
-    };
-  }
+
 
   /**
    * Genera una clave de cache para búsquedas de magnets
@@ -330,53 +308,9 @@ export class CacheService {
     }
   }
 
-  /**
-   * Destruye el servicio de cache
-   */
-  destroy() {
-    this.clear();
-    this.logger.info('CacheService destruido');
-  }
 
-  /**
-   * Genera clave de cache para magnets
-   * @public
-   * @param {string} contentId - ID del contenido
-   * @param {string} type - Tipo de contenido
-   * @param {Object} options - Opciones adicionales
-   * @returns {string} Clave de cache
-   */
-  generateMagnetCacheKey(contentId, type, options = {}) {
-    const optionsHash = this.#generateOptionsHash(options);
-    return `magnets:${contentId}:${type}:${optionsHash}`;
-  }
 
-  /**
-   * Genera hash para opciones de cache
-   * @private
-   * @param {Object} options - Opciones a hashear
-   * @returns {string} Hash de las opciones
-   */
-  #generateOptionsHash(options) {
-    if (!options || Object.keys(options).length === 0) {
-      return 'default';
-    }
-    
-    const sortedKeys = Object.keys(options).sort();
-    const optionsString = sortedKeys
-      .map(key => `${key}:${JSON.stringify(options[key])}`)
-      .join('|');
-    
-    // Generar hash simple basado en el string
-    let hash = 0;
-    for (let i = 0; i < optionsString.length; i++) {
-      const char = optionsString.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convertir a 32bit integer
-    }
-    
-    return Math.abs(hash).toString(36);
-  }
+
 
   /**
    * Genera clave de cache para streams
@@ -389,16 +323,7 @@ export class CacheService {
     return `streams:${contentId}:${type}`;
   }
 
-  /**
-   * Genera clave de cache para metadatos
-   * @public
-   * @param {string} contentId - ID del contenido
-   * @param {string} type - Tipo de contenido
-   * @returns {string} Clave de cache
-   */
-  generateMetadataCacheKey(contentId, type) {
-    return `metadata:${contentId}:${type}`;
-  }
+
 }
 
 // Crear instancia singleton

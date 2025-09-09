@@ -624,39 +624,7 @@ export class DynamicValidationService {
     };
   }
 
-  /**
-   * Agrega una nueva regla de validación
-   * @param {string} type - Tipo de ID
-   * @param {Object} rules - Reglas de validación
-   */
-  addValidationRules(type, rules) {
-    this.validationRules.set(type, {
-      ...this.validationRules.get(type),
-      ...rules
-    });
-  }
 
-  /**
-   * Agrega un nuevo contexto de validación
-   * @param {string} name - Nombre del contexto
-   * @param {Object} config - Configuración del contexto
-   */
-  addValidationContext(name, config) {
-    this.validationContexts.set(name, config);
-  }
-
-  /**
-   * Obtiene estadísticas de validación
-   * @returns {Object} Estadísticas
-   */
-  getValidationStats() {
-    return {
-      supportedTypes: Array.from(this.validationRules.keys()),
-      availableContexts: Array.from(this.validationContexts.keys()),
-      rulesCount: this.validationRules.size,
-      contextsCount: this.validationContexts.size
-    };
-  }
 }
 
 // Instancia singleton
