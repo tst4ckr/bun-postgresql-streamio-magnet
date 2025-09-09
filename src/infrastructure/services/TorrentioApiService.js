@@ -382,7 +382,7 @@ export class TorrentioApiService {
    * @returns {Promise<Magnet[]>} Array de magnets encontrados
    */
   async searchMagnetsInEnglish(contentId, type = 'auto', season = null, episode = null) {
-    this.#log('info', `Iniciando búsqueda en inglés para ${contentId}`, { type, season, episode });
+    this.#log('info', `Búsqueda inglés: ${contentId} (${type}${season ? `:S${season}` : ''}${episode ? `E${episode}` : ''})`);
     
     try {
       // Detectar tipo de contenido si es 'auto'
