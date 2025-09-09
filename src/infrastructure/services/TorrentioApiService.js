@@ -482,26 +482,13 @@ export class TorrentioApiService {
           ? { season, episode }
           : this.#extractEpisodeInfo(streamTitle, type);
         
-        // Procesar content_id para mantener compatibilidad con todos los tipos de ID
-        const processedInfo = this.#processContentId(contentId);
+        // Procesamiento inteligente de content_id específico por tipo
+        const contentIdInfo = this.#intelligentContentIdProcessing(contentId);
         
-        // Para Kitsu, preservar información completa (ID:temporada:episodio)
-        // Para otros IDs, usar el formato estándar con prefijo del tipo
-        let finalContentId;
-        if (processedInfo.idType === 'kitsu') {
-          // Para Kitsu, mantener formato completo con temporada/episodio si existe
-          finalContentId = contentId.includes(':') ? contentId : `kitsu:${processedInfo.processedId}`;
-        } else if (processedInfo.idType === 'imdb') {
-          // Para IMDb, usar el ID tal como viene (ya tiene formato tt123456)
-          finalContentId = processedInfo.processedId;
-        } else {
-          // Para otros tipos (tmdb, tvdb, anilist, mal), usar formato con prefijo
-          finalContentId = `${processedInfo.idType}:${processedInfo.processedId}`;
-        }
-        
-        // Usar información ya procesada del ID
-        const idType = processedInfo.idType === 'unknown' ? 'imdb' : processedInfo.idType;
-        const imdbId = processedInfo.idType === 'imdb' ? processedInfo.processedId : undefined;
+        // Usar información procesada inteligentemente
+        const finalContentId = contentIdInfo.finalContentId;
+        const idType = contentIdInfo.idType;
+        const imdbId = contentIdInfo.imdbId;
         
         const magnetData = {
           content_id: finalContentId,
@@ -1227,41 +1214,199 @@ export class TorrentioApiService {
     }
   };
 
-  #processContentId(contentId) {
-    // Validación de entrada con early returns
-    if (!contentId) {
-      throw new Error('ID de contenido no proporcionado');
-    }
-
-    if (typeof contentId !== 'string') {
-      throw new Error('ID de contenido debe ser string');
+  /**
+   * Procesamiento inteligente de content_id específico por tipo
+   * Cada tipo de ID tiene su propia lógica de procesamiento y almacenamiento
+   * @private
+   * @param {string} contentId - ID completo del contenido
+   * @returns {Object} Información procesada del content_id
+   */
+  #intelligentContentIdProcessing(contentId) {
+    // Validación de entrada
+    if (!contentId || typeof contentId !== 'string') {
+      throw new Error('ID de contenido inválido');
     }
 
     const originalId = contentId.trim();
     
-    if (originalId.length === 0) {
-      throw new Error('ID de contenido no puede estar vacío');
-    }
+    // Detectar tipo de ID usando el ID completo
+    const detectedType = this.#detectContentIdType(originalId);
     
-    // Detectar tipo de ID usando mapa de patrones optimizado
-    for (const [idType, config] of Object.entries(TorrentioApiService.#ID_PATTERNS)) {
-      if (config.pattern.test(originalId)) {
+    // Procesamiento específico por tipo
+    switch (detectedType.type) {
+      case 'imdb':
+        return this.#processImdbId(originalId, detectedType);
+      
+      case 'kitsu':
+        return this.#processKitsuId(originalId, detectedType);
+      
+      case 'tmdb':
+        return this.#processTmdbId(originalId, detectedType);
+      
+      case 'tvdb':
+        return this.#processTvdbId(originalId, detectedType);
+      
+      case 'anilist':
+      case 'anilist_series':
+        return this.#processAnilistId(originalId, detectedType);
+      
+      case 'mal':
+      case 'mal_series':
+        return this.#processMalId(originalId, detectedType);
+      
+      case 'anidb':
+      case 'anidb_series':
+        return this.#processAnidbId(originalId, detectedType);
+      
+      default:
+        // Fallback para IDs no reconocidos - asumir IMDb
         return {
-          originalId,
-          processedId: config.processor(originalId),
-          idType,
+          finalContentId: originalId,
+          idType: 'imdb',
+          imdbId: originalId.startsWith('tt') ? originalId : undefined,
+          isValid: false
+        };
+    }
+  }
+
+  /**
+   * Detecta el tipo de content_id usando patrones específicos
+   * @private
+   * @param {string} contentId - ID del contenido
+   * @returns {Object} Tipo detectado y información adicional
+   */
+  #detectContentIdType(contentId) {
+    // Detectar usando patrones optimizados
+    for (const [idType, config] of Object.entries(TorrentioApiService.#ID_PATTERNS)) {
+      if (config.pattern.test(contentId)) {
+        return {
+          type: idType,
+          config,
           isValid: true
         };
       }
     }
-
-    // Fallback para IDs no reconocidos
+    
     return {
-      originalId,
-      processedId: originalId,
-      idType: 'unknown',
+      type: 'unknown',
+      config: null,
       isValid: false
     };
+  }
+
+  /**
+   * Procesamiento específico para IDs de IMDb
+   * Formato: tt1234567
+   */
+  #processImdbId(contentId, detectedType) {
+    const cleanId = contentId.startsWith('tt') ? contentId : `tt${contentId}`;
+    
+    return {
+      finalContentId: cleanId,
+      idType: 'imdb',
+      imdbId: cleanId,
+      isValid: true
+    };
+  }
+
+  /**
+   * Procesamiento específico para IDs de Kitsu
+   * Formato: kitsu:6448:8 (ID:temporada:episodio)
+   */
+  #processKitsuId(contentId, detectedType) {
+    // Kitsu mantiene formato completo con temporada/episodio
+    const finalId = contentId.startsWith('kitsu:') ? contentId : `kitsu:${contentId}`;
+    
+    return {
+      finalContentId: finalId,
+      idType: 'kitsu',
+      imdbId: undefined,
+      isValid: true
+    };
+  }
+
+  /**
+   * Procesamiento específico para IDs de TMDB
+   * Formato: tmdb:12345 o 12345
+   */
+  #processTmdbId(contentId, detectedType) {
+    const cleanId = contentId.replace(/^tmdb:/i, '');
+    
+    return {
+      finalContentId: `tmdb:${cleanId}`,
+      idType: 'tmdb',
+      imdbId: undefined,
+      isValid: true
+    };
+  }
+
+  /**
+   * Procesamiento específico para IDs de TVDB
+   * Formato: tvdb:12345 o 12345
+   */
+  #processTvdbId(contentId, detectedType) {
+    const cleanId = contentId.replace(/^tvdb:/i, '');
+    
+    return {
+      finalContentId: `tvdb:${cleanId}`,
+      idType: 'tvdb',
+      imdbId: undefined,
+      isValid: true
+    };
+  }
+
+  /**
+   * Procesamiento específico para IDs de AniList
+   * Formato: anilist:21087:1:1 (series) o anilist:21087 (simple)
+   */
+  #processAnilistId(contentId, detectedType) {
+    const cleanId = contentId.replace(/^anilist:/i, '');
+    const finalType = detectedType.type === 'anilist_series' ? 'anilist' : 'anilist';
+    
+    return {
+      finalContentId: `anilist:${cleanId}`,
+      idType: finalType,
+      imdbId: undefined,
+      isValid: true
+    };
+  }
+
+  /**
+   * Procesamiento específico para IDs de MyAnimeList
+   * Formato: mal:11061:1:1 (series) o mal:11061 (simple)
+   */
+  #processMalId(contentId, detectedType) {
+    const cleanId = contentId.replace(/^mal:/i, '');
+    const finalType = detectedType.type === 'mal_series' ? 'mal' : 'mal';
+    
+    return {
+      finalContentId: `mal:${cleanId}`,
+      idType: finalType,
+      imdbId: undefined,
+      isValid: true
+    };
+  }
+
+  /**
+   * Procesamiento específico para IDs de AniDB
+   * Formato: anidb:8074:1:1 (series) o anidb:8074 (simple)
+   */
+  #processAnidbId(contentId, detectedType) {
+    const cleanId = contentId.replace(/^anidb:/i, '');
+    const finalType = detectedType.type === 'anidb_series' ? 'anidb' : 'anidb';
+    
+    return {
+      finalContentId: `anidb:${cleanId}`,
+      idType: finalType,
+      imdbId: undefined,
+      isValid: true
+    };
+  }
+
+  #processContentId(contentId) {
+    // Método legacy mantenido para compatibilidad
+    // Usar #intelligentContentIdProcessing para nueva funcionalidad
+    return this.#intelligentContentIdProcessing(contentId);
   }
 
   /**
