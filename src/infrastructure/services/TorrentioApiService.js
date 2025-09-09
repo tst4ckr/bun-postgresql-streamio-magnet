@@ -173,12 +173,12 @@ export class TorrentioApiService {
       this.#log('info', `Buscando magnets en API Torrentio para: ${contentId} (${detectedType})`);
       
       // Procesar el ID para obtener el formato correcto para Torrentio
-      const { processedId } = this.#processContentId(contentId);
+      const { finalContentId } = this.#processContentId(contentId);
       
       // Construir ID según el tipo de contenido
-      let finalStreamId = processedId;
+      let finalStreamId = finalContentId;
       if ((detectedType === 'series' || detectedType === 'anime') && season !== null && episode !== null) {
-        finalStreamId = `${processedId}:${season}:${episode}`;
+        finalStreamId = `${finalContentId}:${season}:${episode}`;
         this.#log('info', `Formato de serie/anime: ${finalStreamId}`);
       }
       
