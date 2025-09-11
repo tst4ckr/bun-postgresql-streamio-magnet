@@ -245,17 +245,6 @@ export class UnifiedIdService {
   }
 
   /**
-   * Obtiene estadísticas del servicio
-   * @returns {Object} Estadísticas de uso
-   */
-  getStats() {
-    return {
-      cacheSize: this.conversionCache.size,
-      supportedTypes: this.detectorService.getSupportedTypes()
-    };
-  }
-
-  /**
    * Valida si un ID es procesable por el servicio
    * @param {string} contentId - ID a validar
    * @returns {boolean} True si es procesable

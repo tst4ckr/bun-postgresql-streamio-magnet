@@ -124,79 +124,7 @@ export class LanguageConfigurationCommand extends ConfigurationCommand {
   }
 }
 
-/**
- * Comando para cambio temporal de múltiples configuraciones
- */
-export class BatchConfigurationCommand extends ConfigurationCommand {
-  constructor(target, configurations, logger = console) {
-    super(target, logger);
-    this.configurations = configurations;
-    this.commands = [];
-  }
 
-  execute() {
-    if (this.executed) {
-      this.logger.warn('Comando batch ya ejecutado');
-      return false;
-    }
-
-    try {
-      // Crear y ejecutar comandos individuales
-      for (const config of this.configurations) {
-        const command = new LanguageConfigurationCommand(
-          this.target,
-          config.type,
-          config.languageConfig,
-          this.logger
-        );
-        
-        if (command.execute()) {
-          this.commands.push(command);
-        } else {
-          // Si falla algún comando, revertir todos
-          this._rollbackCommands();
-          return false;
-        }
-      }
-
-      this.executed = true;
-      this.logger.debug(`Configuración batch aplicada: ${this.configurations.length} cambios`);
-      return true;
-    } catch (error) {
-      this.logger.error('Error en comando batch:', error);
-      this._rollbackCommands();
-      return false;
-    }
-  }
-
-  undo() {
-    if (!this.executed) {
-      this.logger.warn('No se puede deshacer: comando batch no ejecutado');
-      return false;
-    }
-
-    return this._rollbackCommands();
-  }
-
-  _rollbackCommands() {
-    let success = true;
-    // Revertir en orden inverso
-    for (let i = this.commands.length - 1; i >= 0; i--) {
-      if (!this.commands[i].undo()) {
-        success = false;
-      }
-    }
-    
-    this.commands = [];
-    this.executed = false;
-    return success;
-  }
-
-  _restoreState(state) {
-    // No implementado para batch - usa _rollbackCommands
-    throw new Error('BatchConfigurationCommand usa _rollbackCommands en lugar de _restoreState');
-  }
-}
 
 /**
  * Invoker para gestionar comandos de configuración
@@ -270,9 +198,7 @@ export class ConfigurationCommandFactory {
     return new LanguageConfigurationCommand(target, type, languageConfig, logger);
   }
 
-  static createBatchCommand(target, configurations, logger = console) {
-    return new BatchConfigurationCommand(target, configurations, logger);
-  }
+
 
   static createInvoker(logger = console) {
     return new ConfigurationInvoker(logger);

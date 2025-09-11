@@ -316,25 +316,7 @@ export class EnhancedLogger {
     }
   }
 
-  /**
-   * Limpia el cache de ubicaciones para liberar memoria
-   */
-  clearCache() {
-    this.#sourceLocationCache.clear();
-  }
 
-  /**
-   * Obtiene estadísticas del logger
-   * @returns {Object} Estadísticas de uso
-   */
-  getStats() {
-    return {
-      cacheSize: this.#sourceLocationCache.size,
-      logLevel: this.#logLevel,
-      sourceTracking: this.#enableSourceTracking,
-      isProduction: this.#isProduction
-    };
-  }
 }
 
 export default EnhancedLogger;

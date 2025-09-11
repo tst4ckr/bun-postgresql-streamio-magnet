@@ -325,19 +325,6 @@ export class MetadataService {
   }
 
   /**
-   * Limpia el cache de metadatos
-   * @public
-   */
-  clearCache() {
-    this.cache.clear();
-    
-    // Limpiar también patrones de metadatos en cache global
-    cacheService.invalidatePattern('metadata:*');
-    
-    this.logger.info('Cache de metadatos limpiado (local y global)');
-  }
-
-  /**
    * Invalida cache para un contenido específico
    * @public
    * @param {string} contentId - ID del contenido

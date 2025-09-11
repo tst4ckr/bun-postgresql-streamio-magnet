@@ -295,14 +295,5 @@ function generateManifest() {
   return manifest;
 }
 
-/**
- * Limpia el cache del manifest (útil para testing o actualizaciones).
- */
-function clearManifestCache() {
-  manifestCache = null;
-  manifestCacheTimestamp = null;
-}
-
 export const addonConfig = Object.freeze(config);
 export const manifest = Object.freeze(generateManifest());
-export { clearManifestCache };
