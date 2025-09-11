@@ -40,7 +40,6 @@ export class MetadataService {
    * @param {string} contentType - Tipo de contenido (movie, series, anime)
    * @returns {Promise<Object>} Metadatos del contenido
    */
-  @withErrorHandling({ logArgs: false })
   async getMetadata(contentId, contentType) {
     const startTime = Date.now();
     this.logger.info(`Obteniendo metadatos para ${contentType}: ${contentId}`);
@@ -133,7 +132,6 @@ export class MetadataService {
    * @param {string} contentId - ID de la película
    * @returns {Promise<Object>} Metadatos de la película
    */
-  @withErrorHandling({ logArgs: false })
   async #getMovieMetadata(contentId) {
     this.logger.debug(`Obteniendo metadatos de película para ${contentId}`);
     
@@ -406,7 +404,6 @@ export class MetadataService {
    * @param {string} contentId - ID del contenido
    * @param {string} contentType - Tipo de contenido
    */
-  @withErrorHandling({ logArgs: false })
   invalidateMetadata(contentId, contentType) {
     // Limpiar cache local
     const localCacheKey = `${contentType}:${contentId}`;

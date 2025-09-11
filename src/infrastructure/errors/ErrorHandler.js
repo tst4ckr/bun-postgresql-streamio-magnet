@@ -4,7 +4,6 @@
  */
 
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
-import { CONSTANTS } from '../../config/constants.js';
 
 /**
  * Tipos de errores clasificados por severidad y estrategia de recuperación

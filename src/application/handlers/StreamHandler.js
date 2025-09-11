@@ -157,7 +157,6 @@ export class StreamHandler {
    * @param {Object} args - Argumentos de la petición.
    * @returns {Promise<Object>}
    */
-  @withErrorHandling({ logArgs: false })
   async #handleStreamRequest(args) {
     const { type, id } = args;
     const startTime = Date.now();
@@ -244,7 +243,6 @@ export class StreamHandler {
    * @throws {Error}
    * @returns {Promise<Object>} Resultado de validación
    */
-  @withErrorHandling({ logArgs: false })
   async #validateStreamRequest(args) {
     // Validación de entrada con early returns
     if (!args || typeof args !== 'object') {
@@ -351,7 +349,6 @@ export class StreamHandler {
    * @param {string} type - Tipo de contenido ('movie', 'series', 'anime')
    * @returns {Promise<import('../../domain/entities/Magnet.js').Magnet[]|null>}
    */
-  @withErrorHandling({ logArgs: false })
   async #getMagnets(contentId, type = 'movie') {
     this.#log('info', `Iniciando búsqueda de magnets para ${contentId} (${type})`);
     
