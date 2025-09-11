@@ -38,13 +38,42 @@ const config = {
     background: process.env.ADDON_BACKGROUND || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyMCIgaGVpZ2h0PSIxMDgwIiB2aWV3Qm94PSIwIDAgMTkyMCAxMDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTkyMCIgaGVpZ2h0PSIxMDgwIiBmaWxsPSIjMWExYTFhIi8+Cjx0ZXh0IHg9Ijk2MCIgeT0iNTgwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iODAiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjZmZmZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5Ub3JyZW50IFNlYXJjaDwvdGV4dD4KPC9zdmc+',
     resources: [
       {
+        name: 'catalog',
+        types: ['movie', 'series', 'anime'],
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
+      },
+      {
+        name: 'meta',
+        types: ['movie', 'series', 'anime'],
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
+      },
+      {
         name: 'stream',
         types: ['movie', 'series', 'anime'],
         idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
       }
     ],
     types: ['movie', 'series', 'anime'],
-    catalogs: [],
+    catalogs: [
+      {
+        type: 'movie',
+        id: 'torrent_search_movies',
+        name: 'Torrent Search Movies',
+        extra: [{ name: 'search', isRequired: false }]
+      },
+      {
+        type: 'series',
+        id: 'torrent_search_series',
+        name: 'Torrent Search Series',
+        extra: [{ name: 'search', isRequired: false }]
+      },
+      {
+        type: 'anime',
+        id: 'torrent_search_anime',
+        name: 'Torrent Search Anime',
+        extra: [{ name: 'search', isRequired: false }]
+      }
+    ],
     idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
   },
   server: {

@@ -54,6 +54,50 @@ class MagnetAddon {
     this.#addonBuilder.defineStreamHandler(streamHandler.createAddonHandler());
     this.#logger.info('Handler de streams configurado.');
 
+    // 3.1. Configurar Catalog Handler
+    this.#addonBuilder.defineCatalogHandler(async (args) => {
+      this.#logger.info('Catalog request received', { type: args.type, id: args.id, extra: args.extra });
+      
+      try {
+        // Por ahora retornamos un catálogo vacío ya que este addon se enfoca en streams
+        // En futuras versiones se puede implementar catálogos de contenido popular
+        return {
+          metas: [],
+          cacheMaxAge: this.#config.cache.metadataCacheMaxAge
+        };
+      } catch (error) {
+        this.#logger.error('Error in catalog handler', { error: error.message, args });
+        return { metas: [] };
+      }
+    });
+    this.#logger.info('Handler de catálogos configurado.');
+
+    // 3.2. Configurar Meta Handler
+    this.#addonBuilder.defineMetaHandler(async (args) => {
+      this.#logger.info('Meta request received', { type: args.type, id: args.id });
+      
+      try {
+        // Retornar metadatos básicos basados en el ID
+        // En futuras versiones se puede integrar con APIs de metadatos
+        const meta = {
+          id: args.id,
+          type: args.type,
+          name: `Content ${args.id}`,
+          poster: this.#config.addon?.logo,
+          background: this.#config.addon?.background
+        };
+        
+        return {
+          meta: meta,
+          cacheMaxAge: this.#config.cache.metadataCacheMaxAge
+        };
+      } catch (error) {
+        this.#logger.error('Error in meta handler', { error: error.message, args });
+        return { meta: {} };
+      }
+    });
+    this.#logger.info('Handler de metadatos configurado.');
+
     // 4. Configurar rutas personalizadas para configuración de idioma
     this.#setupLanguageRoutes(streamHandler);
     
