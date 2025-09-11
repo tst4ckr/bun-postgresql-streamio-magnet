@@ -7,6 +7,7 @@
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 import { addonConfig } from '../../config/addonConfig.js';
 import { cacheService } from './CacheService.js';
+import { errorHandler, withErrorHandling, createError, ERROR_TYPES, safeExecute } from '../errors/ErrorHandler.js';
 
 export class MetadataService {
   constructor() {
@@ -39,36 +40,43 @@ export class MetadataService {
    * @param {string} contentType - Tipo de contenido (movie, series, anime)
    * @returns {Promise<Object>} Metadatos del contenido
    */
+  @withErrorHandling({ logArgs: false })
   async getMetadata(contentId, contentType) {
     const startTime = Date.now();
     this.logger.info(`Obteniendo metadatos para ${contentType}: ${contentId}`);
     
+    // Verificar cache global primero
+    const globalCacheKey = cacheService.generateMetadataCacheKey(contentId, contentType);
+    const cachedMetadata = await safeExecute(
+      () => cacheService.get(globalCacheKey),
+      { operation: 'cache.get', globalCacheKey, contentId, contentType }
+    );
+    
+    if (cachedMetadata && !cachedMetadata.error) {
+      this.logger.info(`Metadatos encontrados en cache global para ${contentId}`);
+      return cachedMetadata;
+    }
+    
+    // Verificar cache local como fallback
+    const localCacheKey = `${contentType}:${contentId}`;
+    const localCachedMetadata = this.#getCachedMetadata(localCacheKey);
+    
+    if (localCachedMetadata) {
+      this.logger.info(`Metadatos encontrados en cache local para ${contentId}`);
+      
+      // Migrar a cache global
+      const cacheTTL = this.#getMetadataCacheTTL(contentType);
+      await safeExecute(
+        () => cacheService.set(globalCacheKey, localCachedMetadata, cacheTTL),
+        { operation: 'cache.set', globalCacheKey, contentId, contentType }
+      );
+      
+      return localCachedMetadata;
+    }
+    
+    // Obtener metadatos según el tipo de contenido
+    let metadata;
     try {
-      // Verificar cache global primero
-      const globalCacheKey = cacheService.generateMetadataCacheKey(contentId, contentType);
-      const cachedMetadata = cacheService.get(globalCacheKey);
-      
-      if (cachedMetadata) {
-        this.logger.info(`Metadatos encontrados en cache global para ${contentId}`);
-        return cachedMetadata;
-      }
-      
-      // Verificar cache local como fallback
-      const localCacheKey = `${contentType}:${contentId}`;
-      const localCachedMetadata = this.#getCachedMetadata(localCacheKey);
-      
-      if (localCachedMetadata) {
-        this.logger.info(`Metadatos encontrados en cache local para ${contentId}`);
-        
-        // Migrar a cache global
-        const cacheTTL = this.#getMetadataCacheTTL(contentType);
-        cacheService.set(globalCacheKey, localCachedMetadata, cacheTTL);
-        
-        return localCachedMetadata;
-      }
-      
-      // Obtener metadatos según el tipo de contenido
-      let metadata;
       switch (contentType) {
         case 'movie':
           metadata = await this.#getMovieMetadata(contentId);
@@ -80,26 +88,43 @@ export class MetadataService {
           metadata = await this.#getAnimeMetadata(contentId);
           break;
         default:
-          throw new Error(`Tipo de contenido no soportado: ${contentType}`);
+          throw createError(
+            `Tipo de contenido no soportado: ${contentType}`,
+            ERROR_TYPES.VALIDATION,
+            { contentId, contentType, supportedTypes: ['movie', 'series', 'anime'] }
+          );
+      }
+    } catch (error) {
+      // Si hay error, intentar fallback a cache stale
+      const staleData = await this.#getStaleFromCache(globalCacheKey);
+      if (staleData) {
+        this.logger.warn('Using stale metadata due to fetch error', {
+          contentId,
+          contentType,
+          error: error.message
+        });
+        return staleData;
       }
       
-      // Validar metadatos obtenidos
-      const validatedMetadata = this.#validateMetadata(metadata, contentType);
-      
-      // Guardar en ambos caches
-      this.#setCachedMetadata(localCacheKey, validatedMetadata, contentType);
-      const cacheTTL = this.#getMetadataCacheTTL(contentType);
-      cacheService.set(globalCacheKey, validatedMetadata, cacheTTL);
-      
-      const duration = Date.now() - startTime;
-      this.logger.info(`Metadatos obtenidos exitosamente para ${contentId} en ${duration}ms`);
-      
-      return validatedMetadata;
-      
-    } catch (error) {
       this.logger.error(`Error obteniendo metadatos para ${contentId}:`, error.message);
       return this.#getDefaultMetadata(contentId, contentType);
     }
+    
+    // Validar metadatos obtenidos
+    const validatedMetadata = this.#validateMetadata(metadata, contentType);
+    
+    // Guardar en ambos caches
+    this.#setCachedMetadata(localCacheKey, validatedMetadata, contentType);
+    const cacheTTL = this.#getMetadataCacheTTL(contentType);
+    await safeExecute(
+      () => cacheService.set(globalCacheKey, validatedMetadata, cacheTTL),
+      { operation: 'cache.set', globalCacheKey, contentId, contentType }
+    );
+    
+    const duration = Date.now() - startTime;
+    this.logger.info(`Metadatos obtenidos exitosamente para ${contentId} en ${duration}ms`);
+    
+    return validatedMetadata;
   }
 
   /**
@@ -108,28 +133,63 @@ export class MetadataService {
    * @param {string} contentId - ID de la película
    * @returns {Promise<Object>} Metadatos de la película
    */
+  @withErrorHandling({ logArgs: false })
   async #getMovieMetadata(contentId) {
     this.logger.debug(`Obteniendo metadatos de película para ${contentId}`);
     
-    const metadata = {
-      id: contentId,
-      type: 'movie',
-      title: null,
-      year: null,
-      imdbId: contentId.startsWith('tt') ? contentId.split(':')[0] : null,
-      genre: [],
-      director: null,
-      cast: [],
-      plot: null,
-      poster: null,
-      rating: null,
-      retrievedAt: new Date().toISOString()
-    };
+    // Validar parámetros de entrada
+    if (!contentId || typeof contentId !== 'string') {
+      throw createError(
+        'Content ID is required and must be a string',
+        ERROR_TYPES.VALIDATION,
+        { contentId }
+      );
+    }
     
-    // Aquí se implementaría la lógica para obtener metadatos de APIs externas
-    // Por ahora retornamos estructura básica
-    
-    return metadata;
+    try {
+      // Simular timeout para evitar cuelgues
+      const fetchPromise = new Promise(resolve => {
+        setTimeout(() => {
+          resolve({
+            id: contentId,
+            type: 'movie',
+            title: null,
+            year: null,
+            imdbId: contentId.startsWith('tt') ? contentId.split(':')[0] : null,
+            genre: [],
+            director: null,
+            cast: [],
+            plot: null,
+            poster: null,
+            rating: null,
+            retrievedAt: new Date().toISOString()
+          });
+        }, 100);
+      });
+      
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(createError(
+            'Movie metadata fetch timeout',
+            ERROR_TYPES.TIMEOUT,
+            { contentId, timeout: 5000 }
+          ));
+        }, 5000);
+      });
+      
+      return await Promise.race([fetchPromise, timeoutPromise]);
+      
+    } catch (error) {
+      if (error.type === ERROR_TYPES.TIMEOUT) {
+        throw error;
+      }
+      
+      throw createError(
+        `Failed to fetch movie metadata`,
+        ERROR_TYPES.NETWORK,
+        { contentId, originalError: error }
+      );
+    }
   }
 
   /**
@@ -325,11 +385,28 @@ export class MetadataService {
   }
 
   /**
+   * Obtiene datos stale del cache como fallback
+   * @private
+   */
+  async #getStaleFromCache(cacheKey) {
+    try {
+      // Intentar obtener datos expirados del cache
+      // En una implementación real, esto podría consultar un cache secundario
+      // o datos con TTL extendido
+      return await cacheService.get(`${cacheKey}:stale`);
+    } catch (error) {
+      this.logger.debug('No stale data available', { cacheKey });
+      return null;
+    }
+  }
+
+  /**
    * Invalida cache para un contenido específico
    * @public
    * @param {string} contentId - ID del contenido
    * @param {string} contentType - Tipo de contenido
    */
+  @withErrorHandling({ logArgs: false })
   invalidateMetadata(contentId, contentType) {
     // Limpiar cache local
     const localCacheKey = `${contentType}:${contentId}`;
@@ -337,9 +414,19 @@ export class MetadataService {
     
     // Limpiar cache global
     const globalCacheKey = cacheService.generateMetadataCacheKey(contentId, contentType);
-    cacheService.delete(globalCacheKey);
+    const result = safeExecute(
+      () => cacheService.delete(globalCacheKey),
+      { operation: 'cache.delete', globalCacheKey, contentId, contentType }
+    );
     
-    this.logger.info(`Cache invalidado para ${contentId} (${contentType})`);
+    if (result && !result.error) {
+      this.logger.info(`Cache invalidado para ${contentId} (${contentType})`);
+    } else {
+      this.logger.warn(`Failed to invalidate global cache for ${contentId}`, {
+        contentType,
+        error: result?.error?.message
+      });
+    }
   }
 
   /**
@@ -380,10 +467,12 @@ export class MetadataService {
     };
     
     const globalStats = cacheService.getStats();
+    const errorStats = errorHandler.getStats();
     
     return {
       local: localStats,
       global: globalStats,
+      errorHandler: errorStats,
       combined: {
         totalEntries: localStats.totalEntries + globalStats.totalEntries,
         memoryUsage: localStats.memoryUsage + globalStats.memoryUsage

@@ -8,6 +8,7 @@ import { parseMagnet } from 'parse-magnet-uri';
 import { dynamicValidationService } from '../../infrastructure/services/DynamicValidationService.js';
 import { cacheService } from '../../infrastructure/services/CacheService.js';
 import { ConfigurationCommandFactory } from '../../infrastructure/patterns/ConfigurationCommand.js';
+import { errorHandler, withErrorHandling, createError, ERROR_TYPES, safeExecute } from '../../infrastructure/errors/ErrorHandler.js';
 
 /**
  * Handler para peticiones de streams de magnets.
@@ -117,33 +118,36 @@ export class StreamHandler {
   createAddonHandler() {
     return async (args) => {
       const startTime = Date.now();
+      const context = {
+        args: JSON.stringify(args),
+        timestamp: new Date().toISOString(),
+        handler: 'StreamHandler.createAddonHandler'
+      };
       
-      try {
-        this.#logger.info(`Stream request: ${JSON.stringify(args)}`);
-        
-        const result = await this.#handleStreamRequest(args);
-        
-        const duration = Date.now() - startTime;
+      this.#logger.info(`Stream request: ${JSON.stringify(args)}`);
+      
+      const result = await safeExecute(
+        () => this.#handleStreamRequest(args),
+        { ...context, operation: 'handleStreamRequest' }
+      );
+      
+      const duration = Date.now() - startTime;
+      
+      if (result.error || result.degraded) {
+        this.#logger.warn(`Stream request completed with issues in ${duration}ms`, {
+          error: result.error,
+          degraded: result.degraded
+        });
+      } else {
         this.#logger.info(`Stream request completed in ${duration}ms`);
-        
-        return result;
-        
-      } catch (error) {
-        const duration = Date.now() - startTime;
-        
-        // Preservar stack trace completo para errores asíncronos
-        const errorDetails = {
-          message: error.message,
-          stack: error.stack,
-          name: error.name,
-          code: error.code,
-          duration
-        };
-        
-        this.#logger.error(`Stream request failed in ${duration}ms:`, errorDetails);
-        
-        return this.#createErrorResponse(error);
       }
+      
+      // Si hay error, devolver respuesta de error apropiada
+      if (result.error && !result.degraded) {
+        return this.#createErrorResponse(result.error);
+      }
+      
+      return result.degraded ? result.data : result;
     };
   }
 
@@ -153,6 +157,7 @@ export class StreamHandler {
    * @param {Object} args - Argumentos de la petición.
    * @returns {Promise<Object>}
    */
+  @withErrorHandling({ logArgs: false })
   async #handleStreamRequest(args) {
     const { type, id } = args;
     const startTime = Date.now();
@@ -162,25 +167,37 @@ export class StreamHandler {
     
     // Verificar cache de streams primero
     const streamCacheKey = cacheService.generateStreamCacheKey(id, type);
-    const cachedStreams = cacheService.get(streamCacheKey);
+    const cachedStreams = await safeExecute(
+      () => cacheService.get(streamCacheKey),
+      { operation: 'cache.get', cacheKey: streamCacheKey }
+    );
     
-    if (cachedStreams) {
+    if (cachedStreams && !cachedStreams.error) {
       const duration = Date.now() - startTime;
       this.#log('info', `Streams obtenidos desde cache para ${id} en ${duration}ms`);
       return cachedStreams;
     }
     
     // Validación asíncrona con servicio dinámico
-    const validationResult = await this.#validateStreamRequest(args);
+    const validationResult = await safeExecute(
+      () => this.#validateStreamRequest(args),
+      { operation: 'validation', contentId: id, type }
+    );
+    
+    if (validationResult.error) {
+      throw createError(
+        `Validation failed for ${id}: ${validationResult.error.message}`,
+        ERROR_TYPES.VALIDATION,
+        { contentId: id, type, originalError: validationResult.error }
+      );
+    }
     
     if (!this.#isSupportedType(type)) {
-      this.#log('warn', `Tipo no soportado: ${type}`);
-      const emptyResponse = this.#createEmptyResponse();
-      
-      // Cachear respuesta vacía con TTL corto
-      cacheService.set(streamCacheKey, emptyResponse, 300000); // 5 minutos
-      
-      return emptyResponse;
+      throw createError(
+        `Tipo de contenido no soportado: ${type}`,
+        ERROR_TYPES.VALIDATION,
+        { type, supportedTypes: ['movie', 'series', 'anime'] }
+      );
     }
 
     // Detectar tipo de ID para anime
@@ -227,58 +244,94 @@ export class StreamHandler {
    * @throws {Error}
    * @returns {Promise<Object>} Resultado de validación
    */
+  @withErrorHandling({ logArgs: false })
   async #validateStreamRequest(args) {
     // Validación de entrada con early returns
     if (!args || typeof args !== 'object') {
-      throw new Error('Argumentos de stream requeridos y deben ser objeto');
+      throw createError(
+        'Argumentos de stream requeridos y deben ser objeto',
+        ERROR_TYPES.VALIDATION,
+        { args }
+      );
     }
 
     if (!args.type || typeof args.type !== 'string') {
-      throw new Error('Tipo de contenido requerido y debe ser string');
+      throw createError(
+        'Tipo de contenido requerido y debe ser string',
+        ERROR_TYPES.VALIDATION,
+        { type: args.type }
+      );
     }
 
     if (!['movie', 'series', 'anime'].includes(args.type)) {
-      throw new Error('Tipo de contenido debe ser movie, series o anime');
+      throw createError(
+        'Tipo de contenido debe ser movie, series o anime',
+        ERROR_TYPES.VALIDATION,
+        { type: args.type, supportedTypes: ['movie', 'series', 'anime'] }
+      );
     }
     
     if (!args.id || typeof args.id !== 'string') {
-      throw new Error('ID de contenido requerido y debe ser string');
+      throw createError(
+        'ID de contenido requerido y debe ser string',
+        ERROR_TYPES.VALIDATION,
+        { id: args.id }
+      );
     }
 
     if (args.id.trim().length === 0) {
-      throw new Error('ID de contenido no puede estar vacío');
+      throw createError(
+        'ID de contenido no puede estar vacío',
+        ERROR_TYPES.VALIDATION,
+        { id: args.id }
+      );
     }
 
-    try {
-      // Usar validación dinámica para verificar el ID
-      // Para stream requests no forzamos conversión a IMDb ya que Torrentio maneja anime IDs
-      const validationResult = await this.#validationService.validateContentId(
+    // Usar validación dinámica para verificar el ID
+    const validationResult = await safeExecute(
+      () => this.#validationService.validateContentId(
         args.id, 
         'stream_request',
         { strictMode: false }
-      );
-      
-      if (!validationResult.isValid) {
-        const errorMsg = validationResult.details?.error || 'ID de contenido inválido';
-        this.#logger.warn(`Validación falló para ID ${args.id}: ${errorMsg}`);
-        throw new Error(`ID de contenido inválido: ${errorMsg}`);
+      ),
+      { 
+        operation: 'validation.validateContentId',
+        contentId: args.id,
+        type: args.type
       }
-
-      this.#logger.debug(`Validación exitosa para ID ${args.id}:`, {
-        type: validationResult.details?.detection?.type,
-        confidence: validationResult.details?.detection?.confidence
-      });
-      
-      return validationResult;
-      
-    } catch (error) {
-      // Preservar stack trace y contexto para errores de validación
-      const validationError = new Error(`Error en validación de stream request para ${args.id}: ${error.message}`);
-      validationError.cause = error;
-      validationError.contentId = args.id;
-      validationError.contentType = args.type;
-      throw validationError;
+    );
+    
+    if (validationResult.error) {
+      throw createError(
+        `Error en validación de stream request para ${args.id}`,
+        ERROR_TYPES.VALIDATION,
+        { 
+          contentId: args.id,
+          contentType: args.type,
+          originalError: validationResult.error
+        }
+      );
     }
+    
+    if (!validationResult.isValid) {
+      const errorMsg = validationResult.details?.error || 'ID de contenido inválido';
+      this.#logger.warn(`Validación falló para ID ${args.id}: ${errorMsg}`);
+      throw createError(
+        `ID de contenido inválido: ${errorMsg}`,
+        ERROR_TYPES.VALIDATION,
+        { 
+          contentId: args.id,
+          validationDetails: validationResult.details
+        }
+      );
+    }
+
+    this.#logger.debug(`Validación exitosa para ID ${args.id}:`, {
+      type: validationResult.details?.detection?.type,
+      confidence: validationResult.details?.detection?.confidence
+    });
+    
+    return validationResult;
   }
 
   /**
@@ -298,32 +351,45 @@ export class StreamHandler {
    * @param {string} type - Tipo de contenido ('movie', 'series', 'anime')
    * @returns {Promise<import('../../domain/entities/Magnet.js').Magnet[]|null>}
    */
+  @withErrorHandling({ logArgs: false })
   async #getMagnets(contentId, type = 'movie') {
-    try {
-      this.#log('info', `Iniciando búsqueda de magnets para ${contentId} (${type})`);
-      
-      // Usar el método unificado del repositorio para manejar cualquier tipo de ID
-      const magnets = await this.#magnetRepository.getMagnetsByContentId(contentId, type);
-      
-      if (magnets && magnets.length > 0) {
-        this.#log('info', `Encontrados ${magnets.length} magnets para ${contentId}`);
-        
-        // Log adicional para anime con información de fuentes
-        if (type === 'anime') {
-          const sources = [...new Set(magnets.map(m => m.provider || 'Unknown'))];
-          this.#log('info', `Fuentes de anime para ${contentId}: ${sources.join(', ')}`);
-        }
+    this.#log('info', `Iniciando búsqueda de magnets para ${contentId} (${type})`);
+    
+    // Usar el método unificado del repositorio para manejar cualquier tipo de ID
+    const magnetsResult = await safeExecute(
+      () => this.#magnetRepository.getMagnetsByContentId(contentId, type),
+      { 
+        operation: 'repository.getMagnetsByContentId',
+        contentId,
+        type
       }
-      
-      return magnets;
-    } catch (error) {
-      if (error instanceof MagnetNotFoundError) {
-        this.#log('warn', `No se encontraron magnets para ${contentId}: ${error.message}`);
+    );
+    
+    if (magnetsResult.error) {
+      if (magnetsResult.error instanceof MagnetNotFoundError) {
+        this.#log('warn', `No se encontraron magnets para ${contentId}: ${magnetsResult.error.message}`);
         return null;
       }
-      this.#log('error', `Error obteniendo magnets para ${contentId}: ${error.message}`);
-      throw error;
+      throw createError(
+        `Error accessing magnet repository for ${contentId}`,
+        ERROR_TYPES.REPOSITORY,
+        { contentId, type, originalError: magnetsResult.error }
+      );
     }
+    
+    const magnets = magnetsResult;
+    
+    if (magnets && magnets.length > 0) {
+      this.#log('info', `Encontrados ${magnets.length} magnets para ${contentId}`);
+      
+      // Log adicional para anime con información de fuentes
+      if (type === 'anime') {
+        const sources = [...new Set(magnets.map(m => m.provider || 'Unknown'))];
+        this.#log('info', `Fuentes de anime para ${contentId}: ${sources.join(', ')}`);
+      }
+    }
+    
+    return magnets;
   }
 
   /**
@@ -515,16 +581,32 @@ export class StreamHandler {
   }
 
   /**
-   * Crea respuesta de error.
+   * Crea respuesta de error estandarizada.
    * @private
    * @param {Error} error 
    * @returns {Object}
    */
   #createErrorResponse(error) {
     this.#log('error', `Error en stream handler: ${error.message}`);
+    
+    // Determinar el tiempo de cache basado en el tipo de error
+    let cacheMaxAge = 300; // 5 minutos por defecto
+    
+    if (error.type === ERROR_TYPES.VALIDATION) {
+      cacheMaxAge = 60; // 1 minuto para errores de validación
+    } else if (error.type === ERROR_TYPES.NETWORK || error.type === ERROR_TYPES.TIMEOUT) {
+      cacheMaxAge = 30; // 30 segundos para errores de red
+    } else if (error.type === ERROR_TYPES.RATE_LIMIT) {
+      cacheMaxAge = 900; // 15 minutos para rate limiting
+    }
+    
     return {
       streams: [],
-      cacheMaxAge: 60 // Cache corto para errores
+      cacheMaxAge,
+      error: error.message || 'Error interno del servidor',
+      errorType: error.type || ERROR_TYPES.UNKNOWN,
+      recoverable: error.recoverable || false,
+      timestamp: new Date().toISOString()
     };
   }
 
