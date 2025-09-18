@@ -251,7 +251,7 @@ export class MetadataService {
    * @returns {Object} Metadatos validados
    */
   #validateMetadata(metadata, contentType) {
-    const typeConfig = this.config[contentType];
+    const typeConfig = this.config.metadata?.[contentType];
     
     if (!typeConfig) {
       throw new Error(`Configuración no encontrada para tipo: ${contentType}`);
@@ -351,7 +351,7 @@ export class MetadataService {
    * @param {string} contentType - Tipo de contenido
    */
   #setCachedMetadata(cacheKey, metadata, contentType) {
-    const typeConfig = this.config[contentType];
+    const typeConfig = this.config.metadata?.[contentType];
     const expiry = typeConfig?.cacheExpiry || 86400000; // 1 día por defecto
     
     this.cacheService.set(cacheKey, {
@@ -408,7 +408,7 @@ export class MetadataService {
    * @returns {number} TTL en milisegundos
    */
   #getMetadataCacheTTL(contentType) {
-    const typeConfig = this.config[contentType];
+    const typeConfig = this.config.metadata?.[contentType];
     return typeConfig?.cacheExpiry || 86400000; // 1 día por defecto
   }
 
