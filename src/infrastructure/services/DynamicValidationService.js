@@ -12,7 +12,7 @@ export class DynamicValidationService {
   constructor({ idDetectorService, unifiedIdService, logger, config }) {
     this.idDetectorService = idDetectorService;
     this.unifiedIdService = unifiedIdService;
-    this.logger = logger;
+    this.logger = logger || new EnhancedLogger('DynamicValidationService');
     this.config = config;
     
     this.validationRules = this.#initializeValidationRules();

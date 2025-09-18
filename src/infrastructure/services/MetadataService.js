@@ -19,7 +19,7 @@ export class MetadataService {
    * @param {Object} dependencies.config - Configuración del addon
    */
   constructor({ logger, cacheService, errorHandler, config }) {
-    this.logger = logger;
+    this.logger = logger || new EnhancedLogger('MetadataService');
     this.cacheService = cacheService;
     this.errorHandler = errorHandler;
     this.config = config;
@@ -89,41 +89,8 @@ export class MetadataService {
       return localCachedMetadata;
     }
     
-    // Obtener metadatos según el tipo de contenido
-    let metadata;
-    try {
-      switch (contentType) {
-        case 'movie':
-          metadata = await this.#getMovieMetadata(contentId);
-          break;
-        case 'series':
-          metadata = await this.#getSeriesMetadata(contentId);
-          break;
-        case 'anime':
-          metadata = await this.#getAnimeMetadata(contentId);
-          break;
-        default:
-          throw createError(
-            `Tipo de contenido no soportado: ${contentType}`,
-            ERROR_TYPES.VALIDATION,
-            { contentId, contentType, supportedTypes: ['movie', 'series', 'anime'] }
-          );
-      }
-    } catch (error) {
-      // Si hay error, intentar fallback a cache stale
-      const staleData = await this.#getStaleFromCache(globalCacheKey);
-      if (staleData) {
-        this.logger.warn('Using stale metadata due to fetch error', {
-          contentId,
-          contentType,
-          error: error.message
-        });
-        return staleData;
-      }
-      
-      this.logger.error(`Error obteniendo metadatos para ${contentId}:`, error.message);
-      return this.#getDefaultMetadata(contentId, contentType);
-    }
+    // Obtener metadatos con reintentos
+    const metadata = await this.#fetchWithRetries(contentId, contentType);
     
     // Validar metadatos obtenidos
     const validatedMetadata = this.#validateMetadata(metadata, contentType);
@@ -308,13 +275,60 @@ export class MetadataService {
   }
 
   /**
+   * Obtiene metadatos con reintentos
+   * @private
+   * @param {string} contentId - ID del contenido
+   * @param {string} contentType - Tipo de contenido
+   * @returns {Promise<Object>} Metadatos obtenidos
+   */
+  async #fetchWithRetries(contentId, contentType) {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
+      try {
+        this.logger.debug(`Intento ${attempt} de ${this.MAX_RETRIES} para obtener metadatos de ${contentId}`);
+        
+        switch (contentType) {
+          case 'movie':
+            return await this.#getMovieMetadata(contentId);
+          case 'series':
+            return await this.#getSeriesMetadata(contentId);
+          case 'anime':
+            return await this.#getAnimeMetadata(contentId);
+          default:
+            throw createError(
+              `Tipo de contenido no soportado: ${contentType}`,
+              ERROR_TYPES.VALIDATION,
+              { contentId, contentType }
+            );
+        }
+      } catch (error) {
+        lastError = error;
+        this.logger.warn(`Intento ${attempt} fallido para ${contentId}:`, error.message);
+        
+        if (attempt < this.MAX_RETRIES) {
+          // Esperar antes del siguiente intento
+          await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY * attempt));
+        }
+      }
+    }
+    
+    // Todos los intentos fallaron
+    throw createError(
+      `Failed to fetch metadata after ${this.MAX_RETRIES} attempts`,
+      ERROR_TYPES.NETWORK,
+      { contentId, contentType, lastError: lastError.message }
+    );
+  }
+
+  /**
    * Obtiene metadatos desde cache
    * @private
    * @param {string} cacheKey - Clave de cache
    * @returns {Object|null} Metadatos cacheados o null
    */
   #getCachedMetadata(cacheKey) {
-    const cached = this.cache.get(cacheKey);
+    const cached = this.cacheService.get(cacheKey);
     
     if (!cached) {
       return null;
@@ -322,7 +336,7 @@ export class MetadataService {
     
     // Verificar si el cache ha expirado
     if (Date.now() - cached.timestamp > cached.expiry) {
-      this.cache.delete(cacheKey);
+      this.cacheService.delete(cacheKey);
       return null;
     }
     
@@ -340,7 +354,7 @@ export class MetadataService {
     const typeConfig = this.config[contentType];
     const expiry = typeConfig?.cacheExpiry || 86400000; // 1 día por defecto
     
-    this.cache.set(cacheKey, {
+    this.cacheService.set(cacheKey, {
       data: metadata,
       timestamp: Date.now(),
       expiry: expiry
@@ -375,9 +389,9 @@ export class MetadataService {
     const now = Date.now();
     let cleared = 0;
     
-    for (const [key, value] of this.cache.entries()) {
+    for (const [key, value] of this.cacheService.entries()) {
       if (now - value.timestamp > value.expiry) {
-        this.cache.delete(key);
+        this.cacheService.delete(key);
         cleared++;
       }
     }
@@ -423,7 +437,7 @@ export class MetadataService {
   invalidateMetadata(contentId, contentType) {
     // Limpiar cache local
     const localCacheKey = `${contentType}:${contentId}`;
-    this.cache.delete(localCacheKey);
+    this.cacheService.delete(localCacheKey);
     
     // Limpiar cache global
     const globalCacheKey = cacheService.generateMetadataCacheKey(contentId, contentType);

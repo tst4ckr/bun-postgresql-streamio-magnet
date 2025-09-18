@@ -23,6 +23,7 @@ export class StreamHandler {
   #logger;
   #validationService;
   #configInvoker;
+  #cacheService;
 
   /**
    * @param {Object} magnetRepository - Repositorio de magnets.
@@ -36,6 +37,7 @@ export class StreamHandler {
     this.#logger = logger;
     this.#validationService = validationService;
     this.#configInvoker = ConfigurationCommandFactory.createInvoker(this.#logger);
+    this.#cacheService = cacheService;
   }
 
   /**
@@ -212,7 +214,11 @@ export class StreamHandler {
       const emptyResponse = this.#createEmptyResponse();
       
       // Cachear respuesta vacía con TTL corto
-      cacheService.set(streamCacheKey, emptyResponse, 300000); // 5 minutos
+      const emptyTTL = this.#getStreamCacheTTL(type, 0);
+      cacheService.set(streamCacheKey, emptyResponse, emptyTTL, {
+        contentType: type,
+        metadata: { streamCount: 0, source: 'stream' }
+      });
       
       return emptyResponse;
     }
@@ -231,7 +237,15 @@ export class StreamHandler {
     
     // Cachear respuesta exitosa
     const cacheTTL = this.#getStreamCacheTTL(type, streams.length);
-    cacheService.set(streamCacheKey, streamResponse, cacheTTL);
+    cacheService.set(streamCacheKey, streamResponse, cacheTTL, {
+      contentType: type,
+      metadata: { 
+        streamCount: streams.length, 
+        source: 'stream',
+        duration,
+        timestamp: Date.now()
+      }
+    });
     
     return streamResponse;
   }
@@ -657,16 +671,14 @@ export class StreamHandler {
    * @returns {number} TTL en milisegundos
    */
   #getStreamCacheTTL(type, streamCount) {
-    // Cache más largo para contenido con muchos streams
-    if (streamCount > 10) {
-      return 3600000; // 1 hora
-    } else if (streamCount > 5) {
-      return 1800000; // 30 minutos
-    } else if (streamCount > 0) {
-      return 900000; // 15 minutos
-    } else {
-      return 300000; // 5 minutos para respuestas vacías
-    }
+    // Usar el optimizador de caché para TTL adaptativo
+    const adaptiveTTL = this.#cacheService.calculateAdaptiveTTL(type, streamCount, {
+      source: 'stream',
+      timestamp: Date.now()
+    });
+    
+    this.#logger('info', `TTL adaptativo calculado para ${type} con ${streamCount} streams: ${adaptiveTTL}ms`);
+    return adaptiveTTL;
   }
 
   /**

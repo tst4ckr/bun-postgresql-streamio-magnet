@@ -30,6 +30,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
   #englishCsvPath;
   #idService;
   #configInvoker;
+  #cacheService;
 
   /**
    * Método auxiliar para logging optimizado con contexto estructurado
@@ -100,6 +101,9 @@ export class CascadingMagnetRepository extends MagnetRepository {
     
     // Inicializar invoker de comandos de configuración
     this.#configInvoker = ConfigurationCommandFactory.createInvoker(this.#logger);
+    
+    // Inicializar servicio de caché
+    this.#cacheService = cacheService;
   }
 
   /**
@@ -338,7 +342,14 @@ export class CascadingMagnetRepository extends MagnetRepository {
       if (finalResults.length > 0) {
         // Cachear resultados exitosos
         const cacheTTL = this.#getCacheTTL(type, finalResults.length);
-        cacheService.set(cacheKey, finalResults, cacheTTL);
+        cacheService.set(cacheKey, finalResults, cacheTTL, {
+          contentType: type,
+          metadata: { 
+            resultCount: finalResults.length, 
+            source: 'repository',
+            duration: Date.now() - startTime
+          }
+        });
         
         const duration = Date.now() - startTime;
         this.#logger.log('info', `Encontrados ${finalResults.length} magnets en fuentes locales para ${contentId} en ${duration}ms`, { component: 'CascadingMagnetRepository' });
@@ -357,7 +368,15 @@ export class CascadingMagnetRepository extends MagnetRepository {
         
         // Cachear resultados de API con TTL más corto
         const apiCacheTTL = this.#getCacheTTL(type, enrichedSpanishResults.length, true);
-        cacheService.set(cacheKey, enrichedSpanishResults, apiCacheTTL);
+        cacheService.set(cacheKey, enrichedSpanishResults, apiCacheTTL, {
+          contentType: type,
+          metadata: { 
+            resultCount: enrichedSpanishResults.length, 
+            source: 'api',
+            language: 'spanish',
+            duration: Date.now() - startTime
+          }
+        });
         
         // Reinicializar repositorio secundario para incluir nuevos datos
         await this.#reinitializeSecondaryRepository();
@@ -383,7 +402,15 @@ export class CascadingMagnetRepository extends MagnetRepository {
         if (finalEnglishResults.length > 0) {
           // Cachear resultados de english.csv
           const cacheTTL = this.#getCacheTTL(type, finalEnglishResults.length);
-          cacheService.set(cacheKey, finalEnglishResults, cacheTTL);
+          cacheService.set(cacheKey, finalEnglishResults, cacheTTL, {
+            contentType: type,
+            metadata: { 
+              resultCount: finalEnglishResults.length, 
+              source: 'repository',
+              language: 'english',
+              duration: Date.now() - startTime
+            }
+          });
           
           const duration = Date.now() - startTime;
           this.#logger.log('info', `Encontrados ${finalEnglishResults.length} magnets en english.csv para ${contentId} en ${duration}ms`, { component: 'CascadingMagnetRepository' });
@@ -403,7 +430,15 @@ export class CascadingMagnetRepository extends MagnetRepository {
         
         // Cachear resultados de API con TTL más corto
         const apiCacheTTL = this.#getCacheTTL(type, enrichedEnglishApiResults.length, true);
-        cacheService.set(cacheKey, enrichedEnglishApiResults, apiCacheTTL);
+        cacheService.set(cacheKey, enrichedEnglishApiResults, apiCacheTTL, {
+          contentType: type,
+          metadata: { 
+            resultCount: enrichedEnglishApiResults.length, 
+            source: 'api',
+            language: 'english',
+            duration: Date.now() - startTime
+          }
+        });
         
         // Reinicializar repositorio de inglés para incluir nuevos datos
         await this.#reinitializeRepository(this.#englishRepository, 'english.csv');
@@ -418,7 +453,15 @@ export class CascadingMagnetRepository extends MagnetRepository {
       this.#logger.log('warn', `No se encontraron magnets para ${contentId} en ninguna fuente (${duration}ms)`, { component: 'CascadingMagnetRepository' });
       
       // Cachear resultado vacío con TTL corto para evitar búsquedas repetidas
-      cacheService.set(cacheKey, [], 300000); // 5 minutos
+      const emptyTTL = this.#getCacheTTL(type, 0);
+      cacheService.set(cacheKey, [], emptyTTL, {
+        contentType: type,
+        metadata: { 
+          resultCount: 0, 
+          source: 'repository',
+          duration: Date.now() - startTime
+        }
+      });
       
       throw new MagnetNotFoundError(contentId);
       
@@ -982,30 +1025,14 @@ export class CascadingMagnetRepository extends MagnetRepository {
    * @returns {number} TTL en milisegundos
    */
   #getCacheTTL(type, resultCount, isApiResult = false) {
-    // TTL base según tipo de contenido
-    let baseTTL;
+    // Usar el optimizador de caché para TTL adaptativo
+    const adaptiveTTL = this.#cacheService.calculateAdaptiveTTL(type, resultCount, {
+      source: isApiResult ? 'api' : 'repository',
+      timestamp: Date.now()
+    });
     
-    if (type === 'anime') {
-      baseTTL = 3600000; // 1 hora para anime
-    } else if (type === 'series') {
-      baseTTL = 1800000; // 30 minutos para series
-    } else {
-      baseTTL = 2700000; // 45 minutos para películas
-    }
-    
-    // Ajustar TTL según número de resultados
-    if (resultCount > 10) {
-      baseTTL *= 1.5; // Más tiempo para muchos resultados
-    } else if (resultCount < 3) {
-      baseTTL *= 0.5; // Menos tiempo para pocos resultados
-    }
-    
-    // Resultados de API tienen TTL más corto
-    if (isApiResult) {
-      baseTTL *= 0.7;
-    }
-    
-    return Math.floor(baseTTL);
+    this.#logger.log('info', `TTL adaptativo calculado para ${type} con ${resultCount} resultados (API: ${isApiResult}): ${adaptiveTTL}ms`, { component: 'CascadingMagnetRepository' });
+    return adaptiveTTL;
   }
 
 

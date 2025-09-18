@@ -372,6 +372,118 @@ export class EnhancedLogger {
     this.log(level, message, { component, data }, ...args);
   }
 
+  /**
+   * Log de operación completada con métricas
+   * @param {string} operation - Nombre de la operación
+   * @param {number} duration - Duración en milisegundos
+   * @param {Object} metrics - Métricas adicionales
+   */
+  operationComplete(operation, duration, metrics = {}) {
+    this.info(`${operation} completada en ${duration}ms`, metrics);
+  }
+
+  /**
+   * Log de validación fallida
+   * @param {string} entity - Entidad que falló la validación
+   * @param {string} reason - Razón de la falla
+   * @param {Object} context - Contexto adicional
+   */
+  validationFailed(entity, reason, context = {}) {
+    this.warn(`Validación falló para ${entity}: ${reason}`, context);
+  }
+
+  /**
+   * Log de recurso no encontrado
+   * @param {string} resourceType - Tipo de recurso
+   * @param {string} identifier - Identificador del recurso
+   * @param {Object} context - Contexto adicional
+   */
+  resourceNotFound(resourceType, identifier, context = {}) {
+    this.warn(`No se encontró ${resourceType}: ${identifier}`, context);
+  }
+
+  /**
+   * Log de configuración aplicada
+   * @param {string} configType - Tipo de configuración
+   * @param {string|Object} value - Valor de la configuración
+   */
+  configurationApplied(configType, value) {
+    const valueStr = typeof value === 'object' ? JSON.stringify(value) : value;
+    this.info(`${configType} configurado a: ${valueStr}`);
+  }
+
+  /**
+   * Log de resultado de búsqueda
+   * @param {string} searchType - Tipo de búsqueda
+   * @param {string} query - Consulta de búsqueda
+   * @param {number} resultCount - Número de resultados
+   * @param {Object} details - Detalles adicionales
+   */
+  searchResults(searchType, query, resultCount, details = {}) {
+    this.info(`Encontrados ${resultCount} resultados ${searchType} para ${query}`, details);
+  }
+
+  /**
+   * Log de recurso descartado
+   * @param {string} resourceType - Tipo de recurso
+   * @param {string} reason - Razón del descarte
+   * @param {Object} details - Detalles del recurso
+   */
+  resourceDiscarded(resourceType, reason, details = {}) {
+    this.debug(`${resourceType} descartado: ${reason}`, details);
+  }
+
+  /**
+   * Log de error en procesamiento
+   * @param {string} operation - Operación que falló
+   * @param {Error} error - Error ocurrido
+   * @param {Object} context - Contexto adicional
+   */
+  processingError(operation, error, context = {}) {
+    this.error(`Error en ${operation}:`, error, context);
+  }
+
+  /**
+   * Log de selección realizada
+   * @param {string} selectionType - Tipo de selección
+   * @param {string} selectedItem - Item seleccionado
+   * @param {Object} criteria - Criterios de selección
+   */
+  selectionMade(selectionType, selectedItem, criteria = {}) {
+    this.info(`${selectionType} seleccionado: ${selectedItem}`, criteria);
+  }
+
+  /**
+   * Log de advertencia por condición no óptima
+   * @param {string} condition - Condición detectada
+   * @param {string} impact - Impacto de la condición
+   * @param {Object} details - Detalles adicionales
+   */
+  nonOptimalCondition(condition, impact, details = {}) {
+    this.warn(`Condición no óptima - ${condition}: ${impact}`, details);
+  }
+
+  /**
+   * Log de recurso creado o modificado
+   * @param {string} resourceType - Tipo de recurso
+   * @param {string} action - Acción realizada (creado, modificado, etc)
+   * @param {Object} details - Detalles del recurso
+   */
+  resourceChanged(resourceType, action, details = {}) {
+    this.info(`${resourceType} ${action}`, details);
+  }
+
+  /**
+   * Log de estado de configuración
+   * @param {string} configType - Tipo de configuración
+   * @param {boolean} isValid - Si la configuración es válida
+   * @param {Object} details - Detalles de validación
+   */
+  configurationStatus(configType, isValid, details = {}) {
+    const status = isValid ? 'válida' : 'inválida';
+    const level = isValid ? 'info' : 'warn';
+    this[level](`${configType} ${status}`, details);
+  }
 
 }
 

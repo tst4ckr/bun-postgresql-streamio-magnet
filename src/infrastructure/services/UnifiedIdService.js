@@ -9,70 +9,78 @@ import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 import { CONSTANTS } from '../../config/constants.js';
 
 export class UnifiedIdService {
-  constructor(detectorService) {
-    this.detectorService = detectorService;
-    this.enhancedLogger = new EnhancedLogger('info', true);
+  constructor({ idDetectorService, logger, cacheService, config }) {
+    this.idDetectorService = idDetectorService;
+    this.logger = logger || new EnhancedLogger('UnifiedIdService');
+    this.cacheService = cacheService;
+    this.config = config;
     
-    // Cache para optimizar conversiones repetidas
-    this.conversionCache = new Map();
-    this.cacheExpiry = CONSTANTS.CACHE.UNIFIED_ID_CACHE_EXPIRY; // 24 horas
+    this.CONVERSION_CACHE_TTL = config.cache?.conversionTtl || 86400;
+    this.SUPPORTED_SERVICES = ['imdb', 'kitsu', 'mal', 'anilist', 'anidb'];
+    this.SERVICE_PRIORITIES = {
+      imdb: 1,
+      kitsu: 2,
+      mal: 3,
+      anilist: 4,
+      anidb: 5
+    };
+    
+    this.logger.info('UnifiedIdService inicializado', {
+      supportedServices: this.SUPPORTED_SERVICES,
+      cacheTtl: this.CONVERSION_CACHE_TTL,
+      priorities: this.SERVICE_PRIORITIES
+    });
   }
 
   /**
-   * Procesa cualquier tipo de ID y lo convierte al formato requerido
-   * @param {string} contentId - ID de contenido (Kitsu o IMDb)
-   * @param {string} targetFormat - Formato objetivo ('imdb' o 'kitsu')
-   * @returns {Promise<Object>} Resultado de conversión con metadatos
+   * Convierte un ID entre diferentes servicios
+   * @param {string} contentId - ID a convertir
+   * @param {string} targetService - Servicio destino (imdb, kitsu, mal, anilist, anidb)
+   * @param {Object} options - Opciones de conversión
+   * @returns {Promise<Object>} Resultado de la conversión
    */
-  async processContentId(contentId, targetFormat = 'imdb') {
-    try {
-      // Detectar tipo de ID de entrada
-      const detection = this.detectorService.detectIdType(contentId);
-      
-      if (!detection.isValid) {
-        return this.#createProcessingResult(false, null, contentId, {
-          error: 'ID de contenido inválido',
-          details: detection.message
-        });
-      }
-
-      // Si ya está en el formato objetivo, retornar directamente
-      if (detection.type === targetFormat) {
-        return this.#createProcessingResult(true, detection.id, contentId, {
-          message: `ID ya está en formato ${targetFormat}`,
-          sourceType: detection.type,
-          targetType: targetFormat,
-          conversionRequired: false
-        });
-      }
-
-      // Realizar conversión según el tipo detectado
-      const conversionResult = await this.#performConversion(
-        detection.id, 
-        detection.type, 
-        targetFormat
-      );
-
-      return this.#createProcessingResult(
-        conversionResult.success,
-        conversionResult.convertedId,
-        contentId,
-        {
-          sourceType: detection.type,
-          targetType: targetFormat,
-          conversionRequired: true,
-          conversionMethod: conversionResult.method,
-          metadata: conversionResult.metadata
-        }
-      );
-
-    } catch (error) {
-      this.enhancedLogger.error('Error procesando ID de contenido:', error);
-      return this.#createProcessingResult(false, null, contentId, {
-        error: 'Error interno durante el procesamiento',
-        details: error.message
-      });
+  async convertId(contentId, targetService, options = {}) {
+    this.#validateConversionInput(contentId, targetService);
+    
+    targetService = targetService.toLowerCase();
+    const detectionResult = this.idDetectorService.detectIdType(contentId);
+    
+    if (!detectionResult.isValid) {
+      throw new Error(`ID inválido: ${detectionResult.error}`);
     }
+
+    const sourceService = detectionResult.type;
+    
+    if (sourceService === targetService) {
+      return {
+        success: true,
+        convertedId: contentId,
+        sourceService,
+        targetService,
+        cached: false,
+        message: 'ID ya es del servicio destino'
+      };
+    }
+
+    const cacheKey = `conversion:${sourceService}:${targetService}:${contentId}`;
+    const cached = await this.#getCachedConversion(cacheKey);
+    
+    if (cached) {
+      return { ...cached, cached: true };
+    }
+
+    const convertedId = await this.#performConversion(contentId, sourceService, targetService, options);
+    const result = {
+      success: true,
+      convertedId,
+      sourceService,
+      targetService,
+      cached: false,
+      timestamp: Date.now()
+    };
+
+    await this.#cacheConversion(cacheKey, result);
+    return result;
   }
 
   /**

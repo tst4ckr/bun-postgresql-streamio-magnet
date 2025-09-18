@@ -6,6 +6,7 @@
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 import { addonConfig } from '../../config/addonConfig.js';
 import { CONSTANTS } from '../../config/constants.js';
+import { cacheOptimizer } from './CacheOptimizer.js';
 
 export class CacheService {
   constructor() {
@@ -13,7 +14,6 @@ export class CacheService {
     this.cache = new Map();
     this.stats = { hits: 0, misses: 0, sets: 0, deletes: 0, clears: 0 };
     
-    // Configuración centralizada
     this.config = {
       defaultTTL: addonConfig.cache?.defaultTTL || 3600000,
       maxSize: addonConfig.cache?.maxSize || CONSTANTS.CACHE.MAX_CACHE_SIZE,
@@ -50,6 +50,11 @@ export class CacheService {
     this.#incrementStat('hits');
     this.logger.debug(`Cache hit para clave: ${key}`);
     
+    // Registrar acceso para optimización predictiva
+    if (entry.contentType) {
+      cacheOptimizer.recordAccess(key, entry.contentType, entry.metadata);
+    }
+    
     return entry.value;
   }
 
@@ -58,9 +63,10 @@ export class CacheService {
    * @param {string} key - Clave del cache
    * @param {*} value - Valor a cachear
    * @param {number} ttl - Tiempo de vida en milisegundos (opcional)
+   * @param {Object} options - Opciones adicionales (contentType, metadata)
    * @returns {boolean} true si se estableció correctamente
    */
-  set(key, value, ttl = null) {
+  set(key, value, ttl = null, options = {}) {
     try {
       if (this.cache.size >= this.config.maxSize && !this.cache.has(key)) {
         this.#evictLeastRecentlyUsed();
@@ -73,12 +79,14 @@ export class CacheService {
         expiresAt: Date.now() + actualTTL,
         lastAccessed: Date.now(),
         accessCount: 0,
-        ttl: actualTTL
+        ttl: actualTTL,
+        contentType: options.contentType || null,
+        metadata: options.metadata || {}
       };
       
       this.cache.set(key, entry);
       this.#incrementStat('sets');
-      this.logger.debug(`Valor cacheado para clave: ${key}, TTL: ${actualTTL}ms`);
+      this.logger.debug(`Valor cacheado para clave: ${key}, TTL: ${actualTTL}ms`, options);
       return true;
       
     } catch (error) {
@@ -298,11 +306,29 @@ export class CacheService {
    * Genera clave de cache para streams
    * @public
    * @param {string} contentId - ID del contenido
-   * @param {string} type - Tipo de contenido
+   * @param {string} contentType - Tipo de contenido (movie, series, anime)
+   * @param {Object} options - Opciones adicionales
    * @returns {string} Clave de cache
    */
-  generateStreamCacheKey(contentId, type) {
-    return `streams:${contentId}:${type}`;
+  generateStreamCacheKey(contentId, contentType, options = {}) {
+    const { quality = 'all', language = 'es', season, episode } = options;
+    const parts = ['stream', contentType, contentId, quality, language];
+    
+    if (season !== undefined) parts.push(`s${season}`);
+    if (episode !== undefined) parts.push(`e${episode}`);
+    
+    return parts.join(':');
+  }
+
+  /**
+   * Calcula TTL adaptativo basado en optimizaciones
+   * @param {string} contentType - Tipo de contenido
+   * @param {number} resultCount - Número de resultados
+   * @param {Object} options - Opciones adicionales
+   * @returns {number} TTL en milisegundos
+   */
+  calculateAdaptiveTTL(contentType, resultCount, options = {}) {
+    return cacheOptimizer.calculateAdaptiveTTL(contentType, resultCount, options);
   }
 
 

@@ -71,14 +71,13 @@ export class TorrentioApiService {
    * @param {Object} torConfig - Configuración de Tor {enabled: boolean, host: string, port: number, maxRetries: number, retryDelay: number}
    * @param {string} englishFilePath - Ruta del archivo english.csv para contenido en inglés
    */
-  constructor(baseUrl, torrentioFilePath, logger = console, timeout = CONSTANTS.TIME.DEFAULT_TIMEOUT, torConfig = {}, englishFilePath = null) {
+  constructor(baseUrl, torrentioFilePath, logger = null, timeout = CONSTANTS.TIME.DEFAULT_TIMEOUT, torConfig = {}, englishFilePath = null) {
     this.#baseUrl = baseUrl;
     this.#torrentioFilePath = torrentioFilePath;
     this.#englishFilePath = englishFilePath || torrentioFilePath.replace('torrentio.csv', 'english.csv');
-    this.#logger = logger;
+    this.#logger = logger || new EnhancedLogger('TorrentioApiService');
     this.#timeout = timeout;
     
-    // Configuración de Tor con valores por defecto
     this.#torEnabled = torConfig.enabled ?? true;
     this.#torHost = torConfig.host ?? CONSTANTS.NETWORK.TOR_DEFAULT_HOST;
     this.#torPort = torConfig.port ?? CONSTANTS.NETWORK.TOR_DEFAULT_PORT;
@@ -87,19 +86,17 @@ export class TorrentioApiService {
     this.#maxRetries = torConfig.maxRetries ?? CONSTANTS.NETWORK.MAX_RETRIES;
     this.#retryDelay = torConfig.retryDelay ?? CONSTANTS.TIME.TOR_RETRY_DELAY;
     
-    // Inicializar invoker de comandos para configuración temporal
     this.#configInvoker = ConfigurationCommandFactory.createInvoker(this.#logger);
-    
     this.#providerConfigs = this.#initializeProviderConfigs();
     this.#manifestCache = new Map();
     this.#manifestCacheExpiry = CONSTANTS.TIME.MANIFEST_CACHE_EXPIRY;
     this.#torRotationInterval = null;
+    
     this.#ensureTorrentioFileExists();
     this.#startTorRotation();
     
-    // Configuración de Tor con socks-proxy-agent
     if (this.#torEnabled) {
-      this.#logger.log('info', `Tor configurado en ${this.#torHost}:${this.#torPort}`, { component: 'TorrentioApiService' });
+      this.#logger.info(`Tor configurado en ${this.#torHost}:${this.#torPort}`);
     }
   }
 
@@ -126,7 +123,7 @@ export class TorrentioApiService {
     try {
       // Validar que tengamos un ID válido
       if (!contentId || typeof contentId !== 'string') {
-        this.#logger('warn', `ID inválido para Torrentio API: ${contentId}`);
+        this.#logger.warn(`ID inválido para Torrentio API: ${contentId}`);
         return [];
       }
       
@@ -146,10 +143,7 @@ export class TorrentioApiService {
       
       // Detectar tipo automáticamente si es necesario
       const detectedType = type === 'auto' ? this.#detectContentType(baseContentId, finalSeason, finalEpisode) : type;
-      this.#logger.log('info', `Buscando magnets en API Torrentio para: ${contentId}`, { 
-        component: 'TorrentioApiService', 
-        data: { type: detectedType, season: finalSeason, episode: finalEpisode } 
-      });
+      this.#logger.info(`Buscando magnets en API Torrentio para: ${contentId} (tipo: ${detectedType}, season: ${finalSeason}, episode: ${finalEpisode})`);
       
       // Procesar el ID para obtener el formato correcto para Torrentio
       const { finalContentId } = this.#processContentId(baseContentId);
@@ -158,7 +152,7 @@ export class TorrentioApiService {
       let finalStreamId = finalContentId;
       if ((detectedType === 'series' || detectedType === 'anime') && finalSeason !== null && finalEpisode !== null) {
         finalStreamId = `${finalContentId}:${finalSeason}:${finalEpisode}`;
-        this.#logger.log('info', `Formato de serie/anime: ${finalStreamId}`, { component: 'TorrentioApiService' });
+        this.#logger.info(`Formato de serie/anime: ${finalStreamId}`);
       }
       
       // Construir URL según el tipo de contenido con proveedores optimizados
@@ -180,11 +174,11 @@ export class TorrentioApiService {
       }
       
       const streamUrl = `${optimizedBaseUrl}/stream/${urlContentType}/${finalStreamId}.json`;
-      this.#logger.log('info', `URL construida: ${streamUrl}`, { component: 'TorrentioApiService' });
+      this.#logger.info(`URL construida: ${streamUrl}`);
       const response = await this.#fetchWithTor(streamUrl);
       
       if (!response.ok) {
-        this.#logger.log('warn', `API Torrentio respondió con status ${response.status} para ${finalStreamId}`, { component: 'TorrentioApiService' });
+        this.#logger.warn(`API Torrentio respondió con status ${response.status} para ${finalStreamId}`);
         return [];
       }
       
@@ -193,7 +187,7 @@ export class TorrentioApiService {
       
       if (magnets.length > 0) {
         await this.#saveMagnetsToFile(magnets);
-        this.#logger.log('info', `Guardados ${magnets.length} magnets de API Torrentio para ${finalStreamId}`, { component: 'TorrentioApiService' });
+        this.#logger.info(`Guardados ${magnets.length} magnets de API Torrentio para ${finalStreamId}`);
       }
       
       return magnets;
@@ -210,7 +204,7 @@ export class TorrentioApiService {
         url: streamUrl
       };
       
-      this.#logger.log('error', 'Error en búsqueda de API Torrentio:', apiError, { component: 'TorrentioApiService' });
+      this.#logger.error('Error en búsqueda de API Torrentio:', apiError);
       return [];
     }
   }
@@ -242,10 +236,7 @@ export class TorrentioApiService {
     const finalSeason = season !== null ? season : extractedSeason;
     const finalEpisode = episode !== null ? episode : extractedEpisode;
     
-    this.#logger.log('info', `Iniciando búsqueda con fallback de idioma para ${contentId}`, { 
-      component: 'TorrentioApiService', 
-      data: { type, season: finalSeason, episode: finalEpisode } 
-    });
+    this.#logger.info(`Iniciando búsqueda con fallback de idioma para ${contentId} (tipo: ${type}, season: ${finalSeason}, episode: ${finalEpisode})`);
     
     try {
       // Detectar tipo de contenido si es 'auto'
@@ -254,7 +245,7 @@ export class TorrentioApiService {
       // Obtener configuraciones de idioma para el tipo de contenido
       const typeConfig = addonConfig.torrentio[detectedType];
       if (!typeConfig || !typeConfig.languageConfigs) {
-        this.#logger.log('warn', `No hay configuraciones de idioma para tipo: ${detectedType}`, { component: 'TorrentioApiService' });
+        this.#logger.warn(`No hay configuraciones de idioma para tipo: ${detectedType}`);
         return this.searchMagnetsById(finalContentId, detectedType, finalSeason, finalEpisode);
       }
       
@@ -266,7 +257,7 @@ export class TorrentioApiService {
       const configsAreIdentical = JSON.stringify(spanishConfig) === JSON.stringify(combinedConfig);
       
       if (configsAreIdentical) {
-        this.#logger.log('info', `Configuraciones español y combinado son idénticas, ejecutando búsqueda única para ${contentId}`, { component: 'TorrentioApiService' });
+        this.#logger.info(`Configuraciones español y combinado son idénticas, ejecutando búsqueda única para ${contentId}`);
         const results = await this.#searchWithLanguageConfig(
           finalContentId, 
           detectedType, 
@@ -278,13 +269,13 @@ export class TorrentioApiService {
         if (results && results.length > 0) {
           const resultsWithSeeds = this.#filterResultsWithSeeds(results);
           if (resultsWithSeeds.length > 0) {
-            this.#logger.log('info', `Encontrados ${resultsWithSeeds.length} resultados con seeds`, { component: 'TorrentioApiService' });
+            this.#logger.info(`Encontrados ${resultsWithSeeds.length} resultados con seeds`);
             await this.#saveMagnetsToFile(resultsWithSeeds, 'spanish');
             return resultsWithSeeds;
           }
         }
         
-        this.#logger.log('warn', `No se encontraron resultados para ${contentId}`, { component: 'TorrentioApiService' });
+        this.#logger.warn(`No se encontraron resultados para ${contentId}`);
         return [];
       }
       
@@ -292,7 +283,7 @@ export class TorrentioApiService {
       const minSatisfactoryResults = detectedType === 'anime' ? 2 : 1;
       
       // Primera búsqueda: solo en español
-      this.#logger.log('info', `Primera búsqueda: trackers en español para ${contentId}`, { component: 'TorrentioApiService' });
+      this.#logger.info(`Primera búsqueda: trackers en español para ${contentId}`);
       const spanishResults = await this.#searchWithLanguageConfig(
         finalContentId, 
         detectedType, 
@@ -304,18 +295,18 @@ export class TorrentioApiService {
       if (spanishResults && spanishResults.length > 0) {
         const resultsWithSeeds = this.#filterResultsWithSeeds(spanishResults);
         if (resultsWithSeeds.length >= minSatisfactoryResults) {
-          this.#logger.log('info', `Encontrados ${resultsWithSeeds.length} resultados con seeds en trackers españoles (suficientes, omitiendo búsqueda combinada)`, { component: 'TorrentioApiService' });
+          this.#logger.info(`Encontrados ${resultsWithSeeds.length} resultados con seeds en trackers españoles (suficientes, omitiendo búsqueda combinada)`);
           await this.#saveMagnetsToFile(resultsWithSeeds, 'spanish');
           return resultsWithSeeds;
         } else if (resultsWithSeeds.length > 0) {
-          this.#logger.log('info', `Encontrados ${resultsWithSeeds.length} resultados con seeds en trackers españoles (insuficientes, continuando con búsqueda combinada)`, { component: 'TorrentioApiService' });
+          this.#logger.info(`Encontrados ${resultsWithSeeds.length} resultados con seeds en trackers españoles (insuficientes, continuando con búsqueda combinada)`);
         } else {
-          this.#logger.log('warn', `Encontrados ${spanishResults.length} resultados en español pero sin seeds disponibles`, { component: 'TorrentioApiService' });
+          this.#logger.warn(`Encontrados ${spanishResults.length} resultados en español pero sin seeds disponibles`);
         }
       }
       
       // Segunda búsqueda: trackers combinados (español + inglés) solo si no hay suficientes resultados españoles
-      this.#logger.log('info', `Segunda búsqueda: trackers combinados para ${contentId}`, { component: 'TorrentioApiService' });
+      this.#logger.info(`Segunda búsqueda: trackers combinados para ${contentId}`);
       const combinedResults = await this.#searchWithLanguageConfig(
         finalContentId, 
         detectedType, 
@@ -338,24 +329,24 @@ export class TorrentioApiService {
           );
           
           if (uniqueResults.length > 0) {
-            this.#logger.log('info', `Encontrados ${uniqueResults.length} resultados únicos combinando español (${spanishResultsWithSeeds.length}) y combinado (${combinedResultsWithSeeds.length})`, { component: 'TorrentioApiService' });
+            this.#logger.info(`Encontrados ${uniqueResults.length} resultados únicos combinando español (${spanishResultsWithSeeds.length}) y combinado (${combinedResultsWithSeeds.length})`);
             await this.#saveMagnetsToFile(uniqueResults, 'spanish');
             return uniqueResults;
           }
         } else if (combinedResultsWithSeeds.length > 0) {
-          this.#logger.log('info', `Encontrados ${combinedResultsWithSeeds.length} resultados con seeds en trackers combinados`, { component: 'TorrentioApiService' });
+          this.#logger.info(`Encontrados ${combinedResultsWithSeeds.length} resultados con seeds en trackers combinados`);
           await this.#saveMagnetsToFile(combinedResultsWithSeeds, 'spanish');
           return combinedResultsWithSeeds;
         } else {
-          this.#logger.log('warn', `Encontrados ${combinedResults.length} resultados combinados pero sin seeds disponibles`, { component: 'TorrentioApiService' });
+          this.#logger.warn(`Encontrados ${combinedResults.length} resultados combinados pero sin seeds disponibles`);
         }
       }
       
-      this.#logger.log('warn', `No se encontraron resultados en ninguna configuración de idioma para ${contentId}`, { component: 'TorrentioApiService' });
+      this.#logger.warn(`No se encontraron resultados en ninguna configuración de idioma para ${contentId}`);
       return [];
       
     } catch (error) {
-      this.#logger.log('error', `Error en búsqueda con fallback de idioma para ${contentId}:`, error, { component: 'TorrentioApiService' });
+      this.#logger.error(`Error en búsqueda con fallback de idioma para ${contentId}:`, error);
       throw error;
     }
   }
@@ -383,10 +374,7 @@ export class TorrentioApiService {
       }
     }
     
-    this.#logger.log('info', `Búsqueda inglés: ${contentId}`, { 
-      component: 'TorrentioApiService', 
-      data: { type, season: finalSeason, episode: finalEpisode } 
-    });
+    this.#logger.info(`Búsqueda inglés: ${contentId} (tipo: ${type}, season: ${finalSeason}, episode: ${finalEpisode})`);
     
     try {
       // Detectar tipo de contenido si es 'auto'
@@ -395,12 +383,12 @@ export class TorrentioApiService {
       // Obtener configuraciones de idioma para el tipo de contenido
       const typeConfig = addonConfig.torrentio[detectedType];
       if (!typeConfig || !typeConfig.languageConfigs) {
-        this.#logger.log('warn', `No hay configuraciones de idioma para tipo: ${detectedType}`, { component: 'TorrentioApiService' });
+        this.#logger.warn(`No hay configuraciones de idioma para tipo: ${detectedType}`);
         return this.searchMagnetsById(finalContentId, detectedType, finalSeason, finalEpisode);
       }
       
       // Buscar solo en trackers en inglés
-      this.#logger.log('info', `Búsqueda en trackers ingleses para ${contentId}`, { component: 'TorrentioApiService' });
+      this.#logger.info(`Búsqueda en trackers ingleses para ${contentId}`);
       const englishResults = await this.#searchWithLanguageConfig(
         finalContentId, 
         detectedType, 
@@ -424,7 +412,7 @@ export class TorrentioApiService {
       return [];
       
     } catch (error) {
-      this.#logger.log('error', `Error en búsqueda en inglés para ${contentId}:`, error, { component: 'TorrentioApiService' });
+      this.#logger.error(`Error en búsqueda en inglés para ${contentId}:`, error);
       throw error;
     }
   }
@@ -510,7 +498,7 @@ export class TorrentioApiService {
     for (const stream of streams) {
       try {
         if (!stream.infoHash) {
-          this.#logger.log('debug', `Stream sin infoHash ignorado para ${contentId}:`, stream, { component: 'TorrentioApiService' });
+          this.#logger.debug(`Stream sin infoHash ignorado para ${contentId}:`, stream);
           continue;
         }
         
@@ -528,7 +516,7 @@ export class TorrentioApiService {
         // Filtrar por tamaño: solo menores a 9GB
         const sizeInGB = this.#convertSizeToGB(size);
         if (sizeInGB >= 9) {
-          this.#logger.log('debug', `Stream descartado por tamaño (${size}): ${fullName}`, { component: 'TorrentioApiService' });
+          this.#logger.debug(`Stream descartado por tamaño (${size}): ${fullName}`);
           continue;
         }
         
@@ -575,7 +563,7 @@ export class TorrentioApiService {
         candidates.push(magnet);
         
       } catch (error) {
-        this.#logger.log('error', `Error al procesar stream de Torrentio para ${contentId}:`, { error, stream }, { component: 'TorrentioApiService' });
+        this.#logger.error(`Error al procesar stream de Torrentio para ${contentId}:`, { error, stream });
       }
     }
     
@@ -637,7 +625,7 @@ export class TorrentioApiService {
     );
     
     if (validCandidates.length === 0) {
-      this.#logger.log('warn', `Ningún magnet cumple el mínimo de ${config.minSeeders} seeders`, { component: 'TorrentioApiService' });
+      this.#logger.warn(`Ningún magnet cumple el mínimo de ${config.minSeeders} seeders`);
       return [];
     }
     
@@ -659,7 +647,7 @@ export class TorrentioApiService {
     const bestCandidate = sortedCandidates[0];
     
     if (config.enableSelectionLogging) {
-      this.#logger('info', `Mejor magnet seleccionado (estrategia: ${config.strategy}): ${bestCandidate.name} (${bestCandidate.quality}, ${bestCandidate.seeders || 0} seeders)`);
+      this.#logger.info(`Mejor magnet seleccionado (estrategia: ${config.strategy}): ${bestCandidate.name} (${bestCandidate.quality}, ${bestCandidate.seeders || 0} seeders)`);
     }
     
     return [bestCandidate];
