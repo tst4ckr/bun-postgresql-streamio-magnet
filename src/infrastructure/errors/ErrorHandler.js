@@ -228,13 +228,9 @@ export class ErrorHandler {
         break;
         
       case RECOVERY_STRATEGIES.FALLBACK:
-        return this.#gracefulFallback(error);
-        
       case RECOVERY_STRATEGIES.CACHE_FALLBACK:
-        return this.#cacheFallback(error);
-        
       case RECOVERY_STRATEGIES.GRACEFUL_DEGRADATION:
-        return this.#gracefulDegradation(error);
+        return this.#applyFallbackStrategy(error, error.strategy);
         
       case RECOVERY_STRATEGIES.FAIL_FAST:
       default:

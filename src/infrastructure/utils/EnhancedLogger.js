@@ -144,18 +144,30 @@ export class EnhancedLogger {
   }
 
   /**
+   * Método genérico de logging con lazy evaluation
+   * @private
+   */
+  #logGeneric(level, message, ...args) {
+    // Aplicar filtros de producción
+    if (this.#isProduction) {
+      if (level === 'debug') return;
+      if (this.#errorOnly && ['info', 'warn'].includes(level)) return;
+    }
+    
+    if (this.#shouldLog(level)) {
+      const { formattedMessage, args: formattedArgs } = this.#formatMessage(level, message, args);
+      const logMethod = this.#logger[level] || this.#logger.info;
+      logMethod.call(this.#logger, formattedMessage, ...formattedArgs);
+    }
+  }
+
+  /**
    * Log de información con lazy evaluation
    * @param {string|Function} message - Mensaje a loggear o función que lo genera
    * @param {...any} args - Argumentos adicionales
    */
   info(message, ...args) {
-    // En producción con errorOnly, omitir logs info
-    if (this.#isProduction && this.#errorOnly) return;
-    
-    if (this.#shouldLog('info')) {
-      const { formattedMessage, args: formattedArgs } = this.#formatMessage('info', message, args);
-      this.#logger.info(formattedMessage, ...formattedArgs);
-    }
+    this.#logGeneric('info', message, ...args);
   }
 
   /**
@@ -164,13 +176,7 @@ export class EnhancedLogger {
    * @param {...any} args - Argumentos adicionales
    */
   warn(message, ...args) {
-    // En producción con errorOnly, omitir logs warn
-    if (this.#isProduction && this.#errorOnly) return;
-    
-    if (this.#shouldLog('warn')) {
-      const { formattedMessage, args: formattedArgs } = this.#formatMessage('warn', message, args);
-      this.#logger.warn(formattedMessage, ...formattedArgs);
-    }
+    this.#logGeneric('warn', message, ...args);
   }
 
   /**
@@ -179,10 +185,7 @@ export class EnhancedLogger {
    * @param {...any} args - Argumentos adicionales
    */
   error(message, ...args) {
-    if (this.#shouldLog('error')) {
-      const { formattedMessage, args: formattedArgs } = this.#formatMessage('error', message, args);
-      this.#logger.error(formattedMessage, ...formattedArgs);
-    }
+    this.#logGeneric('error', message, ...args);
   }
 
   /**
@@ -191,14 +194,7 @@ export class EnhancedLogger {
    * @param {...any} args - Argumentos adicionales
    */
   debug(message, ...args) {
-    // En producción, omitir completamente logs debug para máximo rendimiento
-    if (this.#isProduction) return;
-    
-    if (this.#shouldLog('debug')) {
-      const { formattedMessage, args: formattedArgs } = this.#formatMessage('debug', message, args);
-      this.#logger.debug ? this.#logger.debug(formattedMessage, ...formattedArgs) : 
-                          this.#logger.info(formattedMessage, ...formattedArgs);
-    }
+    this.#logGeneric('debug', message, ...args);
   }
 
   /**

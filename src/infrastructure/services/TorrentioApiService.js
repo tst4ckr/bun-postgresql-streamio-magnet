@@ -308,12 +308,9 @@ export class TorrentioApiService {
         // Si ya teníamos algunos resultados españoles, combinarlos con los nuevos
         if (spanishResults && spanishResults.length > 0) {
           const spanishResultsWithSeeds = this.#filterResultsWithSeeds(spanishResults);
-          const allResults = [...spanishResultsWithSeeds, ...combinedResultsWithSeeds];
           
-          // Eliminar duplicados basándose en infoHash
-          const uniqueResults = allResults.filter((result, index, self) => 
-            index === self.findIndex(r => r.infoHash === result.infoHash)
-          );
+          // Eliminar duplicados usando método unificado
+          const uniqueResults = this.#deduplicateAndCombineResults(spanishResultsWithSeeds, combinedResultsWithSeeds);
           
           if (uniqueResults.length > 0) {
             this.#logger.info(`Encontrados ${uniqueResults.length} resultados únicos combinando español (${spanishResultsWithSeeds.length}) y combinado (${combinedResultsWithSeeds.length})`);
@@ -419,6 +416,17 @@ export class TorrentioApiService {
       const seeders = parseInt(magnet.seeders) || 0;
       return seeders > 0;
     });
+  }
+
+  /**
+   * Elimina duplicados basándose en infoHash y combina resultados
+   * @private
+   */
+  #deduplicateAndCombineResults(...resultArrays) {
+    const allResults = resultArrays.flat();
+    return allResults.filter((result, index, self) => 
+      index === self.findIndex(r => r.infoHash === result.infoHash)
+    );
   }
 
   /**
