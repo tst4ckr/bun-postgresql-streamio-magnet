@@ -306,49 +306,49 @@ export class ErrorHandler {
   }
 
   /**
-   * Implementa fallback graceful
+   * Implementa estrategias de fallback unificadas
    * @private
    */
-  #gracefulFallback(error) {
-    this.#logger.warn('Aplicando fallback graceful', { error: error.message });
-    
-    // Retornar respuesta vacía pero válida
-    return {
-      streams: [],
-      cacheMaxAge: 300, // 5 minutos de cache para errores
-      error: 'Servicio temporalmente no disponible'
+  #applyFallbackStrategy(error, strategy) {
+    const fallbackConfigs = {
+      [RECOVERY_STRATEGIES.FALLBACK]: {
+        logLevel: 'warn',
+        message: 'Aplicando fallback graceful',
+        response: {
+          streams: [],
+          cacheMaxAge: 300,
+          error: 'Servicio temporalmente no disponible'
+        }
+      },
+      [RECOVERY_STRATEGIES.CACHE_FALLBACK]: {
+        logLevel: 'warn',
+        message: 'Aplicando fallback a cache',
+        response: {
+          streams: [],
+          cacheMaxAge: 60,
+          fromCache: true,
+          warning: 'Datos desde cache debido a error temporal'
+        }
+      },
+      [RECOVERY_STRATEGIES.GRACEFUL_DEGRADATION]: {
+        logLevel: 'info',
+        message: 'Aplicando degradación graceful',
+        response: {
+          streams: [],
+          cacheMaxAge: 60,
+          degraded: true,
+          message: 'Servicio funcionando con capacidad reducida'
+        }
+      }
     };
-  }
 
-  /**
-   * Implementa fallback a cache
-   * @private
-   */
-  #cacheFallback(error) {
-    this.#logger.warn('Aplicando fallback a cache', { error: error.message });
-    
-    // En una implementación real, aquí se consultaría el cache
-    return {
-      streams: [],
-      cacheMaxAge: 60,
-      fromCache: true,
-      warning: 'Datos desde cache debido a error temporal'
-    };
-  }
+    const config = fallbackConfigs[strategy];
+    if (!config) {
+      throw new Error(`Estrategia de fallback no soportada: ${strategy}`);
+    }
 
-  /**
-   * Implementa degradación graceful
-   * @private
-   */
-  #gracefulDegradation(error) {
-    this.#logger.info('Aplicando degradación graceful', { error: error.message });
-    
-    return {
-      streams: [],
-      cacheMaxAge: 60,
-      degraded: true,
-      message: 'Servicio funcionando con capacidad reducida'
-    };
+    this.#logger[config.logLevel](config.message, { error: error.message });
+    return config.response;
   }
 
   /**
