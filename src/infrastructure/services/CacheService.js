@@ -1,12 +1,11 @@
 /**
- * Servicio de cache optimizado para búsquedas frecuentes
- * Implementa cache en memoria con TTL y estrategias de invalidación
+ * Servicio de cache simplificado con TTL adaptativo
+ * Implementa cache en memoria con estrategias de invalidación directas
  */
 
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 import { addonConfig } from '../../config/addonConfig.js';
 import { CONSTANTS } from '../../config/constants.js';
-import { cacheOptimizer } from './CacheOptimizer.js';
 
 export class CacheService {
   constructor() {
@@ -50,10 +49,8 @@ export class CacheService {
     this.#incrementStat('hits');
     this.logger.debug(`Cache hit para clave: ${key}`);
     
-    // Registrar acceso para optimización predictiva
-    if (entry.contentType) {
-      cacheOptimizer.recordAccess(key, entry.contentType, entry.metadata);
-    }
+    // Registrar acceso simple
+    this.#recordAccess(key, entry.contentType);
     
     return entry.value;
   }
@@ -321,14 +318,57 @@ export class CacheService {
   }
 
   /**
-   * Calcula TTL adaptativo basado en optimizaciones
+   * Calcula TTL adaptativo simplificado
    * @param {string} contentType - Tipo de contenido
    * @param {number} resultCount - Número de resultados
-   * @param {Object} options - Opciones adicionales
+   * @param {string} contentId - ID del contenido (opcional)
    * @returns {number} TTL en milisegundos
    */
-  calculateAdaptiveTTL(contentType, resultCount, options = {}) {
-    return cacheOptimizer.calculateAdaptiveTTL(contentType, resultCount, options);
+  calculateAdaptiveTTL(contentType, resultCount, contentId = null) {
+    const baseTTLs = {
+      movie: 2700000,  // 45 minutos
+      series: 1800000, // 30 minutos
+      anime: 3600000   // 1 hora
+    };
+    
+    let baseTTL = baseTTLs[contentType] || 1800000;
+    
+    // Ajustar por cantidad de resultados
+    if (resultCount > 10) {
+      baseTTL *= 1.5;
+    } else if (resultCount < 3) {
+      baseTTL *= 0.5;
+    }
+    
+    // Ajustar por frecuencia de acceso si hay historial
+    if (contentId && this.accessHistory.has(contentId)) {
+      const accessCount = this.accessHistory.get(contentId);
+      if (accessCount > 10) baseTTL *= 1.3;
+      else if (accessCount < 2) baseTTL *= 0.8;
+    }
+    
+    return Math.max(300000, Math.min(baseTTL, 86400000)); // Entre 5 min y 24 horas
+  }
+
+  /**
+   * Registra acceso simple para TTL adaptativo
+   * @private
+   */
+  #recordAccess(key, contentType) {
+    if (!this.accessHistory) {
+      this.accessHistory = new Map();
+    }
+    
+    const currentCount = this.accessHistory.get(key) || 0;
+    this.accessHistory.set(key, currentCount + 1);
+    
+    // Limpiar historial si crece mucho
+    if (this.accessHistory.size > 1000) {
+      const entries = [...this.accessHistory.entries()];
+      entries.sort((a, b) => b[1] - a[1]); // Ordenar por frecuencia
+      this.accessHistory.clear();
+      entries.slice(0, 500).forEach(([k, v]) => this.accessHistory.set(k, v));
+    }
   }
 
 

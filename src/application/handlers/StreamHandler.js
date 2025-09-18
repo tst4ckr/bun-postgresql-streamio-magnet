@@ -217,7 +217,7 @@ export class StreamHandler {
       const emptyResponse = this.#createEmptyResponse();
       
       // Cachear respuesta vacía con TTL corto
-      const emptyTTL = this.#getStreamCacheTTL(type, 0);
+      const emptyTTL = cacheService.calculateAdaptiveTTL(type, 0, id);
       cacheService.set(streamCacheKey, emptyResponse, emptyTTL, {
         contentType: type,
         metadata: { streamCount: 0, source: 'stream' }
@@ -239,7 +239,7 @@ export class StreamHandler {
     const streamResponse = this.#createStreamResponse(streams);
     
     // Cachear respuesta exitosa usando la misma clave específica por episodio
-    const cacheTTL = this.#getStreamCacheTTL(type, streams.length);
+    const cacheTTL = cacheService.calculateAdaptiveTTL(type, streams.length, id);
     cacheService.set(streamCacheKey, streamResponse, cacheTTL, {
       contentType: type,
       metadata: { 
@@ -694,23 +694,7 @@ export class StreamHandler {
     return 'unknown';
   }
 
-  /**
-   * Determina el TTL de cache para streams basado en el tipo y cantidad.
-   * @private
-   * @param {string} type - Tipo de contenido
-   * @param {number} streamCount - Cantidad de streams encontrados
-   * @returns {number} TTL en milisegundos
-   */
-  #getStreamCacheTTL(type, streamCount) {
-    // Usar el optimizador de caché para TTL adaptativo
-    const adaptiveTTL = this.#cacheService.calculateAdaptiveTTL(type, streamCount, {
-      source: 'stream',
-      timestamp: Date.now()
-    });
-    
-    this.#logMessage('info', `TTL adaptativo calculado para ${type} con ${streamCount} streams: ${adaptiveTTL}ms`);
-    return adaptiveTTL;
-  }
+
 
   /**
    * Método de logging unificado con formato específico.
