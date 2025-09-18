@@ -3,17 +3,17 @@
  * Extrae información de canales desde formato M3U estándar.
  */
 
-import { Channel } from '../../domain/entities/Channel.js';
+import { Tv } from '../../domain/entities/Tv.js';
 
 /**
  * Parser para archivos M3U que extrae información de canales de TV.
- * Responsabilidad única: parsear formato M3U a entidades Channel.
+ * Responsabilidad única: parsear formato M3U a entidades Tv.
  */
 export class M3UParser {
   /**
-   * Parsea contenido M3U y retorna array de canales.
+   * Parsea contenido M3U y retorna array de canales de TV.
    * @param {string} m3uContent - Contenido del archivo M3U
-   * @returns {Channel[]} Array de canales parseados
+   * @returns {Tv[]} Array de canales de TV parseados
    */
   static parse(m3uContent) {
     if (!m3uContent || typeof m3uContent !== 'string') {
@@ -21,37 +21,37 @@ export class M3UParser {
     }
 
     const lines = m3uContent.split('\n').map(line => line.trim()).filter(Boolean);
-    const channels = [];
+    const tvs = [];
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       
-      // Buscar líneas EXTINF que definen canales
+      // Buscar líneas EXTINF que definen canales de TV
       if (line.startsWith('#EXTINF:')) {
-        const channelInfo = this.#parseExtinfLine(line);
+        const tvInfo = this.#parseExtinfLine(line);
         const nextLine = lines[i + 1];
         
         // La siguiente línea debe ser la URL del stream
         if (nextLine && !nextLine.startsWith('#')) {
           try {
-            const channelData = {
-              ...channelInfo,
+            const tvData = {
+              ...tvInfo,
               streamUrl: nextLine,
-              id: Channel.generateId(channelInfo.name, channelInfo.group)
+              id: Tv.generateId(tvInfo.name, tvInfo.group)
             };
             
-            const channel = new Channel(channelData);
-            channels.push(channel);
+            const tv = new Tv(tvData);
+            tvs.push(tv);
             i++; // Saltar la línea de URL ya procesada
           } catch (error) {
             // Continuar con el siguiente canal si hay error en uno específico
-            console.warn(`Error creating channel: ${error.message}`, channelInfo);
+            console.warn(`Error creating tv: ${error.message}`, tvInfo);
           }
         }
       }
     }
     
-    return channels;
+    return tvs;
   }
 
   /**
@@ -61,7 +61,7 @@ export class M3UParser {
    * @returns {Object} Metadatos del canal
    */
   static #parseExtinfLine(extinfLine) {
-    const channelInfo = {
+    const tvInfo = {
       name: '',
       logo: null,
       group: 'General',
@@ -74,38 +74,38 @@ export class M3UParser {
     
     // Mapear atributos conocidos
     if (attributes['tvg-logo']) {
-      channelInfo.logo = attributes['tvg-logo'];
+      tvInfo.logo = attributes['tvg-logo'];
     }
     
     if (attributes['group-title']) {
-      channelInfo.group = attributes['group-title'];
+      tvInfo.group = attributes['group-title'];
     }
     
     if (attributes['tvg-id']) {
-      channelInfo.tvgId = attributes['tvg-id'];
+      tvInfo.tvgId = attributes['tvg-id'];
     }
     
     if (attributes['tvg-name']) {
-      channelInfo.tvgName = attributes['tvg-name'];
+      tvInfo.tvgName = attributes['tvg-name'];
     }
 
     // Extraer nombre del canal (después de la última coma)
     const nameMatch = extinfLine.match(/,(.+)$/);
     if (nameMatch) {
-      channelInfo.name = nameMatch[1].trim();
+      tvInfo.name = nameMatch[1].trim();
     }
 
     // Si no hay nombre, usar tvg-name como fallback
-    if (!channelInfo.name && channelInfo.tvgName) {
-      channelInfo.name = channelInfo.tvgName;
+    if (!tvInfo.name && tvInfo.tvgName) {
+      tvInfo.name = tvInfo.tvgName;
     }
 
     // Validar que tenemos al menos un nombre
-    if (!channelInfo.name) {
-      throw new Error('Channel name is required');
+    if (!tvInfo.name) {
+      throw new Error('Tv name is required');
     }
 
-    return channelInfo;
+    return tvInfo;
   }
 
   /**
