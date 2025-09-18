@@ -54,7 +54,7 @@ export class TorService {
     this.#startAutoRotation();
 
     if (this.#enabled) {
-      this.#logger.log('info', `Tor configurado en ${this.#host}:${this.#port}`, { component: 'TorService' });
+      this.#logger.info(`Tor configurado en ${this.#host}:${this.#port}`);
     }
   }
 
@@ -78,24 +78,24 @@ export class TorService {
     }
 
     return new Promise((resolve) => {
-      this.#logger.log('debug', `Verificando disponibilidad de Tor en ${this.#host}:${this.#port}`, { component: 'TorService' });
+      this.#logger.debug(`Verificando disponibilidad de Tor en ${this.#host}:${this.#port}`);
       const socket = new net.Socket();
       
       const timeout = setTimeout(() => {
-        this.#logger.log('warn', 'Timeout al verificar Tor - considerando no disponible', { component: 'TorService' });
+        this.#logger.warn('Timeout al verificar Tor - considerando no disponible');
         socket.destroy();
         resolve(false);
       }, CONSTANTS.NETWORK.TOR_CHECK_TIMEOUT);
       
       socket.connect(this.#port, this.#host, () => {
-        this.#logger.log('info', 'Tor detectado y disponible', { component: 'TorService' });
+        this.#logger.info('Tor detectado y disponible');
         clearTimeout(timeout);
         socket.destroy();
         resolve(true);
       });
       
       socket.on('error', (err) => {
-        this.#logger.log('warn', `Error al conectar con Tor: ${err.message}`, { component: 'TorService' });
+        this.#logger.warn(`Error al conectar con Tor: ${err.message}`);
         clearTimeout(timeout);
         resolve(false);
       });
@@ -122,7 +122,7 @@ export class TorService {
     }
 
     try {
-      this.#logger.log('info', `Intento ${attempt}/${this.#maxRetries} - Consultando vía Tor: ${url}`, { component: 'TorService' });
+      this.#logger.info(`Intento ${attempt}/${this.#maxRetries} - Consultando vía Tor: ${url}`);
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.#timeout);
@@ -139,7 +139,7 @@ export class TorService {
       clearTimeout(timeoutId);
 
       if (response.ok) {
-        this.#logger.log('info', `Respuesta exitosa vía Tor (${response.status}, {}) en intento ${attempt}`, { component: 'TorService' });
+        this.#logger.info(`Respuesta exitosa vía Tor (${response.status}) en intento ${attempt}`, { component: 'TorService' });
         return response;
       }
 
@@ -151,7 +151,7 @@ export class TorService {
         return this.fetch(url, attempt + 1);
       }
 
-      this.#logger.log('warn', `Respuesta no exitosa vía Tor: ${response.status} en intento ${attempt}`, { component: 'TorService' });
+      this.#logger.warn(`Respuesta no exitosa vía Tor: ${response.status} en intento ${attempt}`);
       return response;
 
     } catch (error) {
@@ -170,7 +170,7 @@ export class TorService {
         return this.fetch(url, attempt + 1);
       }
 
-      this.#logger.log('error', `Error en petición Tor después de ${attempt} intentos: ${error.message}`, { component: 'TorService' });
+      this.#logger.error(`Error en petición Tor después de ${attempt} intentos: ${error.message}`);
       throw error;
     }
   }
@@ -181,7 +181,7 @@ export class TorService {
    */
   async rotateSession() {
     if (!this.#controlPort || !this.#controlHost) {
-      this.#logger.log('warn', 'Control de Tor no configurado correctamente - saltando rotación', { component: 'TorService' });
+      this.#logger.warn('Control de Tor no configurado correctamente - saltando rotación');
       return;
     }
 
@@ -198,7 +198,7 @@ export class TorService {
       socket.on('data', (data) => {
         const response = data.toString();
         if (response.includes('250 OK')) {
-          this.#logger.log('info', 'Sesión Tor rotada exitosamente - nueva IP obtenida', { component: 'TorService' });
+          this.#logger.info('Sesión Tor rotada exitosamente - nueva IP obtenida');
           // Reinicializar agente con nueva sesión
           this.#initializeAgent();
         }
@@ -209,7 +209,7 @@ export class TorService {
       });
 
       socket.on('error', (err) => {
-        this.#logger.log('warn', `No se pudo rotar sesión Tor: ${err.message}`, { component: 'TorService' });
+        this.#logger.warn(`No se pudo rotar sesión Tor: ${err.message}`);
         resolve(); // Resolve anyway to not block the process
       });
     });
@@ -229,13 +229,13 @@ export class TorService {
     this.#rotationInterval = setInterval(async () => {
       try {
         await this.rotateSession();
-        this.#logger.log('info', 'Rotación automática de circuitos Tor completada', { component: 'TorService' });
+        this.#logger.info('Rotación automática de circuitos Tor completada');
       } catch (error) {
         this.#logger.log('error', 'Error en rotación automática de Tor:', error, { component: 'TorService' });
       }
     }, 300000);
 
-    this.#logger.log('info', 'Rotación automática de circuitos Tor iniciada (cada 5 minutos, {})', { component: 'TorService' });
+    this.#logger.info('Rotación automática de circuitos Tor iniciada (cada 5 minutos)', { component: 'TorService' });
   }
 
   /**
@@ -245,7 +245,7 @@ export class TorService {
     if (this.#rotationInterval) {
       clearInterval(this.#rotationInterval);
       this.#rotationInterval = null;
-      this.#logger.log('info', 'Rotación automática de circuitos Tor detenida', { component: 'TorService' });
+      this.#logger.info('Rotación automática de circuitos Tor detenida');
     }
   }
 
@@ -297,7 +297,7 @@ export class TorService {
   destroy() {
     this.stopAutoRotation();
     this.#agent = null;
-    this.#logger.log('info', 'TorService destruido y recursos liberados', { component: 'TorService' });
+    this.#logger.info('TorService destruido y recursos liberados');
   }
 }
 

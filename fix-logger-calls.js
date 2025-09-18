@@ -27,6 +27,54 @@ const CONFIG = {
  */
 const LOGGER_FIXES = [
   {
+    name: "Revertir this.#logger.log genérico a métodos específicos - INFO",
+    pattern: /this\.#logger\.log\(['"]info['"],\s*([^,]+),\s*\{[^}]*\}\)/g,
+    replacement: 'this.#logger.info($1)',
+    description: "Convierte this.#logger.log('info', message, {}) a this.#logger.info(message)"
+  },
+  {
+    name: "Revertir this.#logger.log genérico a métodos específicos - WARN",
+    pattern: /this\.#logger\.log\(['"]warn['"],\s*([^,]+),\s*\{[^}]*\}\)/g,
+    replacement: 'this.#logger.warn($1)',
+    description: "Convierte this.#logger.log('warn', message, {}) a this.#logger.warn(message)"
+  },
+  {
+    name: "Revertir this.#logger.log genérico a métodos específicos - ERROR",
+    pattern: /this\.#logger\.log\(['"]error['"],\s*([^,]+),\s*\{[^}]*\}\)/g,
+    replacement: 'this.#logger.error($1)',
+    description: "Convierte this.#logger.log('error', message, {}) a this.#logger.error(message)"
+  },
+  {
+    name: "Revertir this.#logger.log genérico a métodos específicos - DEBUG",
+    pattern: /this\.#logger\.log\(['"]debug['"],\s*([^,]+),\s*\{[^}]*\}\)/g,
+    replacement: 'this.#logger.debug($1)',
+    description: "Convierte this.#logger.log('debug', message, {}) a this.#logger.debug(message)"
+  },
+  {
+    name: "Convertir this.#logger.log con nivel y options a métodos específicos - INFO",
+    pattern: /this\.#logger\.log\(['"]info['"],\s*([^,]+),\s*(\{[^}]*\})\)/g,
+    replacement: 'this.#logger.info($1, $2)',
+    description: "Convierte this.#logger.log('info', message, options) a this.#logger.info(message, options)"
+  },
+  {
+    name: "Convertir this.#logger.log con nivel y options a métodos específicos - WARN",
+    pattern: /this\.#logger\.log\(['"]warn['"],\s*([^,]+),\s*(\{[^}]*\})\)/g,
+    replacement: 'this.#logger.warn($1, $2)',
+    description: "Convierte this.#logger.log('warn', message, options) a this.#logger.warn(message, options)"
+  },
+  {
+    name: "Convertir this.#logger.log con nivel y options a métodos específicos - ERROR",
+    pattern: /this\.#logger\.log\(['"]error['"],\s*([^,]+),\s*(\{[^}]*\})\)/g,
+    replacement: 'this.#logger.error($1, $2)',
+    description: "Convierte this.#logger.log('error', message, options) a this.#logger.error(message, options)"
+  },
+  {
+    name: "Convertir this.#logger.log con nivel y options a métodos específicos - DEBUG",
+    pattern: /this\.#logger\.log\(['"]debug['"],\s*([^,]+),\s*(\{[^}]*\})\)/g,
+    replacement: 'this.#logger.debug($1, $2)',
+    description: "Convierte this.#logger.log('debug', message, options) a this.#logger.debug(message, options)"
+  },
+  {
     name: 'Corregir this.#logger(level, message) a this.#logger.log(level, message)',
     pattern: /this\.#logger\((['"`])([^'"`,]+)\1,\s*([^)]+)\)/g,
     replacement: 'this.#logger.log($1$2$1, $3)'
@@ -37,19 +85,9 @@ const LOGGER_FIXES = [
     replacement: 'this.#logger.log($1$2$1, $3, { data: $4 })'
   },
   {
-    name: 'Corregir logger.log(level, message) sin options',
-    pattern: /this\.#logger\.log\((['"`])([^'"`,]+)\1,\s*([^,)]+)\)(?!,)/g,
-    replacement: 'this.#logger.log($1$2$1, $3, {})'
-  },
-  {
     name: 'Corregir llamadas directas sin this.#logger',
     pattern: /(?<!this\.)#logger\.(info|warn|error|debug)\(/g,
     replacement: 'this.#logger.$1('
-  },
-  {
-    name: 'Corregir logger.info/warn/error/debug con componente',
-    pattern: /this\.#logger\.(info|warn|error|debug)\(([^,)]+),\s*\{\s*component:\s*([^}]+)\s*\}/g,
-    replacement: 'this.#logger.log("$1", $2, { component: $3 })'
   }
 ];
 

@@ -503,7 +503,7 @@ export class TorrentioApiService {
         // Filtrar por tamaño: solo menores a 9GB
         const sizeInGB = this.#convertSizeToGB(size);
         if (sizeInGB >= 9) {
-          this.#logger.log('debug', `Stream descartado por tamaño (${size}): ${fullName}`, { component: 'TorrentioApiService' });
+          this.#logger.log('debug', `Stream descartado por tamaño (${size}, {}): ${fullName}`, { component: 'TorrentioApiService' });
           continue;
         }
         
@@ -634,7 +634,7 @@ export class TorrentioApiService {
     const bestCandidate = sortedCandidates[0];
     
     if (config.enableSelectionLogging) {
-      this.#logger.log('info', `Mejor magnet seleccionado (estrategia: ${config.strategy}): ${bestCandidate.name} (${bestCandidate.quality}, ${bestCandidate.seeders || 0} seeders)`, { component: 'TorrentioApiService' });
+      this.#logger.log('info', `Mejor magnet seleccionado (estrategia: ${config.strategy}, {}): ${bestCandidate.name} (${bestCandidate.quality}, ${bestCandidate.seeders || 0} seeders)`, { component: 'TorrentioApiService' });
     }
     
     return [bestCandidate];
@@ -1067,7 +1067,7 @@ export class TorrentioApiService {
         appendFileSync(targetFilePath, csvLine + '\n', 'utf8');
       }
       
-      this.#logger.log('info', `Guardados ${newMagnets.length} magnets nuevos en ${fileName} (${magnets.length - newMagnets.length} duplicados omitidos)`, { component: 'TorrentioApiService' });
+      this.#logger.log('info', `Guardados ${newMagnets.length} magnets nuevos en ${fileName} (${magnets.length - newMagnets.length} duplicados omitidos, {})`, { component: 'TorrentioApiService' });
     } catch (error) {
       // Crear objeto de error detallado para debugging
       const fileError = {
@@ -1093,7 +1093,7 @@ export class TorrentioApiService {
       } else if (error.code === 'ENOENT') {
         this.#logger.log('warn', 'Archivo o directorio no encontrado. Continuando sin guardar.', { component: 'TorrentioApiService' });
       } else {
-        this.#logger.log('warn', `Error de sistema (${error.code}). Continuando sin guardar.`, { component: 'TorrentioApiService' });
+        this.#logger.log('warn', `Error de sistema (${error.code}, {}). Continuando sin guardar.`, { component: 'TorrentioApiService' });
       }
     }
   }

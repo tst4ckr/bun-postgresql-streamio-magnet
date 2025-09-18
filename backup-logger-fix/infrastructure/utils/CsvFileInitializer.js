@@ -27,7 +27,7 @@ export class CsvFileInitializer {
         // Crear directorio si no existe
         if (!existsSync(dataDirectory)) {
             mkdirSync(dataDirectory, { recursive: true });
-            this.#logger.info(`[CsvFileInitializer] Directorio creado: ${dataDirectory}`);
+            console.log(`[CsvFileInitializer] Directorio creado: ${dataDirectory}`);
         }
 
         csvFiles.forEach(filename => {
@@ -35,7 +35,7 @@ export class CsvFileInitializer {
             this.ensureCsvFileExists(filePath, filename);
         });
 
-        this.#logger.info('[CsvFileInitializer] Todos los archivos CSV han sido verificados/creados');
+        console.log('[CsvFileInitializer] Todos los archivos CSV han sido verificados/creados');
     }
 
     /**
@@ -53,9 +53,9 @@ export class CsvFileInitializer {
 
             // Crear archivo con cabeceras
             writeFileSync(filePath, this.CSV_HEADER + '\n', 'utf8');
-            this.#logger.info(`[CsvFileInitializer] Archivo creado: ${filename}`);
+            console.log(`[CsvFileInitializer] Archivo creado: ${filename}`);
         } else {
-            this.#logger.info(`[CsvFileInitializer] Archivo verificado: ${filename}`);
+            console.log(`[CsvFileInitializer] Archivo verificado: ${filename}`);
         }
     }
 
@@ -74,7 +74,7 @@ export class CsvFileInitializer {
             const firstLine = fs.readFileSync(filePath, 'utf8').split('\n')[0].trim();
             return firstLine === this.CSV_HEADER;
         } catch (error) {
-            this.#logger.error(`[CsvFileInitializer] Error validando formato de ${filePath}:`, error.message);
+            console.error(`[CsvFileInitializer] Error validando formato de ${filePath}:`, error.message);
             return false;
         }
     }
@@ -94,10 +94,10 @@ export class CsvFileInitializer {
             if (lines[0].trim() !== this.CSV_HEADER) {
                 lines[0] = this.CSV_HEADER;
                 fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
-                this.#logger.info(`[CsvFileInitializer] Formato reparado: ${filename}`);
+                console.log(`[CsvFileInitializer] Formato reparado: ${filename}`);
             }
         } catch (error) {
-            this.#logger.error(`[CsvFileInitializer] Error reparando ${filename}:`, error.message);
+            console.error(`[CsvFileInitializer] Error reparando ${filename}:`, error.message);
         }
     }
 }

@@ -179,9 +179,9 @@ async function main() {
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
     } else {
-      this.#logger.error('❌ Error fatal al iniciar el addon:', error.message || error);
+      console.error('❌ Error fatal al iniciar el addon:', error.message || error);
       if (process.env.NODE_ENV === 'development') {
-        this.#logger.error('Stack trace:', error.stack);
+        console.error('Stack trace:', error.stack);
       }
     }
     process.exit(1);

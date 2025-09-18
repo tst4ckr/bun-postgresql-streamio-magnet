@@ -152,7 +152,7 @@ export class EnhancedLogger {
     
     if (this.#shouldLog('info')) {
       const { formattedMessage, args: formattedArgs } = this.#formatMessage('info', message, args);
-      this.#logger.info(formattedMessage, ...formattedArgs);
+      console.log(formattedMessage, ...formattedArgs);
     }
   }
 
@@ -167,7 +167,7 @@ export class EnhancedLogger {
     
     if (this.#shouldLog('warn')) {
       const { formattedMessage, args: formattedArgs } = this.#formatMessage('warn', message, args);
-      this.#logger.warn(formattedMessage, ...formattedArgs);
+      console.warn(formattedMessage, ...formattedArgs);
     }
   }
 
@@ -179,7 +179,7 @@ export class EnhancedLogger {
   error(message, ...args) {
     if (this.#shouldLog('error')) {
       const { formattedMessage, args: formattedArgs } = this.#formatMessage('error', message, args);
-      this.#logger.error(formattedMessage, ...formattedArgs);
+      console.error(formattedMessage, ...formattedArgs);
     }
   }
 
@@ -194,7 +194,7 @@ export class EnhancedLogger {
     
     if (this.#shouldLog('debug')) {
       const { formattedMessage, args: formattedArgs } = this.#formatMessage('debug', message, args);
-      this.#logger.info(formattedMessage, ...formattedArgs);
+      console.log(formattedMessage, ...formattedArgs);
     }
   }
 
@@ -285,13 +285,13 @@ export class EnhancedLogger {
       
       if (this.#isProduction) {
         // En producción, usar JSON compacto
-        this.#logger.info(JSON.stringify(structuredData));
+        console.log(JSON.stringify(structuredData));
       } else {
         // En desarrollo, usar formato compacto en una línea
         const metadataStr = Object.entries(metadata)
           .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
           .join(' ');
-        this.#logger.info(`${formattedMessage} | ${metadataStr}`);
+        console.log(`${formattedMessage} | ${metadataStr}`);
       }
     }
   }

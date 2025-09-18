@@ -701,7 +701,7 @@ export class StreamHandler {
         this.#logger.error(formattedMessage);
         break;
       default:
-        this.#logger.info(formattedMessage);
+        this.#logger.log("info", formattedMessage, {});
     }
   }
 }
