@@ -40,17 +40,17 @@ const config = {
       {
         name: 'catalog',
         types: ['movie', 'series', 'anime', 'tv'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv:']
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
       },
       {
         name: 'meta',
         types: ['movie', 'series', 'anime', 'tv'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv:']
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
       },
       {
         name: 'stream',
         types: ['movie', 'series', 'anime', 'tv'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv:']
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
       }
     ],
     types: ['movie', 'series', 'anime', 'tv'],
@@ -73,7 +73,7 @@ const config = {
       {
         type: 'tv',
         id: 'tv_catalog',
-        name: 'Live TV'
+        name: 'TV Channels'
       }
     ],
     idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv:']

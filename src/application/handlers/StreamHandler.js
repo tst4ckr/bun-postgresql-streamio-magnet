@@ -138,7 +138,7 @@ export class StreamHandler {
       throw createError(
         `Tipo de contenido no soportado: ${type}`,
         ERROR_TYPES.VALIDATION,
-        { type, supportedTypes: ['movie', 'series', 'anime'] }
+        { type, supportedTypes: ['movie', 'series', 'anime', 'tv'] }
       );
     }
 
@@ -288,11 +288,11 @@ export class StreamHandler {
       );
     }
 
-    if (!['movie', 'series', 'anime'].includes(args.type)) {
+    if (!['movie', 'series', 'anime', 'tv'].includes(args.type)) {
       throw createError(
-        'Tipo de contenido debe ser movie, series o anime',
+        'Tipo de contenido debe ser movie, series, anime o tv',
         ERROR_TYPES.VALIDATION,
-        { type: args.type, supportedTypes: ['movie', 'series', 'anime'] }
+        { type: args.type, supportedTypes: ['movie', 'series', 'anime', 'tv'] }
       );
     }
     
@@ -365,7 +365,7 @@ export class StreamHandler {
    * @returns {boolean}
    */
   #isSupportedType(type) {
-    return ['movie', 'series', 'anime'].includes(type);
+    return ['movie', 'series', 'anime', 'tv'].includes(type);
   }
 
   /**

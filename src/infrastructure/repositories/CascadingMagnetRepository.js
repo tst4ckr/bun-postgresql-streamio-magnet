@@ -232,10 +232,10 @@ export class CascadingMagnetRepository extends MagnetRepository {
       });
     }
 
-    if (!['movie', 'series', 'anime'].includes(type)) {
-      throw new RepositoryError('Tipo de contenido debe ser movie, series o anime', {
-        provided: type,
-        validTypes: ['movie', 'series', 'anime']
+    if (!['movie', 'series', 'anime', 'tv'].includes(type)) {
+      throw new RepositoryError('Tipo de contenido debe ser movie, series, anime o tv', {
+        type,
+        validTypes: ['movie', 'series', 'anime', 'tv']
       });
     }
 
