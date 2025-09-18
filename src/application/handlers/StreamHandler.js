@@ -544,12 +544,16 @@ export class StreamHandler {
           description: streamDescription,
           infoHash: infoHash,
           sources: trackers.map(t => `tracker:${t}`),
-          type: type,
           behaviorHints: {
             bingeGroup: `magnet-${infoHash}`,
             countryWhitelist: ['US', 'GB', 'CA', 'AU', 'DE', 'FR', 'ES', 'IT', 'NL', 'SE', 'NO', 'DK', 'FI']
           }
         };
+
+        // Agregar fileIdx si está disponible
+        if (magnet.fileIdx !== undefined && magnet.fileIdx !== null) {
+          stream.fileIdx = magnet.fileIdx;
+        }
 
         // Agregar información adicional si está disponible
         if (magnet.seeders && magnet.seeders > 0) {
