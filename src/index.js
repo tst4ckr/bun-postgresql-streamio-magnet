@@ -191,10 +191,12 @@ class MagnetAddon {
       
       try {
         // Para canales de TV, buscar el canal real en el repositorio
-        if (args.type === 'tv' && this.#tvHandler) {
+        if (args.type === 'tv' && this.#tvHandler && this.#tvRepository) {
           // Mapear ID alternativo si es necesario (reutilizar lógica de TvHandler)
           const actualId = this.#mapAlternativeTvId(args.id);
-          const tv = await this.#tvRepository.getTvById(actualId);
+          
+          // Buscar el canal mediante el handler
+          const tv = await this.#tvHandler.getTvById(actualId);
           
           if (tv) {
             this.#logger.info(`TV channel found for meta: ${tv.name} (${actualId})`);

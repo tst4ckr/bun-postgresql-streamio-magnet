@@ -213,6 +213,18 @@ export class TvHandler {
   }
 
   /**
+   * Obtiene un canal de TV por su ID.
+   * @param {string} id - ID del canal
+   * @returns {Promise<Object|null>} Canal de TV o null si no existe
+   */
+  async getTvById(id) {
+    // Mapear IDs alternativos a IDs correctos
+    const actualId = this.#mapAlternativeId(id);
+    
+    return await this.#tvRepository.getTvById(actualId);
+  }
+
+  /**
    * Fuerza la recarga de canales de TV.
    * @returns {Promise<void>}
    */
