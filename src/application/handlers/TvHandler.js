@@ -26,22 +26,43 @@ export class TvHandler {
 
   /**
    * Crea el handler para el catálogo de TV.
+   * Responde a las solicitudes de catálogo, filtrando por género si se especifica.
    * @returns {Function} Handler para el catálogo de Stremio
    */
   createCatalogHandler() {
     return async (args) => {
-      this.#logger.info(`Catalog request for TV: ${args.id}`);
-      
+      this.#logger.info(`Request for TV catalog: id=${args.id}, extra=${JSON.stringify(args.extra)}`);
+
       try {
         const tvs = await this.#tvRepository.getAllTvs();
-        const metas = tvs.map(tv => tv.toStremioMeta());
-        
-        return { 
+        if (!tvs || tvs.length === 0) {
+          this.#logger.warn('No TV channels found in repository for catalog.');
+          return { metas: [] };
+        }
+
+        let metas;
+        const genre = args.extra ? args.extra.genre : null;
+
+        if (genre) {
+          this.#logger.info(`Filtering TV catalog for genre: "${genre}"`);
+          metas = tvs
+            .filter(tv => tv.group === genre)
+            .map(tv => tv.toStremioMeta());
+        } else {
+          this.#logger.info('Returning full TV catalog.');
+          metas = tvs.map(tv => tv.toStremioMeta());
+        }
+
+        if (metas.length === 0 && genre) {
+            this.#logger.warn(`No TV channels found for genre: "${genre}"`);
+        }
+
+        return {
           metas,
-          cacheMaxAge: this.#config.cache.tvCatalogMaxAge 
+          cacheMaxAge: this.#config.cache.tvCatalogMaxAge
         };
       } catch (error) {
-        this.#logger.error('Error fetching TV catalog', { error: error.message, args });
+        this.#logger.error('Error fetching TV catalog', { error: error.message, stack: error.stack, args });
         return { metas: [] };
       }
     };
@@ -53,24 +74,25 @@ export class TvHandler {
    */
   createMetaHandler() {
     return async (args) => {
-      this.#logger.info(`Meta request for TV: ${args.id}`);
-      
+      this.#logger.info(`Request for TV meta: id=${args.id}`);
+
       try {
         const tv = await this.#tvRepository.getTvById(args.id);
         if (!tv) {
-          this.#logger.warn(`TV channel not found: ${args.id}`);
-          return { meta: {} };
+          this.#logger.warn(`TV channel not found for meta request: ${args.id}`);
+          return Promise.reject(new Error(`TV channel not found: ${args.id}`));
         }
-        
+
         const meta = tv.toStremioMeta();
-        
-        return { 
+        this.#logger.info(`Found meta for TV channel: ${tv.name}`);
+
+        return {
           meta,
           cacheMaxAge: this.#config.cache.metadataCacheMaxAge
         };
       } catch (error) {
-        this.#logger.error('Error fetching TV meta', { error: error.message, args });
-        return { meta: {} };
+        this.#logger.error('Error fetching TV meta', { error: error.message, stack: error.stack, args });
+        return Promise.reject(error);
       }
     };
   }
@@ -81,23 +103,24 @@ export class TvHandler {
    */
   createStreamHandler() {
     return async (args) => {
-      this.#logger.info(`Stream request for TV: ${args.id}`);
-      
+      this.#logger.info(`Request for TV stream: id=${args.id}`);
+
       try {
         const tv = await this.#tvRepository.getTvById(args.id);
         if (!tv) {
-          this.#logger.warn(`TV channel not found for stream: ${args.id}`);
+          this.#logger.warn(`TV channel not found for stream request: ${args.id}`);
           return { streams: [] };
         }
-        
+
         const stream = tv.toStremioStream();
-        
-        return { 
+        this.#logger.info(`Found stream for TV channel: ${tv.name}`);
+
+        return {
           streams: [stream],
           cacheMaxAge: this.#config.cache.tvCacheMaxAge
         };
       } catch (error) {
-        this.#logger.error('Error fetching TV stream', { error: error.message, args });
+        this.#logger.error('Error fetching TV stream', { error: error.message, stack: error.stack, args });
         return { streams: [] };
       }
     };
