@@ -145,7 +145,7 @@ export class TorService {
 
       // Manejar error 502 con rotación de sesión
       if (response.status === 502 && attempt < this.#maxRetries) {
-        this.#logger.log('warn', `Error 502 detectado, rotando sesión Tor e intentando nuevamente (${attempt}/${this.#maxRetries})`, { component: 'TorService' });
+        this.#logger.warn(`Error 502 detectado, rotando sesión Tor e intentando nuevamente (${attempt}/${this.#maxRetries})`, { component: 'TorService' });
         await this.rotateSession();
         await this.#delay(this.#retryDelay);
         return this.fetch(url, attempt + 1);
@@ -164,7 +164,7 @@ export class TorService {
       }
       
       if (attempt < this.#maxRetries && (error.code === 'ETIMEDOUT' || error.message.includes('Timeout'))) {
-        this.#logger.log('warn', `Error de conexión, rotando sesión Tor e intentando nuevamente (${attempt}/${this.#maxRetries}): ${error.message}`, { component: 'TorService' });
+        this.#logger.warn(`Error de conexión, rotando sesión Tor e intentando nuevamente (${attempt}/${this.#maxRetries}): ${error.message}`, { component: 'TorService' });
         await this.rotateSession();
         await this.#delay(this.#retryDelay);
         return this.fetch(url, attempt + 1);
@@ -221,7 +221,7 @@ export class TorService {
    */
   #startAutoRotation() {
     if (!this.#enabled) {
-      this.#logger.log('debug', 'Tor no está habilitado, omitiendo rotación automática', { component: 'TorService' });
+      this.#logger.debug('Tor no está habilitado, omitiendo rotación automática', { component: 'TorService' });
       return;
     }
 
@@ -231,7 +231,7 @@ export class TorService {
         await this.rotateSession();
         this.#logger.info('Rotación automática de circuitos Tor completada');
       } catch (error) {
-        this.#logger.log('error', 'Error en rotación automática de Tor:', error, { component: 'TorService' });
+        this.#logger.error('Error en rotación automática de Tor:', error, { component: 'TorService' });
       }
     }, 300000);
 

@@ -26,6 +26,38 @@ const CONFIG = {
  * Patrones de corrección para llamadas de logger
  */
 const LOGGER_FIXES = [
+  // Patrones más amplios que capturan múltiples parámetros incluyendo saltos de línea
+  {
+    name: "Convertir this.#logger.log('debug', ...) a this.#logger.debug(...) - Múltiples líneas",
+    pattern: /this\.#logger\.log\(['"]debug['"],\s*([\s\S]*?)\);/g,
+    replacement: 'this.#logger.debug($1);',
+    description: "Convierte this.#logger.log('debug', ...) a this.#logger.debug(...) incluyendo múltiples líneas"
+  },
+  {
+    name: "Convertir this.#logger.log('info', ...) a this.#logger.info(...) - Múltiples parámetros",
+    pattern: /this\.#logger\.log\(['"]info['"],\s*(.+?)\)/g,
+    replacement: 'this.#logger.info($1)',
+    description: "Convierte this.#logger.log('info', ...) a this.#logger.info(...) con cualquier número de parámetros"
+  },
+  {
+    name: "Convertir this.#logger.log('warn', ...) a this.#logger.warn(...) - Múltiples parámetros",
+    pattern: /this\.#logger\.log\(['"]warn['"],\s*(.+?)\)/g,
+    replacement: 'this.#logger.warn($1)',
+    description: "Convierte this.#logger.log('warn', ...) a this.#logger.warn(...) con cualquier número de parámetros"
+  },
+  {
+    name: "Convertir this.#logger.log('error', ...) a this.#logger.error(...) - Múltiples parámetros",
+    pattern: /this\.#logger\.log\(['"]error['"],\s*(.+?)\)/g,
+    replacement: 'this.#logger.error($1)',
+    description: "Convierte this.#logger.log('error', ...) a this.#logger.error(...) con cualquier número de parámetros"
+  },
+  {
+    name: "Convertir this.#logger.log('debug', ...) a this.#logger.debug(...) - Múltiples parámetros",
+    pattern: /this\.#logger\.log\(['"]debug['"],\s*(.+?)\)/g,
+    replacement: 'this.#logger.debug($1)',
+    description: "Convierte this.#logger.log('debug', ...) a this.#logger.debug(...) con cualquier número de parámetros"
+  },
+  // Patrones específicos para casos simples (mantener para compatibilidad)
   {
     name: "Revertir this.#logger.log genérico a métodos específicos - INFO",
     pattern: /this\.#logger\.log\(['"]info['"],\s*([^,]+),\s*\{[^}]*\}\)/g,

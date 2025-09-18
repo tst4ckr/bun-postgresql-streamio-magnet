@@ -43,7 +43,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       // Fallback a console si no hay logger disponible
       const timestamp = new Date().toISOString();
       const formattedMessage = `[${level.toUpperCase()}] ${timestamp} [CascadingMagnetRepository] - ${message}`;
-      console[level] ? console[level](formattedMessage) : console.log(formattedMessage);
+      console[level] ? console[level](formattedMessage) : this.#logger.info(formattedMessage);
       return;
     }
 
@@ -57,7 +57,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
     // Fallback final
     const timestamp = new Date().toISOString();
     const formattedMessage = `[${level.toUpperCase()}] ${timestamp} [CascadingMagnetRepository] - ${message}`;
-    console[level] ? console[level](formattedMessage) : console.log(formattedMessage);
+    console[level] ? console[level](formattedMessage) : this.#logger.info(formattedMessage);
   }
 
   /**

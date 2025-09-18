@@ -130,7 +130,7 @@ export class TorrentioApiService {
       
       // Detectar tipo automáticamente si es necesario
       detectedType = type === 'auto' ? this.#detectContentType(baseContentId, finalSeason, finalEpisode) : type;
-      this.#logger.log('info', `Buscando magnets en API Torrentio para: ${contentId} (tipo: ${detectedType}, season: ${finalSeason}, episode: ${finalEpisode})`, { component: 'TorrentioApiService' });
+      this.#logger.info(`Buscando magnets en API Torrentio para: ${contentId} (tipo: ${detectedType}, season: ${finalSeason}, episode: ${finalEpisode})`, { component: 'TorrentioApiService' });
       
       // Procesar el ID para obtener el formato correcto para Torrentio
       const { finalContentId } = this.#processContentId(baseContentId);
@@ -446,7 +446,7 @@ export class TorrentioApiService {
         throw new Error('No se pudo aplicar la configuración temporal');
       }
 
-      this.#logger.log('debug', `Usando configuración temporal:`, { 
+      this.#logger.debug(`Usando configuración temporal:`, { 
         component: 'TorrentioApiService',
         data: {
           type,
@@ -461,7 +461,7 @@ export class TorrentioApiService {
       return results;
 
     } catch (error) {
-      this.#logger.log('error', `Error en búsqueda con configuración de idioma:`, error, { component: 'TorrentioApiService' });
+      this.#logger.error(`Error en búsqueda con configuración de idioma:`, error, { component: 'TorrentioApiService' });
       throw error;
     } finally {
       // Siempre restaurar configuración original
@@ -1022,7 +1022,7 @@ export class TorrentioApiService {
     
     // Si no hay ruta de archivo especificada, omitir el guardado
     if (!targetFilePath || targetFilePath.trim() === '') {
-      this.#logger.log('debug', `No se especificó ruta para archivo ${fileName}, omitiendo guardado`, { component: 'TorrentioApiService' });
+      this.#logger.debug(`No se especificó ruta para archivo ${fileName}, omitiendo guardado`, { component: 'TorrentioApiService' });
       return;
     }
     
@@ -1030,7 +1030,7 @@ export class TorrentioApiService {
       // Verificar permisos de escritura antes de intentar escribir
       const fileDir = dirname(targetFilePath);
       if (!existsSync(fileDir)) {
-        this.#logger.log('warn', `Directorio ${fileDir} no existe, creando...`, { component: 'TorrentioApiService' });
+        this.#logger.warn(`Directorio ${fileDir} no existe, creando...`, { component: 'TorrentioApiService' });
         mkdirSync(fileDir, { recursive: true });
       }
       
@@ -1058,7 +1058,7 @@ export class TorrentioApiService {
       });
       
       if (newMagnets.length === 0) {
-        this.#logger.log('debug', `Todos los magnets ya existen en ${fileName}, omitiendo guardado`, { component: 'TorrentioApiService' });
+        this.#logger.debug(`Todos los magnets ya existen en ${fileName}, omitiendo guardado`, { component: 'TorrentioApiService' });
         return;
       }
       
@@ -1581,7 +1581,7 @@ export class TorrentioApiService {
     const validLanguages = ['spanish', 'latino', 'english', 'french', 'portuguese', 'russian', 'japanese', 'korean', 'chinese', 'german', 'italian', 'dutch'];
     
     if (!validLanguages.includes(language.toLowerCase())) {
-      this.#logger.log('warn', `Idioma no válido: ${language}. Idiomas soportados: ${validLanguages.join(', ')}`, { component: 'TorrentioApiService' });
+      this.#logger.warn(`Idioma no válido: ${language}. Idiomas soportados: ${validLanguages.join(', ')}`, { component: 'TorrentioApiService' });
       return;
     }
     
@@ -1637,7 +1637,7 @@ export class TorrentioApiService {
   #ensureTorrentioFileExists() {
     // Si no hay ruta de archivo especificada, omitir la creación del archivo
     if (!this.#torrentioFilePath || this.#torrentioFilePath.trim() === '') {
-      this.#logger.log('debug', 'No se especificó ruta para archivo torrentio.csv, omitiendo creación', { component: 'TorrentioApiService' });
+      this.#logger.debug('No se especificó ruta para archivo torrentio.csv, omitiendo creación', { component: 'TorrentioApiService' });
       return;
     }
     
@@ -1730,7 +1730,7 @@ export class TorrentioApiService {
       return await this.#torService.fetch(url);
     } catch (error) {
       if (error.message.includes('Tor no está disponible') || error.message.includes('Tor no está ejecutándose')) {
-        this.#logger.log('warn', `${error.message}, usando fallback sin proxy`, { component: 'TorrentioApiService' });
+        this.#logger.warn(`${error.message}, usando fallback sin proxy`, { component: 'TorrentioApiService' });
         return this.#fetchWithTimeout(url);
       }
       throw error;
