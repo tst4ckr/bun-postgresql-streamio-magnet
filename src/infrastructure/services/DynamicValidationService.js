@@ -224,13 +224,28 @@ export class DynamicValidationService {
       };
     }
 
-    if (context === 'stream_request' && rules.requiredPrefix && !contentId.includes(':')) {
-      return {
-        isValid: false,
-        error: `ID debe incluir prefijo de servicio para ${idType} (ej: mal:12345)`,
-        context,
-        idType
-      };
+    if (context === 'stream_request' && rules.requiredPrefix) {
+      // Para IMDb, el prefijo es 'tt' (no requiere ':')
+      if (idType === 'imdb' || idType === 'imdb_series') {
+        if (!contentId.startsWith(rules.requiredPrefix)) {
+          return {
+            isValid: false,
+            error: `ID debe incluir prefijo ${rules.requiredPrefix} para ${idType} (ej: tt1234567)`,
+            context,
+            idType
+          };
+        }
+      } else {
+        // Para otros servicios, verificar prefijo con ':'
+        if (!contentId.includes(':')) {
+          return {
+            isValid: false,
+            error: `ID debe incluir prefijo de servicio para ${idType} (ej: mal:12345)`,
+            context,
+            idType
+          };
+        }
+      }
     }
 
     return { isValid: true };
@@ -736,7 +751,7 @@ export class DynamicValidationService {
 }
 
 // Instancia singleton
-export const dynamicValidationService = new DynamicValidationService(
+export const dynamicValidationService = new DynamicValidationService({
   idDetectorService,
   unifiedIdService
-);
+});

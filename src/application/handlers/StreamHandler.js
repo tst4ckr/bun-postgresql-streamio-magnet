@@ -301,13 +301,12 @@ export class StreamHandler {
 
     // Usar validación dinámica para verificar el ID
     const validationResult = await safeExecute(
-      () => this.#validationService.validateContentId(
+      () => this.#validationService.validateId(
         args.id, 
-        'stream_request',
-        { strictMode: false }
+        'stream_request'
       ),
       { 
-        operation: 'validation.validateContentId',
+        operation: 'validation.validateId',
         contentId: args.id,
         type: args.type
       }
