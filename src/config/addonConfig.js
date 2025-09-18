@@ -40,17 +40,41 @@ const config = {
       {
         name: 'catalog',
         types: ['movie', 'series', 'anime'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:'],
+        // Aprovechar configuración de cascada para catálogos
+        cascadeEnabled: true
       },
       {
         name: 'meta',
         types: ['movie', 'series', 'anime'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:'],
+        // Usar metadatos específicos por tipo
+        typeSpecific: {
+          movie: { providers: ['tmdb', 'imdb'] },
+          series: { providers: ['tmdb', 'tvdb'] },
+          anime: { providers: ['mal', 'kitsu', 'anilist', 'anidb'] }
+        }
       },
       {
         name: 'stream',
         types: ['movie', 'series', 'anime'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:'],
+        // Aprovechar configuración de torrentio por tipo
+        typeSpecific: {
+          movie: { 
+            providers: process.env.TORRENTIO_MOVIE_PROVIDERS || CONSTANTS.PROVIDER.MOVIE_PROVIDERS.SPANISH,
+            qualityFilter: process.env.TORRENTIO_MOVIE_QUALITY_FILTER || CONSTANTS.QUALITY.DEFAULT_MOVIE_QUALITY_FILTER
+          },
+          series: { 
+            providers: process.env.TORRENTIO_SERIES_PROVIDERS || CONSTANTS.PROVIDER.SERIES_PROVIDERS.SPANISH,
+            qualityFilter: process.env.TORRENTIO_SERIES_QUALITY_FILTER || CONSTANTS.QUALITY.DEFAULT_SERIES_QUALITY_FILTER
+          },
+          anime: { 
+            providers: process.env.TORRENTIO_ANIME_PROVIDERS || CONSTANTS.PROVIDER.ANIME_PROVIDERS.DEFAULT,
+            qualityFilter: process.env.TORRENTIO_ANIME_QUALITY_FILTER || CONSTANTS.QUALITY.DEFAULT_ANIME_QUALITY_FILTER,
+            enableSubtitles: process.env.TORRENTIO_ANIME_SUBTITLES === 'true' || true
+          }
+        }
       }
     ],
     types: ['movie', 'series', 'anime'],
@@ -272,7 +296,17 @@ function generateManifest() {
   const uniqueTypes = [...new Set(config.addon.resources.flatMap(r => r.types))];
   const uniqueIdPrefixes = [...new Set(config.addon.resources.flatMap(r => r.idPrefixes))];
 
-  // Generar manifest optimizado sin duplicaciones
+  // Optimizar catálogos con configuración avanzada
+  const optimizedCatalogs = config.addon.catalogs.map(catalog => ({
+    ...catalog,
+    extra: [
+      { name: 'search', isRequired: false },
+      { name: 'skip', isRequired: false },
+      { name: 'genre', isRequired: false, options: ['action', 'comedy', 'drama', 'horror', 'sci-fi', 'anime'] }
+    ]
+  }));
+
+  // Generar manifest optimizado aprovechando configuración existente
   const manifest = {
     id: config.addon.id,
     version: config.addon.version,
@@ -282,13 +316,53 @@ function generateManifest() {
     background: config.addon.background,
     resources: config.addon.resources,
     types: uniqueTypes,
-    catalogs: config.addon.catalogs,
+    catalogs: optimizedCatalogs,
     idPrefixes: uniqueIdPrefixes,
     behaviorHints: {
-      configurable: false,
+      configurable: process.env.ADDON_CONFIGURABLE === 'true' || false,
       configurationRequired: false,
-      adult: false,
-      p2p: true
+      adult: process.env.ADDON_ADULT_CONTENT === 'true' || false,
+      p2p: true,
+      // Aprovechar configuración de cache existente
+      cacheMaxAge: config.cache.streamCacheMaxAge,
+      // Indicar soporte para búsqueda avanzada
+      searchable: true,
+      // Aprovechar sistema de cascada
+      cascadeSearch: config.cascadeSearch.enabled
+    },
+    // Metadatos adicionales aprovechando configuración existente
+    contactEmail: process.env.ADDON_CONTACT_EMAIL || undefined,
+    // Configuración de rendimiento basada en configuración existente
+    performance: {
+      torEnabled: config.tor.enabled,
+      cascadeSearchEnabled: config.cascadeSearch.enabled,
+      maxRetries: config.cascadeSearch.maxRetries,
+      timeout: config.cascadeSearch.timeout,
+      cacheStrategy: {
+        streams: config.cache.streamCacheMaxAge,
+        metadata: config.cache.metadataCacheMaxAge,
+        anime: config.cache.animeCacheMaxAge
+      }
+    },
+    // Configuración de proveedores por tipo
+    providerConfig: {
+      movie: {
+        providers: config.torrentio.movie.providers,
+        qualityFilter: config.torrentio.movie.qualityFilter,
+        language: config.torrentio.movie.priorityLanguage
+      },
+      series: {
+        providers: config.torrentio.series.providers,
+        qualityFilter: config.torrentio.series.qualityFilter,
+        language: config.torrentio.series.priorityLanguage
+      },
+      anime: {
+        providers: config.torrentio.anime.providers,
+        qualityFilter: config.torrentio.anime.qualityFilter,
+        language: config.torrentio.anime.priorityLanguage,
+        subtitles: config.torrentio.anime.enableSubtitles,
+        fansubs: config.torrentio.anime.preferredFansubs
+      }
     }
   };
 
