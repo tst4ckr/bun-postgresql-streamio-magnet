@@ -4,7 +4,6 @@
  */
 
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
-import { cacheService } from './CacheService.js';
 
 export class CacheOptimizer {
   constructor() {
@@ -540,18 +539,20 @@ export class CacheOptimizer {
    */
   #adaptOptimizationRules() {
     try {
-      const cacheStats = cacheService.getStats();
-      const hitRate = parseFloat(cacheStats.hitRate) / 100;
+      // Adaptar reglas basándose en métricas internas
+      const totalPatterns = this.patterns.size;
+      const totalHistory = this.accessHistory.size;
       
-      // Ajustar umbrales basándose en rendimiento
-      if (hitRate < 0.3) {
+      // Ajustar umbrales basándose en actividad
+      if (totalPatterns < 10) {
         this.config.minPatternConfidence = Math.max(0.5, this.config.minPatternConfidence - 0.05);
-      } else if (hitRate > 0.8) {
+      } else if (totalPatterns > 100) {
         this.config.minPatternConfidence = Math.min(0.9, this.config.minPatternConfidence + 0.02);
       }
       
       this.logger.debug('Reglas de optimización adaptadas', {
-        hitRate,
+        totalPatterns,
+        totalHistory,
         newConfidenceThreshold: this.config.minPatternConfidence
       });
     } catch (error) {
