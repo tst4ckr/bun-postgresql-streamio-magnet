@@ -3,7 +3,8 @@
  * Configura e inicia el servidor del addon de Stremio.
  */
 
-import { addonBuilder, serveHTTP } from 'stremio-addon-sdk';
+import { addonBuilder, getRouter } from 'stremio-addon-sdk';
+import express from 'express';
 import { addonConfig, manifest } from './config/addonConfig.js';
 import { CascadingMagnetRepository } from './infrastructure/repositories/CascadingMagnetRepository.js';
 import { StreamHandler } from './application/handlers/StreamHandler.js';
@@ -133,11 +134,34 @@ class MagnetAddon {
     const { port } = this.#config.server;
     this.#logger.info(`Iniciando servidor en el puerto ${port}...`);
 
-    serveHTTP(this.#addonBuilder.getInterface(), { port });
-
-    const baseUrl = `http://127.0.0.1:${port}`;
-    this.#logger.info(`✅ Addon iniciado en: ${baseUrl}`);
-    this.#logger.info(`🔗 Manifiesto: ${baseUrl}/manifest.json`);
+    // Crear aplicación Express
+    const app = express();
+    
+    // Configurar CORS para todos los orígenes (requerido por Stremio)
+    app.use((req, res, next) => {
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      
+      // Responder a preflight requests
+      if (req.method === 'OPTIONS') {
+        res.sendStatus(200);
+        return;
+      }
+      
+      next();
+    });
+    
+    // Usar el router del SDK de Stremio
+    const router = getRouter(this.#addonBuilder.getInterface());
+    app.use('/', router);
+    
+    // Iniciar servidor
+    app.listen(port, () => {
+      const baseUrl = `http://127.0.0.1:${port}`;
+      this.#logger.info(`✅ Addon iniciado en: ${baseUrl}`);
+      this.#logger.info(`🔗 Manifiesto: ${baseUrl}/manifest.json`);
+    });
   }
 
   /**
