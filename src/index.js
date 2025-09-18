@@ -173,17 +173,19 @@ async function main() {
     const addon = new MagnetAddon();
     await addon.start();
   } catch (error) {
-    if (logger) {
-      logger.error('❌ Error fatal al iniciar el addon', {
-        error: error.message || error,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    // Asegurar que siempre usemos EnhancedLogger
+    if (!logger) {
+      logger = new EnhancedLogger('error', false, {
+        errorOnly: true,
+        minimalOutput: true
       });
-    } else {
-      this.#logger.error('❌ Error fatal al iniciar el addon:', error.message || error);
-      if (process.env.NODE_ENV === 'development') {
-        this.#logger.error('Stack trace:', error.stack);
-      }
     }
+    
+    logger.error('❌ Error fatal al iniciar el addon', {
+      error: error.message || error,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+    
     process.exit(1);
   }
 }
