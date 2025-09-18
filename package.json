@@ -36,7 +36,6 @@
   "dependencies": {
     "csv-parser": "^3.2.0",
     "dotenv": "^17.2.1",
-    "express": "^5.1.0",
     "kitsu": "^11.1.0",
     "knex-stringcase": "^1.4.6",
     "parse-magnet-uri": "^4.0.0",

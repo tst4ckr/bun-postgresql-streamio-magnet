@@ -3,8 +3,7 @@
  * Configura e inicia el servidor del addon de Stremio.
  */
 
-import { addonBuilder, getRouter } from 'stremio-addon-sdk';
-import express from 'express';
+import { addonBuilder, serveHTTP } from 'stremio-addon-sdk';
 import { addonConfig, manifest } from './config/addonConfig.js';
 import { CascadingMagnetRepository } from './infrastructure/repositories/CascadingMagnetRepository.js';
 import { StreamHandler } from './application/handlers/StreamHandler.js';
@@ -126,7 +125,7 @@ class MagnetAddon {
   }
 
   /**
-   * Inicia el servidor HTTP del addon.
+   * Inicia el servidor HTTP del addon usando serveHTTP nativo del SDK.
    */
   async start() {
     await this.initialize();
@@ -134,34 +133,22 @@ class MagnetAddon {
     const { port } = this.#config.server;
     this.#logger.info(`Iniciando servidor en el puerto ${port}...`);
 
-    // Crear aplicación Express
-    const app = express();
+    // Usar serveHTTP nativo del SDK de Stremio
+    // Incluye CORS automático y optimizaciones para addons
+    const addonInterface = this.#addonBuilder.getInterface();
     
-    // Configurar CORS para todos los orígenes (requerido por Stremio)
-    app.use((req, res, next) => {
-      res.header('Access-Control-Allow-Origin', '*');
-      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      
-      // Responder a preflight requests
-      if (req.method === 'OPTIONS') {
-        res.sendStatus(200);
-        return;
-      }
-      
-      next();
-    });
+    const serverOptions = {
+      port: port,
+      cacheMaxAge: this.#config.cache?.metadataCacheMaxAge || 3600 // 1 hora por defecto
+    };
+
+    // Iniciar servidor con serveHTTP nativo
+    serveHTTP(addonInterface, serverOptions);
     
-    // Usar el router del SDK de Stremio
-    const router = getRouter(this.#addonBuilder.getInterface());
-    app.use('/', router);
-    
-    // Iniciar servidor
-    app.listen(port, () => {
-      const baseUrl = `http://127.0.0.1:${port}`;
-      this.#logger.info(`✅ Addon iniciado en: ${baseUrl}`);
-      this.#logger.info(`🔗 Manifiesto: ${baseUrl}/manifest.json`);
-    });
+    const baseUrl = `http://127.0.0.1:${port}`;
+    this.#logger.info(`✅ Addon iniciado en: ${baseUrl}`);
+    this.#logger.info(`🔗 Manifiesto: ${baseUrl}/manifest.json`);
+    this.#logger.info(`🚀 Servidor optimizado con SDK nativo de Stremio`);
   }
 
   /**
