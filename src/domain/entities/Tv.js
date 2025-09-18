@@ -128,16 +128,22 @@ export class Tv {
    * @returns {Object} Stream en formato Stremio
    */
   toStremioStream() {
+    // Determinar si el stream necesita el servidor local de Stremio
+    const isHlsStream = this.#streamUrl.includes('.m3u8');
+    
     return {
       name: `📺 ${this.#name}`,
       description: `Canal en vivo: ${this.#name}${this.#group ? ` (${this.#group})` : ''}`,
       url: this.#streamUrl,
       behaviorHints: {
-        notWebReady: false,
+        // Para streams HLS, usar el servidor local de Stremio para mejor compatibilidad
+        notWebReady: isHlsStream,
         bingeGroup: `tv-${this.#group}`,
-        countryWhitelist: ['ES', 'AD'],
+        // Remover restricciones geográficas para permitir acceso global
         proxyHeaders: {
-          request: {},
+          request: {
+            'User-Agent': 'Stremio/4.4.0'
+          },
           response: {}
         }
       }
