@@ -17,10 +17,12 @@ export class DynamicValidationService {
     this.config = config;
     
     this.validationRules = this.#initializeValidationRules();
+    this.validationContexts = this.#initializeValidationContexts();
     
     this.logger.info('DynamicValidationService inicializado', {
       rulesCount: this.validationRules.size,
-      contexts: Array.from(this.validationRules.keys())
+      contextsCount: this.validationContexts.size,
+      contexts: Array.from(this.validationContexts.keys())
     });
   }
 
@@ -108,9 +110,11 @@ export class DynamicValidationService {
         ]
       }]
     ]);
-    
+  }
+
+  #initializeValidationContexts() {
     // Contextos de validación
-    this.validationContexts = new Map([
+    return new Map([
       ['stream_request', {
         description: 'Validación para peticiones de stream',
         requiredTypes: ['imdb', 'imdb_series', 'kitsu', 'kitsu_series', 'mal', 'mal_series', 'anilist', 'anilist_series', 'anidb', 'anidb_series'],
