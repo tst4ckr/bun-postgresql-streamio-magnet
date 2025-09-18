@@ -737,7 +737,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       }
     } catch (error) {
       stats.primary.status = 'error';
-      this.#logger('error', 'Error obteniendo estadísticas del repositorio principal:', error.message);
+      this.#logger.log('error', 'Error obteniendo estadísticas del repositorio principal:', error.message, { component: 'CascadingMagnetRepository' });
     }
     
     try {
@@ -750,7 +750,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       }
     } catch (error) {
       stats.secondary.status = 'error';
-      this.#logger('error', 'Error obteniendo estadísticas del repositorio secundario:', error.message);
+      this.#logger.log('error', 'Error obteniendo estadísticas del repositorio secundario:', error.message, { component: 'CascadingMagnetRepository' });
     }
     
     try {
@@ -763,7 +763,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       }
     } catch (error) {
       stats.anime.status = 'error';
-      this.#logger('error', 'Error obteniendo estadísticas del repositorio de anime:', error.message);
+      this.#logger.log('error', 'Error obteniendo estadísticas del repositorio de anime:', error.message, { component: 'CascadingMagnetRepository' });
     }
     
     return stats;
@@ -899,7 +899,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
    * @returns {Promise<Array>} Array de magnets encontrados
    */
   async #fallbackSearch(contentId, type) {
-    this.#logger('info', `Ejecutando búsqueda de fallback para ${contentId}`);
+    this.#logger.log('info', `Ejecutando búsqueda de fallback para ${contentId}`, { component: 'CascadingMagnetRepository' });
     
     try {
       // Detectar tipo de ID y aplicar estrategia específica
@@ -929,7 +929,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       searchResults.forEach((result, index) => {
         if (result.status === 'rejected') {
           const sources = ['magnets.csv', 'torrentio.csv', 'anime.csv'];
-          this.#logger('warn', `Error en fallback de ${sources[index]} para ${contentId}:`, result.reason?.message);
+          this.#logger.log('warn', `Error en fallback de ${sources[index]} para ${contentId}:`, result.reason?.message, { component: 'CascadingMagnetRepository' });
         }
       });
     
@@ -941,16 +941,16 @@ export class CascadingMagnetRepository extends MagnetRepository {
     }, type, contentId);
     
     if (finalResults.length > 0) {
-      this.#logger('info', `Encontrados ${finalResults.length} magnets en búsqueda de fallback para ${contentId}`);
+      this.#logger.log('info', `Encontrados ${finalResults.length} magnets en búsqueda de fallback para ${contentId}`, { component: 'CascadingMagnetRepository' });
       return finalResults;
     }
     
     // Paso final: Buscar en API de Torrentio con fallback de idioma
-    this.#logger('info', `Consultando API Torrentio con fallback de idioma para ${contentId} (${type})`);
+    this.#logger.log('info', `Consultando API Torrentio con fallback de idioma para ${contentId} (${type})`, { component: 'CascadingMagnetRepository' });
     const apiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFallback(contentId, type);
     
     if (apiResults.length > 0) {
-      this.#logger('info', `Encontrados ${apiResults.length} magnets en API Torrentio (fallback con idioma) para ${contentId}`);
+      this.#logger.log('info', `Encontrados ${apiResults.length} magnets en API Torrentio (fallback con idioma) para ${contentId}`, { component: 'CascadingMagnetRepository' });
       await this.#reinitializeSecondaryRepository();
       return apiResults;
     }
@@ -968,7 +968,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
         operation: 'fallback_search'
       };
       
-      this.#logger('error', 'Error crítico en búsqueda de fallback:', fallbackError);
+      this.#logger.log('error', 'Error crítico en búsqueda de fallback:', fallbackError, { component: 'CascadingMagnetRepository' });
       throw new RepositoryError(`Fallback search failed for ${contentId}`, { cause: error, contentId, type });
     }
   }
