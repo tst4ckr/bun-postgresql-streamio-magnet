@@ -98,7 +98,7 @@ export class Tv {
    */
   toStremioMeta() {
     return {
-      id: `tv_${this.#id}`,
+      id: this.#id,
       type: 'tv',
       name: this.#name,
       poster: this.#logo,
@@ -196,6 +196,6 @@ export class Tv {
   static generateId(name, group = 'General') {
     const cleanName = name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
     const cleanGroup = group.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-    return `ch_${cleanGroup}_${cleanName}`;
+    return `tv_ch_${cleanGroup}_${cleanName}`;
   }
 }

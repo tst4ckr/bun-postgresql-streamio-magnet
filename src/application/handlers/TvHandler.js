@@ -157,9 +157,8 @@ export class TvHandler {
       return cached;
     }
 
-    // Buscar el canal por ID (quitar prefijo tv_ si existe)
-    const cleanId = id.startsWith('tv_') ? id.substring(3) : id;
-    const tv = await this.#tvRepository.getTvById(cleanId);
+    // Buscar el canal por ID (usar el ID completo tal como se almacena)
+    const tv = await this.#tvRepository.getTvById(id);
     
     if (!tv) {
       this.#logger.warn(`Tv not found: ${id}`);
