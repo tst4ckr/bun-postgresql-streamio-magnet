@@ -277,7 +277,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
     }
     
     const startTime = Date.now();
-    this.#logger.log('info', `Búsqueda en cascada iniciada para content ID: ${contentId} (${type}, {})`, { component: 'CascadingMagnetRepository' });
+    this.#logger.log('info', `Búsqueda en cascada iniciada para content ID: ${contentId} (${type})`, { component: 'CascadingMagnetRepository' });
     
     // Verificar cache primero
     const cacheKey = cacheService.generateMagnetCacheKey(contentId, type, options);
@@ -450,7 +450,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       
       // No se encontraron magnets en ninguna fuente
       const duration = Date.now() - startTime;
-      this.#logger.log('warn', `No se encontraron magnets para ${contentId} en ninguna fuente (${duration}ms, {})`, { component: 'CascadingMagnetRepository' });
+      this.#logger.log('warn', `No se encontraron magnets para ${contentId} en ninguna fuente (${duration}ms)`, { component: 'CascadingMagnetRepository' });
       
       // Cachear resultado vacío con TTL corto para evitar búsquedas repetidas
       const emptyTTL = this.#getCacheTTL(type, 0);
@@ -989,11 +989,11 @@ export class CascadingMagnetRepository extends MagnetRepository {
     }
     
     // Paso final: Buscar en API de Torrentio con fallback de idioma
-    this.#logger.log('info', `Consultando API Torrentio con fallback de idioma para ${contentId} (${type}, {})`, { component: 'CascadingMagnetRepository' });
+    this.#logger.log('info', `Consultando API Torrentio con fallback de idioma para ${contentId} (${type})`, { component: 'CascadingMagnetRepository' });
     const apiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFallback(contentId, type);
     
     if (apiResults.length > 0) {
-      this.#logger.log('info', `Encontrados ${apiResults.length} magnets en API Torrentio (fallback con idioma, {}) para ${contentId}`, { component: 'CascadingMagnetRepository' });
+      this.#logger.log('info', `Encontrados ${apiResults.length} magnets en API Torrentio (fallback con idioma) para ${contentId}`, { component: 'CascadingMagnetRepository' });
       await this.#reinitializeSecondaryRepository();
       return apiResults;
     }
@@ -1031,7 +1031,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       timestamp: Date.now()
     });
     
-    this.#logger.log('info', `TTL adaptativo calculado para ${type} con ${resultCount} resultados (API: ${isApiResult}, {}): ${adaptiveTTL}ms`, { component: 'CascadingMagnetRepository' });
+    this.#logger.log('info', `TTL adaptativo calculado para ${type} con ${resultCount} resultados (API: ${isApiResult}): ${adaptiveTTL}ms`, { component: 'CascadingMagnetRepository' });
     return adaptiveTTL;
   }
 

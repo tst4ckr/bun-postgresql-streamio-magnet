@@ -139,7 +139,7 @@ export class TorService {
       clearTimeout(timeoutId);
 
       if (response.ok) {
-        this.#logger.log('info', `Respuesta exitosa vía Tor (${response.status}, {}) en intento ${attempt}`, { component: 'TorService' });
+        this.#logger.log('info', `Respuesta exitosa vía Tor (${response.status}) en intento ${attempt}`, { component: 'TorService' });
         return response;
       }
 
@@ -235,7 +235,7 @@ export class TorService {
       }
     }, 300000);
 
-    this.#logger.log('info', 'Rotación automática de circuitos Tor iniciada (cada 5 minutos, {})', { component: 'TorService' });
+    this.#logger.log('info', 'Rotación automática de circuitos Tor iniciada (cada 5 minutos)', { component: 'TorService' });
   }
 
   /**
