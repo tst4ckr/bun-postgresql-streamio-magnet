@@ -33,15 +33,15 @@ export class CsvFileInitializer {
         // Crear directorio si no existe
         if (!existsSync(dataDirectory)) {
             mkdirSync(dataDirectory, { recursive: true });
-            CsvFileInitializer.this.#logger.info(`[CsvFileInitializer] Directorio creado: ${dataDirectory}`);
+            CsvFileInitializer.#logger.info(`[CsvFileInitializer] Directorio creado: ${dataDirectory}`);
         }
 
         csvFiles.forEach(filename => {
             const filePath = `${dataDirectory}/${filename}`;
-            this.ensureCsvFileExists(filePath, filename);
+            CsvFileInitializer.ensureCsvFileExists(filePath, filename);
         });
 
-        CsvFileInitializer.this.#logger.info('[CsvFileInitializer] Todos los archivos CSV han sido verificados/creados');
+        CsvFileInitializer.#logger.info('[CsvFileInitializer] Todos los archivos CSV han sido verificados/creados');
     }
 
     /**
@@ -58,10 +58,10 @@ export class CsvFileInitializer {
             }
 
             // Crear archivo con cabeceras
-            writeFileSync(filePath, this.CSV_HEADER + '\n', 'utf8');
-            CsvFileInitializer.this.#logger.info(`[CsvFileInitializer] Archivo creado: ${filename}`);
+            writeFileSync(filePath, CsvFileInitializer.CSV_HEADER + '\n', 'utf8');
+            CsvFileInitializer.#logger.info(`[CsvFileInitializer] Archivo creado: ${filename}`);
         } else {
-            CsvFileInitializer.this.#logger.info(`[CsvFileInitializer] Archivo verificado: ${filename}`);
+            CsvFileInitializer.#logger.info(`[CsvFileInitializer] Archivo verificado: ${filename}`);
         }
     }
 
@@ -78,9 +78,9 @@ export class CsvFileInitializer {
         try {
             const fs = require('fs');
             const firstLine = fs.readFileSync(filePath, 'utf8').split('\n')[0].trim();
-            return firstLine === this.CSV_HEADER;
+            return firstLine === CsvFileInitializer.CSV_HEADER;
         } catch (error) {
-            CsvFileInitializer.this.#logger.error(`[CsvFileInitializer] Error validando formato de ${filePath}:`, error.message);
+            CsvFileInitializer.#logger.error(`[CsvFileInitializer] Error validando formato de ${filePath}:`, error.message);
             return false;
         }
     }
@@ -97,13 +97,13 @@ export class CsvFileInitializer {
             const lines = content.split('\n');
             
             // Si la primera línea no es la cabecera correcta, reemplazarla
-            if (lines[0].trim() !== this.CSV_HEADER) {
-                lines[0] = this.CSV_HEADER;
+            if (lines[0].trim() !== CsvFileInitializer.CSV_HEADER) {
+                lines[0] = CsvFileInitializer.CSV_HEADER;
                 fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
-                CsvFileInitializer.this.#logger.info(`[CsvFileInitializer] Formato reparado: ${filename}`);
+                CsvFileInitializer.#logger.info(`[CsvFileInitializer] Formato reparado: ${filename}`);
             }
         } catch (error) {
-            CsvFileInitializer.this.#logger.error(`[CsvFileInitializer] Error reparando ${filename}:`, error.message);
+            CsvFileInitializer.#logger.error(`[CsvFileInitializer] Error reparando ${filename}:`, error.message);
         }
     }
 }
