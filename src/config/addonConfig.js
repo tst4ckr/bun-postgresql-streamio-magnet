@@ -110,9 +110,9 @@ const config = {
     }
   },
   repository: {
-    primaryCsvPath: process.env.PRIMARY_CSV_PATH || resolvePath('data/magnets.csv'),
-    secondaryCsvPath: process.env.SECONDARY_CSV_PATH || resolvePath('data/torrentio.csv'),
-    animeCsvPath: process.env.ANIME_CSV_PATH || resolvePath('data/anime.csv'),
+    primaryCsvPath: process.env.PRIMARY_CSV_PATH || resolvePath('data/torrents/magnets.csv'),
+    secondaryCsvPath: process.env.SECONDARY_CSV_PATH || resolvePath('data/torrents/torrentio.csv'),
+    animeCsvPath: process.env.ANIME_CSV_PATH || resolvePath('data/torrents/anime.csv'),
     torrentioApiUrl: process.env.TORRENTIO_API_URL || 'https://torrentio.strem.fun/',
     timeout: parseInt(process.env.CSV_TIMEOUT) || CONSTANTS.TIME.DEFAULT_TIMEOUT
   },

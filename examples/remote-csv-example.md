@@ -73,7 +73,7 @@ Para volver a usar un archivo local:
 
 ```bash
 # En .env
-CSV_SOURCE=./data/magnets.csv
+CSV_SOURCE=./data/torrents/magnets.csv
 ```
 
 Y reinicia el addon.
