@@ -32,33 +32,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
   #configInvoker;
   #cacheService;
 
-  /**
-   * Método auxiliar para logging optimizado con contexto estructurado
-   * @param {string} level - Nivel de log (info, warn, error, debug)
-   * @param {string} message - Mensaje a loggear
-   * @param {any} data - Datos adicionales para contexto estructurado
-   */
-  #logMessage(level, message, data = null) {
-    if (!this.#logger) {
-      // Fallback a console si no hay logger disponible
-      const timestamp = new Date().toISOString();
-      const formattedMessage = `[${level.toUpperCase()}] ${timestamp} [CascadingMagnetRepository] - ${message}`;
-      console[level] ? console[level](formattedMessage) : this.#logger.info(formattedMessage);
-      return;
-    }
 
-    // Usar el nuevo método log del EnhancedLogger
-    if (typeof this.#logger.log === 'function') {
-      const logData = data ? { ...data, component: 'CascadingMagnetRepository' } : { component: 'CascadingMagnetRepository' };
-      this.#logger.log(level, message, logData);
-      return;
-    }
-
-    // Fallback final
-    const timestamp = new Date().toISOString();
-    const formattedMessage = `[${level.toUpperCase()}] ${timestamp} [CascadingMagnetRepository] - ${message}`;
-    console[level] ? console[level](formattedMessage) : this.#logger.info(formattedMessage);
-  }
 
   /**
    * @param {string} primaryCsvPath - Ruta del archivo magnets.csv principal
@@ -113,7 +87,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
     if (this.#isInitialized) return;
     
     try {
-      this.#logMessage('info', 'Inicializando repositorios en cascada...');
+      this.#logger.info('Inicializando repositorios en cascada...', { component: 'CascadingMagnetRepository' });
       
       // Inicializar archivos CSV automáticamente
       const dataDirectory = dirname(this.#secondaryCsvPath);
@@ -132,10 +106,10 @@ export class CascadingMagnetRepository extends MagnetRepository {
       await this.#initializeRepository(this.#englishRepository, 'english.csv');
       
       this.#isInitialized = true;
-      this.#logMessage('info', 'Repositorios en cascada inicializados correctamente');
+      this.#logger.info('Repositorios en cascada inicializados correctamente', { component: 'CascadingMagnetRepository' });
       
     } catch (error) {
-      this.#logMessage('error', 'Error al inicializar repositorios en cascada:', error);
+      this.#logger.error('Error al inicializar repositorios en cascada', { component: 'CascadingMagnetRepository', error: error.message });
       throw error;
     }
   }
@@ -578,7 +552,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
 
       // Ejecutar comando
       if (this.#configInvoker.executeCommand(command)) {
-        this.#logMessage('info', `Idioma prioritario configurado temporalmente: ${language} para ${type}`);
+        this.#logger.info('Idioma prioritario configurado temporalmente', { component: 'CascadingMagnetRepository', language, type });
         
         // Retornar función para revertir
         return () => {
