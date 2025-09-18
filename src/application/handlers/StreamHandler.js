@@ -7,8 +7,7 @@ import { MagnetNotFoundError } from '../../domain/repositories/MagnetRepository.
 import { parseMagnet } from 'parse-magnet-uri';
 import { dynamicValidationService } from '../../infrastructure/services/DynamicValidationService.js';
 import { cacheService } from '../../infrastructure/services/CacheService.js';
-import { ConfigurationCommandFactory } from '../../infrastructure/patterns/ConfigurationCommand.js';
-import { errorHandler, withErrorHandling, createError, ERROR_TYPES, safeExecute } from '../../infrastructure/errors/ErrorHandler.js';
+import { createError, ERROR_TYPES, safeExecute } from '../../infrastructure/errors/ErrorHandler.js';
 import { unifiedIdService } from '../../infrastructure/services/UnifiedIdService.js';
 import { idDetectorService } from '../../infrastructure/services/IdDetectorService.js';
 import { metadataService } from '../../infrastructure/services/MetadataService.js';
@@ -18,15 +17,10 @@ import { metadataService } from '../../infrastructure/services/MetadataService.j
  * Responsabilidad única: convertir magnets a formato de stream de Stremio.
  */
 export class StreamHandler {
-  /**
-   * @private
-   */
   #magnetRepository;
   #config;
   #logger;
   #validationService;
-  #configInvoker;
-  #cacheService;
   #unifiedIdService;
   #idDetectorService;
   #metadataService;
@@ -42,84 +36,9 @@ export class StreamHandler {
     this.#config = config;
     this.#logger = logger;
     this.#validationService = validationService;
-    this.#configInvoker = ConfigurationCommandFactory.createInvoker(this.#logger);
-    this.#cacheService = cacheService;
     this.#unifiedIdService = unifiedIdService;
     this.#idDetectorService = idDetectorService;
     this.#metadataService = metadataService;
-  }
-
-  /**
-   * Configura el idioma prioritario temporalmente usando patrón Command/Memento.
-   * @param {string} language - Código de idioma (spanish, latino, english, etc.)
-   * @param {string} type - Tipo de contenido (movie, series, anime)
-   * @returns {Function|null} Función para revertir el cambio, o null si falla
-   * @public
-   */
-  setPriorityLanguageTemporary(language, type = 'movie') {
-    if (!this.#magnetRepository || typeof this.#magnetRepository.setPriorityLanguage !== 'function') {
-      this.#logger.warn('El repositorio no soporta configuración de idioma prioritario');
-      return null;
-    }
-
-    try {
-      // Crear comando para cambio temporal de idioma
-      const languageConfig = {
-        providers: this.#config.torrentio[type]?.languageConfigs?.spanish?.providers || this.#config.torrentio[type]?.providers,
-        priorityLanguage: language
-      };
-
-      const command = ConfigurationCommandFactory.createLanguageCommand(
-        this.#magnetRepository,
-        type,
-        languageConfig,
-        this.#logger
-      );
-
-      // Ejecutar comando
-      if (this.#configInvoker.executeCommand(command)) {
-        this.#logger.info(`Idioma prioritario configurado temporalmente en StreamHandler: ${language} para ${type}`);
-        
-        // Retornar función para revertir
-        return () => {
-          this.#configInvoker.undoLastCommand();
-          this.#logger.info(`Configuración de idioma revertida para ${type}`);
-        };
-      } else {
-        this.#logger.error('No se pudo aplicar la configuración temporal de idioma');
-        return null;
-      }
-    } catch (error) {
-      this.#logger.error('Error al configurar idioma prioritario temporal:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Configura el idioma prioritario de forma permanente (método legacy).
-   * @param {string} language - Código de idioma (spanish, latino, english, etc.)
-   * @public
-   * @deprecated Usar setPriorityLanguageTemporary para cambios temporales
-   */
-  setPriorityLanguage(language) {
-    if (this.#magnetRepository && typeof this.#magnetRepository.setPriorityLanguage === 'function') {
-      this.#magnetRepository.setPriorityLanguage(language);
-      this.#logger.info(`Idioma prioritario configurado en StreamHandler: ${language}`);
-    } else {
-      this.#logger.warn('El repositorio no soporta configuración de idioma prioritario');
-    }
-  }
-
-  /**
-   * Obtiene el idioma prioritario actual.
-   * @returns {string|null} Idioma prioritario configurado
-   * @public
-   */
-  getPriorityLanguage() {
-    if (this.#magnetRepository && typeof this.#magnetRepository.getPriorityLanguage === 'function') {
-      return this.#magnetRepository.getPriorityLanguage();
-    }
-    return null;
   }
 
   /**
@@ -172,22 +91,17 @@ export class StreamHandler {
     const { type, id } = args;
     const startTime = Date.now();
     
-    // Log detallado del inicio de la petición
-    this.#logMessage('info', `Petición de stream iniciada para content ID: ${id} (${type})`);
+    this.#logger.info(`Petición de stream iniciada para content ID: ${id} (${type})`);
     
-    // Detectar tipo de ID para optimizar el procesamiento
     const idDetection = this.#detectContentIdType(id);
     
     if (!idDetection.isValid) {
-      this.#logMessage('warn', `ID potencialmente inválido: ${id} - ${idDetection.error}`);
+      this.#logger.warn(`ID potencialmente inválido: ${id} - ${idDetection.error}`);
     } else {
-      this.#logMessage('info', `Tipo de ID detectado: ${idDetection.type} para ${id}`);
+      this.#logger.info(`Tipo de ID detectado: ${idDetection.type} para ${id}`);
     }
     
-    // Extraer season y episode del contentId para generar clave de caché única
     const { season, episode } = this.#extractSeasonEpisode(id);
-    
-    // Verificar cache de streams primero con clave específica por episodio
     const streamCacheKey = cacheService.generateStreamCacheKey(id, type, { season, episode });
     const cachedStreams = await safeExecute(
       () => cacheService.get(streamCacheKey),
@@ -196,11 +110,11 @@ export class StreamHandler {
     
     if (cachedStreams && !cachedStreams.error) {
       const duration = Date.now() - startTime;
-      this.#logMessage('info', `Streams obtenidos desde cache para ${id} (${idDetection.type}) en ${duration}ms`);
+      this.#logger.info(`Streams obtenidos desde cache para ${id} (${idDetection.type}) en ${duration}ms`);
       return cachedStreams;
     }
     
-    // Validación asíncrona con servicio dinámico incluyendo información del tipo de ID
+
     const validationResult = await safeExecute(
       () => this.#validateStreamRequest({
         ...args,
@@ -228,26 +142,26 @@ export class StreamHandler {
       );
     }
 
-    // Obtener metadatos enriquecidos si es posible
+
     let metadata = null;
     if (idDetection.isValid && idDetection.type !== 'numeric') {
       try {
         metadata = await this.#getEnhancedMetadata(id, type, idDetection);
         if (metadata) {
-          this.#logMessage('info', `Metadatos obtenidos para ${id}: ${metadata.title || 'Sin título'}`);
+          this.#logger.info(`Metadatos obtenidos para ${id}: ${metadata.title || 'Sin título'}`);
         }
       } catch (error) {
-        this.#logMessage('warn', `No se pudieron obtener metadatos para ${id}: ${error.message}`);
+        this.#logger.warn(`No se pudieron obtener metadatos para ${id}: ${error.message}`);
       }
     }
 
     const magnets = await this.#getMagnets(id, type);
     
     if (!magnets || magnets.length === 0) {
-      this.#logMessage('warn', `No se encontraron magnets para: ${id} (${idDetection.type})`);
+      this.#logger.warn(`No se encontraron magnets para: ${id} (${idDetection.type})`);
       const emptyResponse = this.#createEmptyResponse();
       
-      // Cachear respuesta vacía con TTL corto
+
       const emptyTTL = cacheService.calculateAdaptiveTTL(type, 0, id);
       cacheService.set(streamCacheKey, emptyResponse, emptyTTL, {
         contentType: type,
@@ -265,8 +179,7 @@ export class StreamHandler {
     const streams = this.#createStreamsFromMagnets(magnets, type, metadata);
     const duration = Date.now() - startTime;
     
-    // Log detallado de resultados con información del tipo de ID
-    this.#logMessage('info', `Stream generado para ${id} (${idDetection.type}): ${streams.length} streams encontrados en ${duration}ms`);
+    this.#logger.info(`Stream generado para ${id} (${idDetection.type}): ${streams.length} streams encontrados en ${duration}ms`);
     
     const streamResponse = this.#createStreamResponse(streams, {
       contentId: id,
@@ -277,7 +190,7 @@ export class StreamHandler {
       totalStreams: streams.length
     });
     
-    // Cachear respuesta exitosa con TTL basado en tipo de contenido
+
     const cacheTTL = this.#getCacheTTLByType(idDetection.type, streams.length);
     cacheService.set(streamCacheKey, streamResponse, cacheTTL, {
       contentType: type,
@@ -309,14 +222,14 @@ export class StreamHandler {
       );
       
       if (metadata.error) {
-        this.#logMessage('warn', `Error obteniendo metadatos: ${metadata.error.message}`);
+        this.#logger.warn(`Error obteniendo metadatos: ${metadata.error.message}`);
         return null;
       }
       
       return metadata;
       
     } catch (error) {
-      this.#logMessage('warn', `Excepción obteniendo metadatos para ${contentId}: ${error.message}`);
+      this.#logger.warn(`Excepción obteniendo metadatos para ${contentId}: ${error.message}`);
       return null;
     }
   }
@@ -470,16 +383,16 @@ export class StreamHandler {
    * @returns {Promise<Array|null>} Lista de magnets o null si no se encuentran
    */
   async #getMagnets(contentId, type = 'movie') {
-    this.#logMessage('info', `Iniciando búsqueda de magnets para ${contentId} (${type})`);
+    this.#logger.info(`Iniciando búsqueda de magnets para ${contentId} (${type})`);
     
-    // Detectar tipo de ID para optimizar búsqueda
+
     const idDetection = this.#detectContentIdType(contentId);
     
     if (!idDetection.isValid) {
-      this.#logMessage('warn', `ID inválido detectado: ${contentId} - ${idDetection.error}`);
-      // Continuar con búsqueda básica como fallback
+      this.#logger.warn(`ID inválido detectado: ${contentId} - ${idDetection.error}`);
+
     } else {
-      this.#logMessage('info', `Tipo de ID detectado: ${idDetection.type} para ${contentId}`);
+      this.#logger.info(`Tipo de ID detectado: ${idDetection.type} para ${contentId}`);
     }
     
     // Intentar búsqueda con ID original primero
@@ -495,14 +408,14 @@ export class StreamHandler {
     }
     
     if (magnetsResult && magnetsResult.length > 0) {
-      this.#logMessage('info', `Encontrados ${magnetsResult.length} magnets para ${contentId}`);
+      this.#logger.info(`Encontrados ${magnetsResult.length} magnets para ${contentId}`);
       
-      // Log adicional con información de fuentes y tipos
+
       const sources = [...new Set(magnetsResult.map(m => m.provider || 'Unknown'))];
       const qualities = [...new Set(magnetsResult.map(m => m.quality || 'Unknown'))];
       
-      this.#logMessage('info', `Fuentes para ${contentId}: ${sources.join(', ')}`);
-      this.#logMessage('info', `Calidades disponibles: ${qualities.join(', ')}`);
+      this.#logger.info(`Fuentes para ${contentId}: ${sources.join(', ')}`);
+      this.#logger.info(`Calidades disponibles: ${qualities.join(', ')}`);
     }
     
     return magnetsResult;
@@ -529,7 +442,7 @@ export class StreamHandler {
     
     if (magnetsResult.error) {
       if (magnetsResult.error instanceof MagnetNotFoundError) {
-        this.#logMessage('info', `No se encontraron magnets para ${contentId} con ID original`);
+        this.#logger.info(`No se encontraron magnets para ${contentId} con ID original`);
         return null;
       }
       throw createError(
@@ -551,7 +464,7 @@ export class StreamHandler {
    * @returns {Promise<Array|null>} Lista de magnets
    */
   async #searchMagnetsWithConversion(contentId, type, idDetection) {
-    this.#logMessage('info', `Intentando conversión de ID ${idDetection.type} a IMDb para ${contentId}`);
+    this.#logger.info(`Intentando conversión de ID ${idDetection.type} a IMDb para ${contentId}`);
     
     try {
       // Intentar conversión a IMDb
@@ -561,14 +474,14 @@ export class StreamHandler {
       );
       
       if (conversionResult.error || !conversionResult.success) {
-        this.#logMessage('warn', `No se pudo convertir ${contentId} a IMDb: ${conversionResult.error?.message || 'Conversión fallida'}`);
+        this.#logger.warn(`No se pudo convertir ${contentId} a IMDb: ${conversionResult.error?.message || 'Conversión fallida'}`);
         return null;
       }
       
       const imdbId = conversionResult.convertedId;
-      this.#logMessage('info', `ID convertido: ${contentId} -> ${imdbId}`);
+      this.#logger.info(`ID convertido: ${contentId} -> ${imdbId}`);
       
-      // Buscar con ID convertido
+
       const magnetsResult = await safeExecute(
         () => this.#magnetRepository.getMagnetsByContentId(imdbId, type),
         { 
@@ -581,20 +494,20 @@ export class StreamHandler {
       
       if (magnetsResult.error) {
         if (magnetsResult.error instanceof MagnetNotFoundError) {
-          this.#logMessage('info', `No se encontraron magnets para ${imdbId} (convertido desde ${contentId})`);
+          this.#logger.info(`No se encontraron magnets para ${imdbId} (convertido desde ${contentId})`);
           return null;
         }
         throw magnetsResult.error;
       }
       
       if (magnetsResult && magnetsResult.length > 0) {
-        this.#logMessage('info', `Encontrados ${magnetsResult.length} magnets usando ID convertido ${imdbId}`);
+        this.#logger.info(`Encontrados ${magnetsResult.length} magnets usando ID convertido ${imdbId}`);
       }
       
       return magnetsResult;
       
     } catch (error) {
-      this.#logMessage('error', `Error en conversión de ID para ${contentId}: ${error.message}`);
+      this.#logger.error(`Error en conversión de ID para ${contentId}: ${error.message}`);
       return null;
     }
   }
@@ -912,7 +825,7 @@ export class StreamHandler {
    * @returns {Object}
    */
   #createErrorResponse(error) {
-    this.#logMessage('error', `Error en stream handler: ${error.message}`);
+    this.#logger.error(`Error en stream handler: ${error.message}`);
     
     // Determinar el tiempo de cache basado en el tipo de error
     let cacheMaxAge = 300; // 5 minutos por defecto
@@ -995,80 +908,15 @@ export class StreamHandler {
     
     try {
       const detection = this.#idDetectorService.detectIdType(contentId);
-      this.#logMessage('debug', `ID detectado: ${contentId} -> ${detection.type} (válido: ${detection.isValid})`);
+      this.#logger.debug(`ID detectado: ${contentId} -> ${detection.type} (válido: ${detection.isValid})`);
       return detection;
     } catch (error) {
-      this.#logMessage('error', `Error detectando tipo de ID para ${contentId}: ${error.message}`);
+      this.#logger.error(`Error detectando tipo de ID para ${contentId}: ${error.message}`);
       return { type: 'unknown', isValid: false, error: error.message };
     }
   }
 
-  /**
-   * Método legacy para compatibilidad - usa el nuevo método interno
-   * @private
-   * @param {string} contentId - ID del contenido
-   * @returns {string} Tipo de ID detectado
-   * @deprecated Usar #detectContentIdType para información completa
-   */
-  #detectAnimeIdType(contentId) {
-    const detection = this.#detectContentIdType(contentId);
-    return detection.type || 'unknown';
-  }
 
-
-
-  /**
-   * Crea una clave de caché única para el contenido incluyendo tipo de ID
-   * @private
-   * @param {string} contentId - ID del contenido
-   * @param {string} type - Tipo de contenido
-   * @param {number|null} season - Temporada (opcional)
-   * @param {number|null} episode - Episodio (opcional)
-   * @param {string} idType - Tipo de ID detectado (opcional)
-   * @returns {string} Clave de caché
-   */
-  #createCacheKey(contentId, type, season = null, episode = null, idType = null) {
-    let key = `stream:${type}:${contentId}`;
-    
-    // Agregar tipo de ID si está disponible para mayor especificidad
-    if (idType && idType !== 'unknown') {
-      key += `:${idType}`;
-    }
-    
-    // Agregar season/episode solo si ambos están presentes y son válidos
-    if (season !== null && episode !== null && 
-        Number.isInteger(season) && Number.isInteger(episode) &&
-        season > 0 && episode > 0) {
-      key += `:s${season}e${episode}`;
-    }
-    
-    return key;
-  }
-
-  /**
-   * Método de logging unificado con formato específico.
-   * @private
-   * @param {string} level - Nivel de log (info, warn, error)
-   * @param {string} message - Mensaje a registrar
-   */
-  #logMessage(level, message) {
-    const timestamp = new Date().toISOString();
-    const formattedMessage = `[${level.toUpperCase()}] ${timestamp} [handlers/StreamHandler.js] - ${message}`;
-    
-    switch (level) {
-      case 'info':
-        this.#logger.info(formattedMessage);
-        break;
-      case 'warn':
-        this.#logger.warn(formattedMessage);
-        break;
-      case 'error':
-        this.#logger.error(formattedMessage);
-        break;
-      default:
-        this.#logger.info(formattedMessage);
-    }
-  }
 }
 
 export default StreamHandler;
