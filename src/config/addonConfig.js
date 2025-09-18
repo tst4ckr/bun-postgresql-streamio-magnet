@@ -87,13 +87,13 @@ const config = {
     port: process.env.PORT || CONSTANTS.NETWORK.DEFAULT_SERVER_PORT,
   },
   cache: {
-    streamCacheMaxAge: process.env.CACHE_STREAM_MAX_AGE || CONSTANTS.CACHE.STREAM_MAX_AGE,
-    streamStaleRevalidate: process.env.CACHE_STREAM_STALE_REVALIDATE || CONSTANTS.CACHE.STREAM_STALE_REVALIDATE,
-    streamStaleError: process.env.CACHE_STREAM_STALE_ERROR || CONSTANTS.CACHE.STREAM_STALE_ERROR,
+    streamCacheMaxAge: parseInt(process.env.CACHE_STREAM_MAX_AGE) || CONSTANTS.CACHE.STREAM_MAX_AGE,
+    streamStaleRevalidate: parseInt(process.env.CACHE_STREAM_STALE_REVALIDATE) || CONSTANTS.CACHE.STREAM_STALE_REVALIDATE,
+    streamStaleError: parseInt(process.env.CACHE_STREAM_STALE_ERROR) || CONSTANTS.CACHE.STREAM_STALE_ERROR,
     // Cache específico para anime (más tiempo debido a menor frecuencia de cambios)
-    animeCacheMaxAge: process.env.CACHE_ANIME_MAX_AGE || CONSTANTS.CACHE.ANIME_MAX_AGE,
+    animeCacheMaxAge: parseInt(process.env.CACHE_ANIME_MAX_AGE) || CONSTANTS.CACHE.ANIME_MAX_AGE,
     // Cache para metadatos
-    metadataCacheMaxAge: process.env.CACHE_METADATA_MAX_AGE || CONSTANTS.CACHE.METADATA_MAX_AGE
+    metadataCacheMaxAge: parseInt(process.env.CACHE_METADATA_MAX_AGE) || CONSTANTS.CACHE.METADATA_MAX_AGE
   },
   logging: {
     // Optimización para producción: usar 'warn' por defecto en producción, 'info' en desarrollo

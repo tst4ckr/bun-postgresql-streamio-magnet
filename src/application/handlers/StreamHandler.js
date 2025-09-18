@@ -564,7 +564,7 @@ export class StreamHandler {
 
         // Agregar propiedades oficiales de behaviorHints según SDK
         if (magnet.size) {
-          stream.behaviorHints.videoSize = magnet.size;
+          stream.behaviorHints.videoSize = this.#convertSizeToBytes(magnet.size);
         }
 
         // Agregar filename si está disponible (recomendado para subtítulos)
@@ -793,6 +793,41 @@ export class StreamHandler {
       streams: [],
       cacheMaxAge: this.#config.cache.streamCacheMaxAge
     };
+  }
+
+  /**
+   * Convierte el tamaño a bytes para videoSize.
+   * @private
+   * @param {string} size - Tamaño en formato string (ej: "2.5 GB", "1500 MB")
+   * @returns {number} Tamaño en bytes
+   */
+  #convertSizeToBytes(size) {
+    if (!size || size === 'N/A' || size === 'unknown') {
+      return 0;
+    }
+    
+    const sizeStr = size.toString().toLowerCase();
+    const match = sizeStr.match(/(\d+(?:\.\d+)?)\s*(gb|mb|tb|kb)/i);
+    
+    if (!match) {
+      return 0;
+    }
+    
+    const value = parseFloat(match[1]);
+    const unit = match[2].toLowerCase();
+    
+    switch (unit) {
+      case 'tb':
+        return Math.round(value * 1024 * 1024 * 1024 * 1024);
+      case 'gb':
+        return Math.round(value * 1024 * 1024 * 1024);
+      case 'mb':
+        return Math.round(value * 1024 * 1024);
+      case 'kb':
+        return Math.round(value * 1024);
+      default:
+        return 0;
+    }
   }
 
   /**
