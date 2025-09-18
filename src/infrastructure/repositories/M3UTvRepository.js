@@ -14,18 +14,21 @@ export class M3UTvRepository {
   #lastFetch = null;
   #cacheTimeout;
   #m3uUrl;
+  #logger;
 
   /**
    * @param {string} m3uUrl - URL del archivo M3U
-   * @param {number} [cacheTimeout=300000] - Timeout del cache en ms (5 min por defecto)
+   * @param {object} config - Objeto de configuración
+   * @param {EnhancedLogger} logger - Instancia del logger
    */
-  constructor(m3uUrl, cacheTimeout = 300000) {
+  constructor(m3uUrl, config, logger) {
     if (!m3uUrl || typeof m3uUrl !== 'string') {
       throw new Error('M3U URL is required');
     }
     
     this.#m3uUrl = m3uUrl;
-    this.#cacheTimeout = cacheTimeout;
+    this.#cacheTimeout = config.repository.m3uCacheTimeout;
+    this.#logger = logger;
   }
 
   /**
@@ -149,11 +152,11 @@ export class M3UTvRepository {
     try {
       await this.#loadTvsFromSource();
     } catch (error) {
-      console.error('Error loading tvs from M3U source:', error);
+      this.#logger.error('Error loading tvs from M3U source:', error);
       
       // Si hay canales de TV en cache, usarlos aunque estén expirados
       if (this.#tvs.size > 0) {
-        console.warn('Using expired cache due to fetch error');
+        this.#logger.warn('Using expired cache due to fetch error');
         return;
       }
       
@@ -167,7 +170,7 @@ export class M3UTvRepository {
    * @returns {Promise<void>}
    */
   async #loadTvsFromSource() {
-    console.log(`Fetching M3U from: ${this.#m3uUrl}`);
+    this.#logger.info(`Fetching M3U from: ${this.#m3uUrl}`);
     
     const response = await fetch(this.#m3uUrl, {
       headers: {
@@ -197,7 +200,7 @@ export class M3UTvRepository {
     
     this.#lastFetch = Date.now();
     
-    console.log(`Loaded ${tvs.length} tvs from M3U source`);
+    this.#logger.info(`Loaded ${tvs.length} tvs from M3U source`);
   }
 
   /**

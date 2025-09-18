@@ -128,25 +128,25 @@ export class Tv {
    * @returns {Object} Stream en formato Stremio
    */
   toStremioStream() {
-    // Determinar si el stream necesita el servidor local de Stremio
-    const isHlsStream = this.#streamUrl.includes('.m3u8');
-    
-    return {
-      name: `📺 ${this.#name}`,
-      description: `Canal en vivo: ${this.#name}${this.#group ? ` (${this.#group})` : ''}`,
-      url: this.#streamUrl,
-      behaviorHints: {
-        // Para streams HLS, usar el servidor local de Stremio para mejor compatibilidad
-        notWebReady: isHlsStream,
-        bingeGroup: `tv-${this.#group}`,
-        // Remover restricciones geográficas para permitir acceso global
-        proxyHeaders: {
-          request: {
-            'User-Agent': 'Stremio/4.4.0'
-          },
-          response: {}
+    const behaviorHints = {
+      // Forzar `notWebReady: true` para usar siempre el servidor de streaming de Stremio.
+      // Esto mejora la compatibilidad con HLS y otros formatos, y evita problemas de CORS.
+      notWebReady: true,
+      bingeGroup: `tv-${this.#group}`,
+      // Las cabeceras de proxy son seguras aquí porque notWebReady es true.
+      proxyHeaders: {
+        request: {
+          'User-Agent': 'Stremio/4.4.0'
         }
       }
+    };
+
+    return {
+      name: `📺 ${this.#name}`,
+      title: `Canal en vivo: ${this.#name}`,
+      description: `Grupo: ${this.#group || 'General'}`,
+      url: this.#streamUrl,
+      behaviorHints: behaviorHints
     };
   }
 
@@ -194,14 +194,24 @@ export class Tv {
   }
 
   /**
-   * Genera un ID único para el canal basado en su nombre y grupo.
+   * Genera un ID único para el canal basado en su nombre.
    * @param {string} name - Nombre del canal
-   * @param {string} [group] - Grupo del canal
    * @returns {string} ID único generado
    */
-  static generateId(name, group = 'General') {
-    const cleanName = name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-    const cleanGroup = group.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-    return `tv_ch_${cleanGroup}_${cleanName}`;
+  static generateId(name) {
+    if (!name || typeof name !== 'string') {
+      return `tv_invalid_${Date.now()}`;
+    }
+    const cleanName = name
+      .toString()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/[^\w-]+/g, '')
+      .replace(/--+/g, '-');
+    
+    return `tv_${cleanName}`;
   }
 }

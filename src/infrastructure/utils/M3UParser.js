@@ -37,7 +37,7 @@ export class M3UParser {
             const tvData = {
               ...tvInfo,
               streamUrl: nextLine,
-              id: Tv.generateId(tvInfo.name, tvInfo.group)
+              id: Tv.generateId(tvInfo.name)
             };
             
             const tv = new Tv(tvData);
