@@ -39,21 +39,21 @@ const config = {
     resources: [
       {
         name: 'catalog',
-        types: ['movie', 'series', 'anime'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
+        types: ['movie', 'series', 'anime', 'tv'],
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv:']
       },
       {
         name: 'meta',
-        types: ['movie', 'series', 'anime'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
+        types: ['movie', 'series', 'anime', 'tv'],
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv:']
       },
       {
         name: 'stream',
-        types: ['movie', 'series', 'anime'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
+        types: ['movie', 'series', 'anime', 'tv'],
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv:']
       }
     ],
-    types: ['movie', 'series', 'anime'],
+    types: ['movie', 'series', 'anime', 'tv'],
     catalogs: [
       {
         type: 'movie',
@@ -69,9 +69,14 @@ const config = {
         type: 'anime',
         id: 'anime_catalog',
         name: 'Anime'
+      },
+      {
+        type: 'tv',
+        id: 'tv_catalog',
+        name: 'Live TV'
       }
     ],
-    idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
+    idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv:']
   },
   server: {
     port: process.env.PORT || CONSTANTS.NETWORK.DEFAULT_SERVER_PORT,
@@ -83,7 +88,12 @@ const config = {
     // Cache específico para anime (más tiempo debido a menor frecuencia de cambios)
     animeCacheMaxAge: parseInt(process.env.CACHE_ANIME_MAX_AGE) || CONSTANTS.CACHE.ANIME_MAX_AGE,
     // Cache para metadatos
-    metadataCacheMaxAge: parseInt(process.env.CACHE_METADATA_MAX_AGE) || CONSTANTS.CACHE.METADATA_MAX_AGE
+    metadataCacheMaxAge: parseInt(process.env.CACHE_METADATA_MAX_AGE) || CONSTANTS.CACHE.METADATA_MAX_AGE,
+    // Cache específico para TV M3U (streams en vivo requieren cache más corto)
+    tvCacheMaxAge: parseInt(process.env.CACHE_TV_MAX_AGE) || CONSTANTS.CACHE.TV_CACHE_MAX_AGE,
+    tvCatalogMaxAge: parseInt(process.env.CACHE_TV_CATALOG_MAX_AGE) || CONSTANTS.CACHE.TV_CATALOG_MAX_AGE,
+    tvStreamStaleRevalidate: parseInt(process.env.CACHE_TV_STREAM_STALE_REVALIDATE) || CONSTANTS.CACHE.TV_STREAM_STALE_REVALIDATE,
+    tvStreamStaleError: parseInt(process.env.CACHE_TV_STREAM_STALE_ERROR) || CONSTANTS.CACHE.TV_STREAM_STALE_ERROR
   },
   logging: {
     // Optimización para producción: usar 'warn' por defecto en producción, 'info' en desarrollo
@@ -104,7 +114,11 @@ const config = {
     secondaryCsvPath: process.env.SECONDARY_CSV_PATH || resolvePath('data/torrents/torrentio.csv'),
     animeCsvPath: process.env.ANIME_CSV_PATH || resolvePath('data/torrents/anime.csv'),
     torrentioApiUrl: process.env.TORRENTIO_API_URL || 'https://torrentio.strem.fun/',
-    timeout: parseInt(process.env.CSV_TIMEOUT) || CONSTANTS.TIME.DEFAULT_TIMEOUT
+    timeout: parseInt(process.env.CSV_TIMEOUT) || CONSTANTS.TIME.DEFAULT_TIMEOUT,
+    // Configuración específica para TV M3U
+    m3uUrl: process.env.M3U_URL || null,
+    m3uCacheTimeout: parseInt(process.env.M3U_CACHE_TIMEOUT) || CONSTANTS.CACHE.TV_M3U_CACHE_TIMEOUT,
+    maxTvChannels: parseInt(process.env.MAX_TV_CHANNELS) || CONSTANTS.LIMIT.MAX_TV_CHANNELS
   },
   tor: {
     enabled: process.env.TOR_ENABLED === 'true' || false, // Por defecto false, se activa explícitamente con TOR_ENABLED=true
@@ -229,6 +243,16 @@ const config = {
         secondary: process.env.ANIME_METADATA_SECONDARY || CONSTANTS.METADATA.ANIME_METADATA_PROVIDERS.SECONDARY,
         fallback: process.env.ANIME_METADATA_FALLBACK || CONSTANTS.METADATA.ANIME_METADATA_PROVIDERS.FALLBACK
       }
+    },
+    // Configuración específica para TV M3U
+    tv: {
+      requiredFields: CONSTANTS.METADATA.REQUIRED_FIELDS.tv,
+      optionalFields: CONSTANTS.METADATA.OPTIONAL_FIELDS.tv,
+      cacheExpiry: CONSTANTS.CACHE.TV_CATALOG_MAX_AGE,
+      defaultGroup: CONSTANTS.METADATA.TV_METADATA.DEFAULT_GROUP,
+      defaultLogo: CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO,
+      runtime: CONSTANTS.METADATA.TV_METADATA.RUNTIME,
+      defaultVideoId: CONSTANTS.METADATA.TV_METADATA.DEFAULT_VIDEO_ID
     }
   },
   // Configuración del sistema de búsqueda en cascada

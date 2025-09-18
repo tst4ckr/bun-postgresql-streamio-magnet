@@ -7,6 +7,8 @@ import { addonBuilder, serveHTTP } from 'stremio-addon-sdk';
 import { addonConfig, manifest } from './config/addonConfig.js';
 import { CascadingMagnetRepository } from './infrastructure/repositories/CascadingMagnetRepository.js';
 import { StreamHandler } from './application/handlers/StreamHandler.js';
+import { TvHandler } from './application/handlers/TvHandler.js';
+import { M3UTvRepository } from './infrastructure/repositories/M3UTvRepository.js';
 import { EnhancedLogger } from './infrastructure/utils/EnhancedLogger.js';
 
 /**
@@ -18,6 +20,8 @@ class MagnetAddon {
   #magnetRepository;
   #addonBuilder;
   #streamHandler;
+  #tvHandler;
+  #tvRepository;
 
   constructor() {
     this.#config = addonConfig;
@@ -98,11 +102,81 @@ class MagnetAddon {
     });
     this.#logger.info('Handler de metadatos configurado.');
 
-    // 4. Configurar rutas personalizadas para configuración de idioma
+    // 4. Configurar TV M3U (después de la cascada de magnets)
+    await this.#setupTvHandlers();
+
+    // 5. Configurar rutas personalizadas para configuración de idioma
     this.#setupLanguageRoutes(streamHandler);
     
-    // 5. Configurar rutas de diagnóstico (comentario informativo)
+    // 6. Configurar rutas de diagnóstico (comentario informativo)
     this.#setupDiagnosticRoutes();
+  }
+
+  /**
+   * Configura handlers para TV M3U.
+   * Solo se inicializa si M3U_URL está configurada.
+   */
+  async #setupTvHandlers() {
+    const m3uUrl = this.#config.repository.m3uUrl;
+    
+    if (!m3uUrl) {
+      this.#logger.info('M3U_URL no configurada. Funcionalidad de TV M3U deshabilitada.');
+      return;
+    }
+
+    try {
+      // Inicializar repositorio de TV M3U
+      this.#tvRepository = new M3UTvRepository(m3uUrl, this.#config, this.#logger);
+      
+      // Inicializar handler de TV
+      this.#tvHandler = new TvHandler(this.#tvRepository, this.#logger);
+
+      // Configurar handler de catálogo para TV
+      this.#addonBuilder.defineCatalogHandler(async (args) => {
+        if (args.type === 'tv') {
+          try {
+            return await this.#tvHandler.handleCatalog(args);
+          } catch (error) {
+            this.#logger.error('Error en catálogo de TV:', error);
+            return { metas: [] };
+          }
+        }
+        // Para otros tipos, retornar vacío (manejado por otros handlers)
+        return { metas: [] };
+      });
+
+      // Configurar handler de metadatos para TV
+      this.#addonBuilder.defineMetaHandler(async (args) => {
+        if (args.type === 'tv' && args.id.startsWith('tv:')) {
+          try {
+            return await this.#tvHandler.handleMeta(args);
+          } catch (error) {
+            this.#logger.error('Error en metadatos de TV:', error);
+            return null;
+          }
+        }
+        // Para otros tipos, retornar null (manejado por otros handlers)
+        return null;
+      });
+
+      // Configurar handler de streams para TV
+      this.#addonBuilder.defineStreamHandler(async (args) => {
+        if (args.type === 'tv' && args.id.startsWith('tv:')) {
+          try {
+            return await this.#tvHandler.handleStream(args);
+          } catch (error) {
+            this.#logger.error('Error en stream de TV:', error);
+            return { streams: [] };
+          }
+        }
+        // Para otros tipos, usar el handler de magnets existente
+        return await this.#streamHandler.handleStream(args);
+      });
+
+      this.#logger.info(`TV M3U configurado correctamente con URL: ${m3uUrl}`);
+    } catch (error) {
+      this.#logger.error('Error configurando TV M3U:', error);
+    }
   }
 
   /**

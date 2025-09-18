@@ -127,6 +127,32 @@ export const LIMIT_CONSTANTS = {
   
   // Stack de comandos
   MAX_COMMAND_STACK: 10,
+  
+  // Límites de búsqueda
+  MAX_SEARCH_RESULTS: 100,
+  DEFAULT_SEARCH_LIMIT: 20,
+  MIN_SEARCH_QUERY_LENGTH: 2,
+  MAX_SEARCH_QUERY_LENGTH: 100,
+
+  // Límites de paginación
+  DEFAULT_PAGE_SIZE: 20,
+  MAX_PAGE_SIZE: 100,
+  MIN_PAGE_SIZE: 1,
+
+  // Límites de streams
+  MAX_STREAMS_PER_ITEM: 50,
+  DEFAULT_STREAMS_LIMIT: 20,
+
+  // Límites de metadatos
+  MAX_METADATA_SIZE: 1024 * 1024, // 1MB
+  MAX_POSTER_SIZE: 512 * 1024, // 512KB
+
+  // Límites específicos para TV M3U
+  MAX_TV_CHANNELS: 1000,
+  DEFAULT_TV_CATALOG_SIZE: 100,
+  MAX_M3U_FILE_SIZE: 10 * 1024 * 1024, // 10MB
+  TV_CHANNEL_NAME_MAX_LENGTH: 100,
+  TV_GROUP_NAME_MAX_LENGTH: 50,
 };
 
 /**
@@ -143,23 +169,71 @@ export const LANGUAGE_CONSTANTS = {
 };
 
 /**
+ * Constantes de tipos de contenido
+ */
+export const CONTENT_TYPE_CONSTANTS = {
+  // Tipos de contenido soportados
+  SUPPORTED_TYPES: ['movie', 'series', 'anime', 'tv'],
+
+  // Mapeo de tipos de contenido
+  TYPE_MAPPING: {
+    movie: 'movie',
+    series: 'series',
+    anime: 'anime',
+    tv: 'tv',
+  },
+
+  // Configuración por tipo de contenido
+  TYPE_CONFIG: {
+    movie: {
+      hasSeasons: false,
+      hasEpisodes: false,
+      defaultGenre: 'Unknown',
+    },
+    series: {
+      hasSeasons: true,
+      hasEpisodes: true,
+      defaultGenre: 'Unknown',
+    },
+    anime: {
+      hasSeasons: true,
+      hasEpisodes: true,
+      defaultGenre: 'Animation',
+    },
+    tv: {
+      hasSeasons: false,
+      hasEpisodes: false,
+      defaultGenre: 'Live TV',
+      isLive: true,
+    },
+  },
+};
+
+/**
  * Constantes de cache
  */
 export const CACHE_CONSTANTS = {
-  // Tiempos de expiración en segundos
+  // Cache de streams
   STREAM_MAX_AGE: 3600, // 1 hora
   STREAM_STALE_REVALIDATE: 3600, // 1 hora
   STREAM_STALE_ERROR: 86400, // 1 día
   ANIME_MAX_AGE: 7200, // 2 horas
   METADATA_MAX_AGE: 86400, // 1 día
-  
-  // Tiempos de expiración en milisegundos
+
+  // Cache de metadatos
   MOVIE_METADATA_EXPIRY: 86400000, // 1 día
   SERIES_METADATA_EXPIRY: 86400000, // 1 día
   ANIME_METADATA_EXPIRY: 604800000, // 1 semana
   UNIFIED_ID_CACHE_EXPIRY: 24 * 60 * 60 * 1000, // 24 horas
-  
-  // Límites de caché
+
+  // Cache específico para TV M3U
+  TV_CACHE_MAX_AGE: 300, // 5 minutos (streams en vivo)
+  TV_CATALOG_MAX_AGE: 1800, // 30 minutos (catálogo de canales)
+  TV_M3U_CACHE_TIMEOUT: 300000, // 5 minutos para cache M3U
+  TV_STREAM_STALE_REVALIDATE: 300, // 5 minutos
+  TV_STREAM_STALE_ERROR: 1800, // 30 minutos
+
+  // Límites de cache
   MAX_CACHE_SIZE: 1000,
   CACHE_CLEANUP_INTERVAL: 60 * 60 * 1000, // 1 hora
 };
@@ -202,25 +276,35 @@ export const CASCADE_CONSTANTS = {
  * Constantes de metadatos
  */
 export const METADATA_CONSTANTS = {
-  // Campos requeridos por tipo
+  // Campos requeridos por tipo de contenido
   REQUIRED_FIELDS: {
     movie: ['title', 'year', 'imdbId'],
     series: ['title', 'year', 'imdbId'],
     anime: ['title', 'year'],
+    tv: ['name', 'streamUrl'],
   },
-  
-  // Campos opcionales por tipo
+
+  // Campos opcionales por tipo de contenido
   OPTIONAL_FIELDS: {
     movie: ['genre', 'director', 'cast', 'plot', 'poster', 'rating'],
     series: ['genre', 'creator', 'cast', 'plot', 'poster', 'rating', 'seasons', 'episodes'],
     anime: ['genre', 'studio', 'director', 'cast', 'plot', 'poster', 'rating', 'episodes', 'status', 'source'],
+    tv: ['logo', 'group', 'tvgId', 'tvgName'],
   },
-  
+
   // Proveedores de metadatos para anime
   ANIME_METADATA_PROVIDERS: {
     PRIMARY: 'kitsu',
     SECONDARY: 'mal,anilist',
     FALLBACK: 'anidb',
+  },
+
+  // Configuración específica para TV M3U
+  TV_METADATA: {
+    DEFAULT_GROUP: 'General',
+    DEFAULT_LOGO: 'https://via.placeholder.com/256x256/1a1a1a/ffffff?text=TV',
+    RUNTIME: 'Live TV',
+    DEFAULT_VIDEO_ID: 'live',
   },
 };
 
@@ -301,6 +385,7 @@ export const CONSTANTS = Object.freeze({
   LOGGING: LOGGING_CONSTANTS,
   CASCADE: CASCADE_CONSTANTS,
   METADATA: METADATA_CONSTANTS,
+  CONTENT_TYPE: CONTENT_TYPE_CONSTANTS,
   REGEX: REGEX_PATTERNS,
   CONVERSION: CONVERSION_CONSTANTS,
   URL: URL_CONSTANTS,
