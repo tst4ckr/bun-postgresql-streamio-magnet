@@ -3,6 +3,7 @@
  * Garantiza que todos los archivos necesarios existan antes de la inicialización del sistema
  */
 
+import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 
@@ -11,6 +12,11 @@ export class CsvFileInitializer {
      * Formato estándar de cabeceras para todos los archivos CSV
      */
     static CSV_HEADER = 'content_id,name,magnet,quality,size,source,fileIdx,filename,provider,seeders,peers,season,episode,imdb_id,id_type';
+    
+    /**
+     * Logger estático para la clase
+     */
+    static #logger = new EnhancedLogger();
 
     /**
      * Inicializa todos los archivos CSV necesarios para el sistema
@@ -27,7 +33,7 @@ export class CsvFileInitializer {
         // Crear directorio si no existe
         if (!existsSync(dataDirectory)) {
             mkdirSync(dataDirectory, { recursive: true });
-            console.log(`[CsvFileInitializer] Directorio creado: ${dataDirectory}`);
+            CsvFileInitializer.#logger.info(`[CsvFileInitializer] Directorio creado: ${dataDirectory}`);
         }
 
         csvFiles.forEach(filename => {
@@ -35,7 +41,7 @@ export class CsvFileInitializer {
             this.ensureCsvFileExists(filePath, filename);
         });
 
-        console.log('[CsvFileInitializer] Todos los archivos CSV han sido verificados/creados');
+        CsvFileInitializer.#logger.info('[CsvFileInitializer] Todos los archivos CSV han sido verificados/creados');
     }
 
     /**
@@ -53,9 +59,9 @@ export class CsvFileInitializer {
 
             // Crear archivo con cabeceras
             writeFileSync(filePath, this.CSV_HEADER + '\n', 'utf8');
-            console.log(`[CsvFileInitializer] Archivo creado: ${filename}`);
+            CsvFileInitializer.#logger.info(`[CsvFileInitializer] Archivo creado: ${filename}`);
         } else {
-            console.log(`[CsvFileInitializer] Archivo verificado: ${filename}`);
+            CsvFileInitializer.#logger.info(`[CsvFileInitializer] Archivo verificado: ${filename}`);
         }
     }
 
@@ -74,7 +80,7 @@ export class CsvFileInitializer {
             const firstLine = fs.readFileSync(filePath, 'utf8').split('\n')[0].trim();
             return firstLine === this.CSV_HEADER;
         } catch (error) {
-            console.error(`[CsvFileInitializer] Error validando formato de ${filePath}:`, error.message);
+            CsvFileInitializer.#logger.error(`[CsvFileInitializer] Error validando formato de ${filePath}:`, error.message);
             return false;
         }
     }
@@ -94,10 +100,10 @@ export class CsvFileInitializer {
             if (lines[0].trim() !== this.CSV_HEADER) {
                 lines[0] = this.CSV_HEADER;
                 fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
-                console.log(`[CsvFileInitializer] Formato reparado: ${filename}`);
+                CsvFileInitializer.#logger.info(`[CsvFileInitializer] Formato reparado: ${filename}`);
             }
         } catch (error) {
-            console.error(`[CsvFileInitializer] Error reparando ${filename}:`, error.message);
+            CsvFileInitializer.#logger.error(`[CsvFileInitializer] Error reparando ${filename}:`, error.message);
         }
     }
 }

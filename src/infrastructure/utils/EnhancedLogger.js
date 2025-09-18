@@ -10,6 +10,7 @@
 export class EnhancedLogger {
   #logLevel;
   #enableSourceTracking;
+  #logger;
   #logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
   #isProduction = process.env.NODE_ENV === 'production';
   #sourceLocationCache = new Map();
@@ -22,6 +23,7 @@ export class EnhancedLogger {
    */
   constructor(logLevel = 'info', enableSourceTracking = true, productionConfig = {}) {
     this.#logLevel = logLevel;
+    this.#logger = console; // Inicializar con console por defecto
     
     // Aplicar configuración específica de producción
     if (this.#isProduction) {
@@ -194,7 +196,8 @@ export class EnhancedLogger {
     
     if (this.#shouldLog('debug')) {
       const { formattedMessage, args: formattedArgs } = this.#formatMessage('debug', message, args);
-      this.#logger.info(formattedMessage, ...formattedArgs);
+      this.#logger.debug ? this.#logger.debug(formattedMessage, ...formattedArgs) : 
+                          this.#logger.info(formattedMessage, ...formattedArgs);
     }
   }
 
@@ -310,9 +313,8 @@ export class EnhancedLogger {
         : `[TXN:${transactionId}] ${message}`;
       
       const { formattedMessage, args: formattedArgs } = this.#formatMessage(level, prefixedMessage, args);
-      const logMethod = level === 'error' ? console.error : 
-                       level === 'warn' ? console.warn : console.log;
-      logMethod(formattedMessage, ...formattedArgs);
+      this.#logger[level] ? this.#logger[level](formattedMessage, ...formattedArgs) : 
+                           this.#logger.info(formattedMessage, ...formattedArgs);
     }
   }
 
@@ -349,9 +351,8 @@ export class EnhancedLogger {
       
       if (this.#shouldLog(level)) {
         const { formattedMessage, args: formattedArgs } = this.#formatMessage(level, componentMessage, args);
-        const logMethod = level === 'error' ? console.error : 
-                         level === 'warn' ? console.warn : console.log;
-        logMethod(formattedMessage, ...formattedArgs);
+        this.#logger[level] ? this.#logger[level](formattedMessage, ...formattedArgs) : 
+                             this.#logger.info(formattedMessage, ...formattedArgs);
       }
       return;
     }
