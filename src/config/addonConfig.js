@@ -268,7 +268,11 @@ function generateManifest() {
     return manifestCache;
   }
 
-  // Generar manifest fresco
+  // Extraer tipos e idPrefixes únicos de resources para evitar duplicación
+  const uniqueTypes = [...new Set(config.addon.resources.flatMap(r => r.types))];
+  const uniqueIdPrefixes = [...new Set(config.addon.resources.flatMap(r => r.idPrefixes))];
+
+  // Generar manifest optimizado sin duplicaciones
   const manifest = {
     id: config.addon.id,
     version: config.addon.version,
@@ -277,9 +281,9 @@ function generateManifest() {
     logo: config.addon.logo,
     background: config.addon.background,
     resources: config.addon.resources,
-    types: config.addon.types,
+    types: uniqueTypes,
     catalogs: config.addon.catalogs,
-    idPrefixes: config.addon.idPrefixes,
+    idPrefixes: uniqueIdPrefixes,
     behaviorHints: {
       configurable: false,
       configurationRequired: false,
