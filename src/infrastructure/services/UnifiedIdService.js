@@ -9,6 +9,9 @@ import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 import { CONSTANTS } from '../../config/constants.js';
 
 export class UnifiedIdService {
+  #validateConversionInput;
+  #cacheConversion;
+  
   constructor({ idDetectorService, logger, cacheService, config }) {
     this.idDetectorService = idDetectorService;
     this.logger = logger || new EnhancedLogger('UnifiedIdService');
@@ -92,7 +95,7 @@ export class UnifiedIdService {
     const cacheKey = `kitsu:${kitsuId}->imdb`;
     
     // Verificar cache
-    const cached = this.#getCachedConversion(cacheKey);
+    const cached = await this.#getCachedConversion(cacheKey);
     if (cached) {
       return {
         success: true,
@@ -112,7 +115,7 @@ export class UnifiedIdService {
       };
 
     } catch (error) {
-      this.enhancedLogger.error(`Error convirtiendo Kitsu ID ${kitsuId}:`, error);
+      this.logger.error(`Error convirtiendo Kitsu ID ${kitsuId}:`, error);
       return {
         success: false,
         convertedId: null,
@@ -168,7 +171,7 @@ export class UnifiedIdService {
     const cacheKey = `${fullId}->imdb`;
     
     // Verificar cache
-    const cached = this.#getCachedConversion(cacheKey);
+    const cached = await this.#getCachedConversion(cacheKey);
     if (cached) {
       return {
         success: true,
@@ -209,59 +212,51 @@ export class UnifiedIdService {
   }
 
   /**
-   * Obtiene conversión desde cache
-   * @param {string} cacheKey - Clave de cache
-   * @returns {Object|null} Datos cacheados o null
+   * Valida los parámetros de entrada para la conversión
+   * @param {string} contentId - ID a convertir
+   * @param {string} targetService - Servicio destino
    */
-  #getCachedConversion(cacheKey) {
-    const cached = this.conversionCache.get(cacheKey);
-    if (!cached) return null;
-
-    // Verificar expiración
-    if (Date.now() - cached.timestamp > this.cacheExpiry) {
-      this.conversionCache.delete(cacheKey);
-      return null;
+  #validateConversionInput(contentId, targetService) {
+    if (!contentId || typeof contentId !== 'string') {
+      throw new Error('contentId debe ser una cadena no vacía');
     }
-
-    return cached;
+    
+    if (!targetService || typeof targetService !== 'string') {
+      throw new Error('targetService debe ser una cadena no vacía');
+    }
+    
+    const validServices = ['imdb', 'kitsu', 'mal', 'anilist', 'anidb'];
+    if (!validServices.includes(targetService.toLowerCase())) {
+      throw new Error(`targetService debe ser uno de: ${validServices.join(', ')}`);
+    }
   }
 
   /**
    * Almacena conversión en cache
    * @param {string} cacheKey - Clave de cache
-   * @param {string} id - ID convertido
-   * @param {Object} metadata - Metadatos
+   * @param {Object} result - Resultado de conversión
    */
-  #setCachedConversion(cacheKey, id, metadata) {
-    this.conversionCache.set(cacheKey, {
-      id,
-      metadata,
-      timestamp: Date.now()
-    });
-  }
-
-  /**
-   * Limpia cache expirado
-   */
-  cleanExpiredCache() {
-    const now = Date.now();
-    for (const [key, value] of this.conversionCache.entries()) {
-      if (now - value.timestamp > this.cacheExpiry) {
-        this.conversionCache.delete(key);
-      }
+  async #cacheConversion(cacheKey, result) {
+    try {
+      await this.cacheService.set(cacheKey, result, this.CONVERSION_CACHE_TTL);
+    } catch (error) {
+      this.logger.warn('Error almacenando conversión en cache:', error);
     }
   }
 
   /**
-   * Valida si un ID es procesable por el servicio
-   * @param {string} contentId - ID a validar
-   * @returns {boolean} True si es procesable
+   * Obtiene conversión desde cache
+   * @param {string} cacheKey - Clave de cache
+   * @returns {Object|null} Datos cacheados o null
    */
-  isProcessableId(contentId) {
-    const detection = this.detectorService.detectIdType(contentId);
-    return detection.isValid;
+  async #getCachedConversion(cacheKey) {
+    try {
+      const cached = await this.cacheService.get(cacheKey);
+      return cached || null;
+    } catch (error) {
+      this.logger.warn('Error obteniendo conversión desde cache:', error);
+      return null;
+    }
   }
-}
 
-// Instancia singleton con dependencias inyectadas
-export const unifiedIdService = new UnifiedIdService(idDetectorService);
+}

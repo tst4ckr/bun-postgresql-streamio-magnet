@@ -488,8 +488,8 @@ export class MetadataService {
    */
   getCacheStats() {
     const localStats = {
-      totalEntries: this.cache.size,
-      memoryUsage: JSON.stringify([...this.cache.entries()]).length,
+      totalEntries: this.cacheService.size || 0,
+      memoryUsage: JSON.stringify([...this.cacheService.entries()]).length,
       lastCleared: new Date().toISOString()
     };
     
