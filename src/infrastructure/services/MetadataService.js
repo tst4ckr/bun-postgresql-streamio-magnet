@@ -5,9 +5,9 @@
  */
 
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
-import { addonConfig } from '../../config/addonConfig.js';
-import { cacheService } from './CacheService.js';
 import { errorHandler, withErrorHandling, createError, ERROR_TYPES, safeExecute } from '../errors/ErrorHandler.js';
+import { cacheService } from './CacheService.js';
+import { addonConfig } from '../../config/addonConfig.js';
 
 export class MetadataService {
   /**
@@ -508,5 +508,10 @@ export class MetadataService {
   }
 }
 
-// Instancia singleton del servicio
-export const metadataService = new MetadataService();
+// Instancia singleton del servicio con dependencias
+export const metadataService = new MetadataService({
+  logger: new EnhancedLogger('MetadataService'),
+  cacheService,
+  errorHandler,
+  config: addonConfig
+});

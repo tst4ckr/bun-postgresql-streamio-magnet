@@ -4,21 +4,21 @@
  * Sigue principios de arquitectura limpia y responsabilidad única
  */
 
-import { idDetectorService } from './IdDetectorService.js';
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
+import { idDetectorService } from './IdDetectorService.js';
+import { cacheService } from './CacheService.js';
+import { addonConfig } from '../../config/addonConfig.js';
 import { CONSTANTS } from '../../config/constants.js';
 
 export class UnifiedIdService {
-  #validateConversionInput;
-  #cacheConversion;
   
-  constructor({ idDetectorService, logger, cacheService, config }) {
+  constructor({ idDetectorService, logger, cacheService, config } = {}) {
     this.idDetectorService = idDetectorService;
     this.logger = logger || new EnhancedLogger('UnifiedIdService');
     this.cacheService = cacheService;
     this.config = config;
     
-    this.CONVERSION_CACHE_TTL = config.cache?.conversionTtl || 86400;
+    this.CONVERSION_CACHE_TTL = config?.cache?.conversionTtl || 86400;
     this.SUPPORTED_SERVICES = ['imdb', 'kitsu', 'mal', 'anilist', 'anidb'];
     this.SERVICE_PRIORITIES = {
       imdb: 1,
@@ -260,3 +260,12 @@ export class UnifiedIdService {
   }
 
 }
+
+// Crear instancia singleton con dependencias
+const unifiedIdService = new UnifiedIdService({
+  idDetectorService,
+  cacheService,
+  config: addonConfig
+});
+
+export { unifiedIdService };

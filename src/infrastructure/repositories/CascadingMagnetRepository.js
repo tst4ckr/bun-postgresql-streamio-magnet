@@ -38,7 +38,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
    * @param {string} message - Mensaje a loggear
    * @param {any} data - Datos adicionales para contexto estructurado
    */
-  #logger(level, message, data = null) {
+  #logMessage(level, message, data = null) {
     if (!this.#logger) {
       // Fallback a console si no hay logger disponible
       const timestamp = new Date().toISOString();
@@ -113,7 +113,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
     if (this.#isInitialized) return;
     
     try {
-      this.#logger('info', 'Inicializando repositorios en cascada...');
+      this.#logMessage('info', 'Inicializando repositorios en cascada...');
       
       // Inicializar archivos CSV automáticamente
       const dataDirectory = dirname(this.#secondaryCsvPath);
@@ -132,10 +132,10 @@ export class CascadingMagnetRepository extends MagnetRepository {
       await this.#initializeRepository(this.#englishRepository, 'english.csv');
       
       this.#isInitialized = true;
-      this.#logger('info', 'Repositorios en cascada inicializados correctamente');
+      this.#logMessage('info', 'Repositorios en cascada inicializados correctamente');
       
     } catch (error) {
-      this.#logger('error', 'Error al inicializar repositorios en cascada:', error);
+      this.#logMessage('error', 'Error al inicializar repositorios en cascada:', error);
       throw error;
     }
   }
@@ -578,7 +578,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
 
       // Ejecutar comando
       if (this.#configInvoker.executeCommand(command)) {
-        this.#logger('info', `Idioma prioritario configurado temporalmente: ${language} para ${type}`);
+        this.#logMessage('info', `Idioma prioritario configurado temporalmente: ${language} para ${type}`);
         
         // Retornar función para revertir
         return () => {

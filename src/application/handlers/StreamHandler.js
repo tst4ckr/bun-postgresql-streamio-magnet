@@ -164,7 +164,7 @@ export class StreamHandler {
     const startTime = Date.now();
     
     // Log detallado del inicio de la petición
-    this.#logger('info', `Petición de stream iniciada para content ID: ${id} (${type})`);
+    this.#logMessage('info', `Petición de stream iniciada para content ID: ${id} (${type})`);
     
     // Verificar cache de streams primero
     const streamCacheKey = cacheService.generateStreamCacheKey(id, type);
@@ -175,7 +175,7 @@ export class StreamHandler {
     
     if (cachedStreams && !cachedStreams.error) {
       const duration = Date.now() - startTime;
-      this.#logger('info', `Streams obtenidos desde cache para ${id} en ${duration}ms`);
+      this.#logMessage('info', `Streams obtenidos desde cache para ${id} en ${duration}ms`);
       return cachedStreams;
     }
     
@@ -204,13 +204,13 @@ export class StreamHandler {
     // Detectar tipo de ID para anime
     const idType = this.#detectAnimeIdType(id);
     if (type === 'anime' && idType !== 'unknown') {
-      this.#logger('info', `ID de anime detectado: ${id} (tipo: ${idType})`);
+      this.#logMessage('info', `ID de anime detectado: ${id} (tipo: ${idType})`);
     }
 
     const magnets = await this.#getMagnets(id, type);
     
     if (!magnets || magnets.length === 0) {
-      this.#logger('warn', `No se encontraron magnets para: ${id}`);
+      this.#logMessage('warn', `No se encontraron magnets para: ${id}`);
       const emptyResponse = this.#createEmptyResponse();
       
       // Cachear respuesta vacía con TTL corto
@@ -228,9 +228,9 @@ export class StreamHandler {
     
     // Log detallado de resultados
     if (validationResult?.details?.detection) {
-      this.#logger('info', `Stream generado para ${id} (${validationResult.details.detection.type}): ${streams.length} streams encontrados en ${duration}ms`);
+      this.#logMessage('info', `Stream generado para ${id} (${validationResult.details.detection.type}): ${streams.length} streams encontrados en ${duration}ms`);
     } else {
-      this.#logger('info', `Stream generado para ${id} (${type}): ${streams.length} streams encontrados en ${duration}ms`);
+      this.#logMessage('info', `Stream generado para ${id} (${type}): ${streams.length} streams encontrados en ${duration}ms`);
     }
     
     const streamResponse = this.#createStreamResponse(streams);
@@ -364,7 +364,7 @@ export class StreamHandler {
    * @returns {Promise<import('../../domain/entities/Magnet.js').Magnet[]|null>}
    */
   async #getMagnets(contentId, type = 'movie') {
-    this.#logger('info', `Iniciando búsqueda de magnets para ${contentId} (${type})`);
+    this.#logMessage('info', `Iniciando búsqueda de magnets para ${contentId} (${type})`);
     
     // Usar el método unificado del repositorio para manejar cualquier tipo de ID
     const magnetsResult = await safeExecute(
@@ -378,7 +378,7 @@ export class StreamHandler {
     
     if (magnetsResult.error) {
       if (magnetsResult.error instanceof MagnetNotFoundError) {
-        this.#logger('warn', `No se encontraron magnets para ${contentId}: ${magnetsResult.error.message}`);
+        this.#logMessage('warn', `No se encontraron magnets para ${contentId}: ${magnetsResult.error.message}`);
         return null;
       }
       throw createError(
@@ -391,12 +391,12 @@ export class StreamHandler {
     const magnets = magnetsResult;
     
     if (magnets && magnets.length > 0) {
-      this.#logger('info', `Encontrados ${magnets.length} magnets para ${contentId}`);
+      this.#logMessage('info', `Encontrados ${magnets.length} magnets para ${contentId}`);
       
       // Log adicional para anime con información de fuentes
       if (type === 'anime') {
         const sources = [...new Set(magnets.map(m => m.provider || 'Unknown'))];
-        this.#logger('info', `Fuentes de anime para ${contentId}: ${sources.join(', ')}`);
+        this.#logMessage('info', `Fuentes de anime para ${contentId}: ${sources.join(', ')}`);
       }
     }
     
@@ -598,7 +598,7 @@ export class StreamHandler {
    * @returns {Object}
    */
   #createErrorResponse(error) {
-    this.#logger('error', `Error en stream handler: ${error.message}`);
+    this.#logMessage('error', `Error en stream handler: ${error.message}`);
     
     // Determinar el tiempo de cache basado en el tipo de error
     let cacheMaxAge = 300; // 5 minutos por defecto
@@ -677,7 +677,7 @@ export class StreamHandler {
       timestamp: Date.now()
     });
     
-    this.#logger('info', `TTL adaptativo calculado para ${type} con ${streamCount} streams: ${adaptiveTTL}ms`);
+    this.#logMessage('info', `TTL adaptativo calculado para ${type} con ${streamCount} streams: ${adaptiveTTL}ms`);
     return adaptiveTTL;
   }
 
@@ -687,7 +687,7 @@ export class StreamHandler {
    * @param {string} level - Nivel de log (info, warn, error)
    * @param {string} message - Mensaje a registrar
    */
-  #logger(level, message) {
+  #logMessage(level, message) {
     const timestamp = new Date().toISOString();
     const formattedMessage = `[${level.toUpperCase()}] ${timestamp} [handlers/StreamHandler.js] - ${message}`;
     

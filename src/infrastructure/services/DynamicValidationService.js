@@ -6,6 +6,7 @@
 
 import { idDetectorService } from './IdDetectorService.js';
 import { unifiedIdService } from './UnifiedIdService.js';
+import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 import { CONSTANTS } from '../../config/constants.js';
 
 export class DynamicValidationService {
