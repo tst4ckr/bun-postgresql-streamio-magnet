@@ -213,6 +213,67 @@ export class TvHandler {
   }
 
   /**
+   * Crea el handler de metadatos para el addon de Stremio.
+   * @returns {Function} Handler function para defineMetaHandler.
+   */
+  createMetaHandler() {
+    return async (args) => {
+      const startTime = Date.now();
+      
+      return safeExecute(async () => {
+        this.#logger.info('Tv meta request:', args);
+        
+        const result = await this.#handleMetaRequest(args);
+        
+        this.#logger.info(`Tv meta response time: ${Date.now() - startTime}ms`);
+        return result;
+      }, (error) => {
+        this.#logger.error('Error in tv meta handler:', error);
+        return this.#createErrorMetaResponse(error);
+      });
+    };
+  }
+
+  /**
+   * Maneja peticiones de metadatos de canales de TV.
+   * @private
+   * @param {Object} args - Argumentos de la petición
+   * @returns {Promise<Object>} Respuesta de metadatos
+   */
+  async #handleMetaRequest(args) {
+    const { type, id } = args;
+    
+    // Validar que es una petición de canales de TV
+    if (type !== 'tv') {
+      return this.#createEmptyMetaResponse();
+    }
+
+    // Mapear IDs alternativos a IDs correctos
+    const actualId = this.#mapAlternativeId(id);
+    
+    // Buscar el canal por ID (usar el ID mapeado)
+    const tv = await this.#tvRepository.getTvById(actualId);
+    
+    if (!tv) {
+      this.#logger.warn(`Tv not found for meta: ${id} (mapped to: ${actualId})`);
+      return this.#createEmptyMetaResponse();
+    }
+
+    // Convertir a formato Stremio Meta
+    const meta = tv.toStremioMeta();
+    
+    const response = {
+      meta: meta,
+      cacheMaxAge: this.#config.cache?.metadata || 300, // 5 minutos por defecto
+      staleRevalidate: this.#config.cache?.staleRevalidate || 60,
+      staleError: this.#config.cache?.staleError || 3600
+    };
+
+    this.#logger.info(`Meta response for tv: ${tv.name}`);
+    return response;
+  }
+
+  /**
    * Obtiene un canal de TV por su ID.
    * @param {string} id - ID del canal
    * @returns {Promise<Object|null>} Canal de TV o null si no existe
@@ -275,6 +336,31 @@ export class TvHandler {
   #createErrorCatalogResponse(error) {
     this.#logger.error('Tv catalog error:', error);
     return this.#createEmptyCatalogResponse();
+  }
+
+  /**
+   * Crea respuesta vacía para metadatos.
+   * @private
+   * @returns {Object} Respuesta vacía
+   */
+  #createEmptyMetaResponse() {
+    return {
+      meta: {},
+      cacheMaxAge: 300,
+      staleRevalidate: 60,
+      staleError: 3600
+    };
+  }
+
+  /**
+   * Crea respuesta de error para metadatos.
+   * @private
+   * @param {Error} error - Error ocurrido
+   * @returns {Object} Respuesta de error
+   */
+  #createErrorMetaResponse(error) {
+    this.#logger.error('Tv meta error:', error);
+    return this.#createEmptyMetaResponse();
   }
 
   /**

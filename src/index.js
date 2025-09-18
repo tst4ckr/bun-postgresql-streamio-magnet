@@ -43,53 +43,49 @@ class MagnetAddon {
       this.#config.repository.torrentioApiUrl,
       this.#logger,
       this.#config.repository.timeout,
-      undefined, // idService (usar por defecto)
-      this.#config.tor // configuración de Tor
+      undefined,
+      this.#config.tor
     );
     await this.#magnetRepository.initialize();
-    this.#logger.info('Repositorio de magnets en cascada inicializado.');
+    this.#logger.info('Repositorio de magnets inicializado');
 
     // 2. Crear Addon Builder
     this.#addonBuilder = new addonBuilder(manifest);
-    this.#logger.info(`Addon builder creado: ${manifest.name} v${manifest.version}`);
+    this.#logger.info(`Addon: ${manifest.name} v${manifest.version}`);
 
     // 3. Configurar Stream Handler
-    const streamHandler = new StreamHandler(this.#magnetRepository, this.#config, this.#logger);
-    this.#streamHandler = streamHandler;
-    
-    // Configurar handlers después de inicializar TV (se configurarán en #setupHandlers)
-    this.#logger.info('Preparando configuración de handlers...');
+    this.#streamHandler = new StreamHandler(this.#magnetRepository, this.#config, this.#logger);
 
-    // 4. Configurar TV M3U (después de la cascada de magnets)
-    await this.#setupTvHandlers();
+    // 4. Configurar handlers
+    await this.#setupHandlers();
 
-    // 5. Configurar rutas personalizadas para configuración de idioma
-    this.#setupLanguageRoutes(streamHandler);
-    
-    // 6. Configurar rutas de diagnóstico (comentario informativo)
-    this.#setupDiagnosticRoutes();
+    // 5. Configurar rutas adicionales
+    this.#setupAdditionalRoutes();
   }
 
   /**
-   * Configura handlers independientes según sus responsabilidades específicas.
-   * StreamHandler para magnets, TvHandler para TV M3U (si está configurado).
+   * Configura todos los handlers del addon.
+   * @private
    */
-  async #setupTvHandlers() {
+  async #setupHandlers() {
     const m3uUrl = this.#config.repository.m3uUrl;
     
-    // Siempre configurar StreamHandler para magnets
     this.#setupStreamHandler();
     
-    // Configurar TvHandler solo si M3U_URL está disponible
     if (m3uUrl) {
       await this.#setupTvHandler(m3uUrl);
-    } else {
-      this.#logger.info('M3U_URL no configurada. Funcionalidad de TV M3U deshabilitada.');
     }
 
-    // Configurar handlers comunes
     this.#setupCatalogHandler();
     this.#setupMetaHandler();
+  }
+
+  /**
+   * Configura rutas adicionales.
+   * @private
+   */
+  #setupAdditionalRoutes() {
+    this.#logger.info('Rutas adicionales configuradas');
   }
 
   /**
@@ -97,10 +93,26 @@ class MagnetAddon {
    * @private
    */
   #setupStreamHandler() {
-    // Configurar handler de streams para magnets
-    this.#addonBuilder.defineStreamHandler(this.#createCombinedStreamHandler());
+    this.#addonBuilder.defineStreamHandler(async (args) => {
+      try {
+        // Delegar a StreamHandler para todo tipo excepto TV
+        if (args.type !== 'tv') {
+          return await this.#streamHandler.createAddonHandler()(args);
+        }
+        
+        // Para TV, usar TvHandler si está disponible
+        if (this.#tvHandler) {
+          return await this.#tvHandler.createStreamHandler()(args);
+        }
+        
+        return { streams: [] };
+      } catch (error) {
+        this.#logger.error('Error in stream handler', { error: error.message, args });
+        return { streams: [] };
+      }
+    });
     
-    this.#logger.info('StreamHandler configurado para magnets (movies, series, anime).');
+    this.#logger.info('StreamHandler configurado.');
   }
 
   /**
@@ -110,13 +122,9 @@ class MagnetAddon {
    */
   async #setupTvHandler(m3uUrl) {
     try {
-      // Inicializar repositorio de TV M3U
       this.#tvRepository = new M3UTvRepository(m3uUrl, this.#config, this.#logger);
-      
-      // Inicializar handler de TV
       this.#tvHandler = new TvHandler(this.#tvRepository, this.#config, this.#logger);
-      
-      this.#logger.info(`TvHandler configurado para TV M3U con URL: ${m3uUrl}`);
+      this.#logger.info('TvHandler configurado');
     } catch (error) {
       this.#logger.error('Error configurando TvHandler:', error);
       throw error;
@@ -124,132 +132,53 @@ class MagnetAddon {
   }
 
   /**
-   * Configura handler de catálogo combinado para todos los tipos.
+   * Configura handler de catálogo.
    * @private
    */
   #setupCatalogHandler() {
-    this.#addonBuilder.defineCatalogHandler(this.#createCombinedCatalogHandler());
-    this.#logger.info('Handler de catálogo combinado configurado para todos los tipos.');
-  }
-
-  /**
-   * Crea un handler combinado de streams que maneja tanto magnets como TV.
-   * @private
-   * @returns {Function} Handler combinado de streams
-   */
-  #createCombinedStreamHandler() {
-    return async (args) => {
+    this.#addonBuilder.defineCatalogHandler(async (args) => {
       try {
-        // Si es tipo 'tv', usar TvHandler
-        if (args.type === 'tv' && this.#tvHandler) {
-          return await this.#tvHandler.createStreamHandler()(args);
-        }
-        
-        // Para otros tipos (movie, series), usar StreamHandler
-        return await this.#streamHandler.createAddonHandler()(args);
-      } catch (error) {
-        this.#logger.error('Error in combined stream handler', { error: error.message, args });
-        return { streams: [] };
-      }
-    };
-  }
-
-  /**
-   * Crea un handler combinado de catálogos que maneja tanto magnets como TV.
-   * @private
-   * @returns {Function} Handler combinado de catálogos
-   */
-  #createCombinedCatalogHandler() {
-    return async (args) => {
-      try {
-        // Si es tipo 'tv', usar TvHandler
+        // Solo TvHandler maneja catálogos
         if (args.type === 'tv' && this.#tvHandler) {
           return await this.#tvHandler.createCatalogHandler()(args);
         }
         
-        // Para otros tipos, retornar catálogo vacío (StreamHandler no maneja catálogos)
-        return { 
-          metas: [], 
-          cacheMaxAge: this.#config.cache.catalogCacheMaxAge,
-          staleRevalidate: this.#config.cache.staleRevalidate,
-          staleError: this.#config.cache.staleError
-        };
+        // StreamHandler no maneja catálogos
+        return { metas: [] };
       } catch (error) {
-        this.#logger.error('Error in combined catalog handler', { error: error.message, args });
+        this.#logger.error('Error in catalog handler', { error: error.message, args });
         return { metas: [] };
       }
-    };
+    });
+    
+    this.#logger.info('CatalogHandler configurado.');
   }
 
+
+
   /**
-   * Configura Meta Handler mejorado para TV y otros contenidos.
+   * Configura Meta Handler.
    * @private
    */
   #setupMetaHandler() {
     this.#addonBuilder.defineMetaHandler(async (args) => {
-      this.#logger.info('Meta request received', { type: args.type, id: args.id });
-      
       try {
-        // Para canales de TV, buscar el canal real en el repositorio
-        if (args.type === 'tv' && this.#tvHandler && this.#tvRepository) {
-          // Mapear ID alternativo si es necesario (reutilizar lógica de TvHandler)
-          const actualId = this.#mapAlternativeTvId(args.id);
-          
-          // Buscar el canal mediante el handler
-          const tv = await this.#tvHandler.getTvById(actualId);
-          
-          if (tv) {
-            this.#logger.info(`TV channel found for meta: ${tv.name} (${actualId})`);
-            return {
-              meta: tv.toStremioMeta(),
-              cacheMaxAge: this.#config.cache.metadataCacheMaxAge
-            };
-          } else {
-            this.#logger.warn(`TV channel not found for meta: ${args.id} (mapped: ${actualId})`);
-          }
+        // Delegar a TvHandler para TV
+        if (args.type === 'tv' && this.#tvHandler) {
+          return await this.#tvHandler.createMetaHandler()(args);
         }
         
-        // Para otros tipos o si no se encontró el canal, retornar metadatos básicos
-        const meta = {
-          id: args.id,
-          type: args.type,
-          name: `Content ${args.id}`,
-          poster: this.#config.addon?.logo,
-          background: this.#config.addon?.background
-        };
-        
-        return {
-          meta: meta,
-          cacheMaxAge: this.#config.cache.metadataCacheMaxAge
-        };
+        // Respuesta por defecto para otros tipos
+        return { meta: {} };
       } catch (error) {
         this.#logger.error('Error in meta handler', { error: error.message, args });
         return { meta: {} };
       }
     });
-
-    this.#logger.info('MetaHandler configurado con soporte para TV.');
+    
+    this.#logger.info('MetaHandler configurado.');
   }
-
-  /**
-   * Configura rutas personalizadas para configuración de idioma.
-   * @param {StreamHandler} streamHandler - Handler de streams
-   */
-  #setupLanguageRoutes(streamHandler) {
-    // Almacenar referencia al streamHandler para uso en rutas personalizadas
-    this.#streamHandler = streamHandler;
-    this.#logger.info('Configuración de idioma disponible mediante métodos del StreamHandler.');
-  }
-
-  /**
-   * Configura rutas de diagnóstico simples
-   */
-  #setupDiagnosticRoutes() {
-    // Diagnóstico disponible en servidor independiente (puerto 3004)
-    // Usar: bun run scripts/diagnostic-server.js
-    this.#logger.info('Diagnóstico disponible en servidor independiente.');
-  }
-
+  
   /**
    * Inicia el servidor HTTP del addon usando serveHTTP nativo del SDK.
    */
@@ -275,33 +204,6 @@ class MagnetAddon {
     this.#logger.info(`✅ Addon iniciado en: ${baseUrl}`);
     this.#logger.info(`🔗 Manifiesto: ${baseUrl}/manifest.json`);
     this.#logger.info(`🚀 Servidor optimizado con SDK nativo de Stremio`);
-  }
-
-  /**
-   * Mapea IDs alternativos de TV a IDs correctos (reutiliza lógica de TvHandler).
-   * @private
-   * @param {string} id - ID original
-   * @returns {string} ID mapeado o el original si no hay mapeo
-   */
-  #mapAlternativeTvId(id) {
-    // Mapeo de IDs alternativos comunes para TV
-    const idMappings = {
-      // Bob Esponja - mapeos comunes
-      'tv_ch_kids_bobesponjala': 'tv_ch_kids_bobesponjalatam',
-      'tv_ch_kids_bobesponja': 'tv_ch_kids_bobesponjalatam',
-      'tv_ch_kids_bobespoja': 'tv_ch_kids_bobesponjalatam',
-      'tv_ch_kids_spongebob': 'tv_ch_kids_bobesponjalatam',
-      
-      // Bob l'éponge - versión francesa
-      'tv_ch_kids_boblponge': 'tv_ch_kids_boblponge',
-      'tv_ch_kids_bobleponge': 'tv_ch_kids_boblponge',
-      
-      // Pluto TV Bob Esponja
-      'tv_ch_kids_plutotvbobesponja': 'tv_ch_kids_plutotvbobesponja720p',
-      'tv_ch_kids_plutotvspongebob': 'tv_ch_kids_plutotvbobesponja720p'
-    };
-
-    return idMappings[id] || id;
   }
 
   /**
