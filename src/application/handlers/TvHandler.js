@@ -147,8 +147,11 @@ export class TvHandler {
       return this.#createEmptyStreamResponse();
     }
 
+    // Mapear IDs alternativos a IDs correctos
+    const actualId = this.#mapAlternativeId(id);
+
     // Crear clave de cache
-    const cacheKey = `stream_tv_${id}`;
+    const cacheKey = `stream_tv_${actualId}`;
     
     // Intentar obtener desde cache
     const cached = cacheService.get(cacheKey);
@@ -157,11 +160,11 @@ export class TvHandler {
       return cached;
     }
 
-    // Buscar el canal por ID (usar el ID completo tal como se almacena)
-    const tv = await this.#tvRepository.getTvById(id);
+    // Buscar el canal por ID (usar el ID mapeado)
+    const tv = await this.#tvRepository.getTvById(actualId);
     
     if (!tv) {
-      this.#logger.warn(`Tv not found: ${id}`);
+      this.#logger.warn(`Tv not found: ${id} (mapped to: ${actualId})`);
       return this.#createEmptyStreamResponse();
     }
 
@@ -271,5 +274,32 @@ export class TvHandler {
   #createErrorStreamResponse(error) {
     this.#logger.error('Tv stream error:', error);
     return this.#createEmptyStreamResponse();
+  }
+
+  /**
+   * Mapea IDs alternativos a IDs correctos.
+   * @private
+   * @param {string} id - ID original
+   * @returns {string} ID mapeado o el original si no hay mapeo
+   */
+  #mapAlternativeId(id) {
+    // Mapeo de IDs alternativos comunes
+    const idMappings = {
+      // Bob Esponja - mapeos comunes
+      'tv_ch_kids_bobesponjala': 'tv_ch_kids_bobesponjalatam',
+      'tv_ch_kids_bobesponja': 'tv_ch_kids_bobesponjalatam',
+      'tv_ch_kids_bobespoja': 'tv_ch_kids_bobesponjalatam',
+      'tv_ch_kids_spongebob': 'tv_ch_kids_bobesponjalatam',
+      
+      // Bob l'éponge - versión francesa
+      'tv_ch_kids_boblponge': 'tv_ch_kids_boblponge',
+      'tv_ch_kids_bobleponge': 'tv_ch_kids_boblponge',
+      
+      // Pluto TV Bob Esponja
+      'tv_ch_kids_plutotvbobesponja': 'tv_ch_kids_plutotvbobesponja720p',
+      'tv_ch_kids_plutotvspongebob': 'tv_ch_kids_plutotvbobesponja720p'
+    };
+
+    return idMappings[id] || id;
   }
 }
