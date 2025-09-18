@@ -166,8 +166,11 @@ export class StreamHandler {
     // Log detallado del inicio de la petición
     this.#logMessage('info', `Petición de stream iniciada para content ID: ${id} (${type})`);
     
-    // Verificar cache de streams primero
-    const streamCacheKey = cacheService.generateStreamCacheKey(id, type);
+    // Extraer season y episode del contentId para generar clave de caché única
+    const { season, episode } = this.#extractSeasonEpisode(id);
+    
+    // Verificar cache de streams primero con clave específica por episodio
+    const streamCacheKey = cacheService.generateStreamCacheKey(id, type, { season, episode });
     const cachedStreams = await safeExecute(
       () => cacheService.get(streamCacheKey),
       { operation: 'cache.get', cacheKey: streamCacheKey }
@@ -235,7 +238,7 @@ export class StreamHandler {
     
     const streamResponse = this.#createStreamResponse(streams);
     
-    // Cachear respuesta exitosa
+    // Cachear respuesta exitosa usando la misma clave específica por episodio
     const cacheTTL = this.#getStreamCacheTTL(type, streams.length);
     cacheService.set(streamCacheKey, streamResponse, cacheTTL, {
       contentType: type,
@@ -618,6 +621,35 @@ export class StreamHandler {
       recoverable: error.recoverable || false,
       timestamp: new Date().toISOString()
     };
+  }
+
+  /**
+   * Extrae season y episode del contentId si están presentes.
+   * @private
+   * @param {string} contentId - ID de contenido (ej: kitsu:6448:11, tt1234567:1:5)
+   * @returns {Object} Objeto con season y episode extraídos
+   */
+  #extractSeasonEpisode(contentId) {
+    if (!contentId || typeof contentId !== 'string') {
+      return { season: undefined, episode: undefined };
+    }
+    
+    // Dividir por ':' para extraer partes
+    const parts = contentId.split(':');
+    
+    // Para formatos como kitsu:6448:11, tt1234567:1:5, etc.
+    if (parts.length >= 3) {
+      const seasonPart = parts[parts.length - 2]; // Penúltima parte
+      const episodePart = parts[parts.length - 1]; // Última parte
+      
+      // Validar que sean números válidos
+      const season = /^\d+$/.test(seasonPart) ? parseInt(seasonPart, 10) : undefined;
+      const episode = /^\d+$/.test(episodePart) ? parseInt(episodePart, 10) : undefined;
+      
+      return { season, episode };
+    }
+    
+    return { season: undefined, episode: undefined };
   }
 
   /**
