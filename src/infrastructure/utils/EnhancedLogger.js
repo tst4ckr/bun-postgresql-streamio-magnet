@@ -316,6 +316,62 @@ export class EnhancedLogger {
     }
   }
 
+  /**
+   * Método universal de logging con componente y datos opcionales
+   * Reemplaza los métodos #logger personalizados de los servicios
+   * @param {string} level - Nivel del log
+   * @param {string|Function} message - Mensaje principal
+   * @param {Object} options - Opciones adicionales
+   * @param {string} options.component - Componente que genera el log
+   * @param {Object} options.data - Datos adicionales para contexto estructurado
+   * @param {string} options.transactionId - ID de transacción para correlación
+   * @param {...any} args - Argumentos adicionales
+   */
+  log(level, message, options = {}, ...args) {
+    const { component, data, transactionId } = options;
+    
+    // Si hay transactionId, usar withTransaction
+    if (transactionId) {
+      return this.withTransaction(level, transactionId, message, ...args);
+    }
+    
+    // Si hay datos estructurados, usar structured
+    if (data && Object.keys(data).length > 0) {
+      const metadata = component ? { component, ...data } : data;
+      return this.structured(level, message, metadata);
+    }
+    
+    // Si hay componente, crear mensaje con prefijo
+    if (component) {
+      const componentMessage = typeof message === 'function'
+        ? () => `[${component}] ${message()}`
+        : `[${component}] ${message}`;
+      
+      if (this.#shouldLog(level)) {
+        const { formattedMessage, args: formattedArgs } = this.#formatMessage(level, componentMessage, args);
+        const logMethod = level === 'error' ? console.error : 
+                         level === 'warn' ? console.warn : console.log;
+        logMethod(formattedMessage, ...formattedArgs);
+      }
+      return;
+    }
+    
+    // Logging estándar por nivel
+    this[level](message, ...args);
+  }
+
+  /**
+   * Método de conveniencia para logging con componente
+   * @param {string} component - Componente que genera el log
+   * @param {string} level - Nivel del log
+   * @param {string|Function} message - Mensaje principal
+   * @param {Object} data - Datos adicionales opcionales
+   * @param {...any} args - Argumentos adicionales
+   */
+  logWithComponent(component, level, message, data = null, ...args) {
+    this.log(level, message, { component, data }, ...args);
+  }
+
 
 }
 
