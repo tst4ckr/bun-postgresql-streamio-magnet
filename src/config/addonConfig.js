@@ -40,47 +40,37 @@ const config = {
       {
         name: 'catalog',
         types: ['movie', 'series', 'anime'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:'],
-        // Aprovechar configuración de cascada para catálogos
-        cascadeEnabled: true
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
       },
       {
         name: 'meta',
         types: ['movie', 'series', 'anime'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:'],
-        // Usar metadatos específicos por tipo
-        typeSpecific: {
-          movie: { providers: ['tmdb', 'imdb'] },
-          series: { providers: ['tmdb', 'tvdb'] },
-          anime: { providers: ['mal', 'kitsu', 'anilist', 'anidb'] }
-        }
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
       },
       {
         name: 'stream',
         types: ['movie', 'series', 'anime'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:'],
-        // Aprovechar configuración de torrentio por tipo
-        typeSpecific: {
-          movie: { 
-            providers: process.env.TORRENTIO_MOVIE_PROVIDERS || CONSTANTS.PROVIDER.MOVIE_PROVIDERS.SPANISH,
-            qualityFilter: process.env.TORRENTIO_MOVIE_QUALITY_FILTER || CONSTANTS.QUALITY.DEFAULT_MOVIE_QUALITY_FILTER
-          },
-          series: { 
-            providers: process.env.TORRENTIO_SERIES_PROVIDERS || CONSTANTS.PROVIDER.SERIES_PROVIDERS.SPANISH,
-            qualityFilter: process.env.TORRENTIO_SERIES_QUALITY_FILTER || CONSTANTS.QUALITY.DEFAULT_SERIES_QUALITY_FILTER
-          },
-          anime: { 
-            providers: process.env.TORRENTIO_ANIME_PROVIDERS || CONSTANTS.PROVIDER.ANIME_PROVIDERS.DEFAULT,
-            qualityFilter: process.env.TORRENTIO_ANIME_QUALITY_FILTER || CONSTANTS.QUALITY.DEFAULT_ANIME_QUALITY_FILTER,
-            enableSubtitles: process.env.TORRENTIO_ANIME_SUBTITLES === 'true' || true
-          }
-        }
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
       }
     ],
     types: ['movie', 'series', 'anime'],
-    // Stremio genera dinámicamente catálogos para movies, series y anime
-    // Solo se incluyen catálogos personalizados para tipos específicos como TV
-    catalogs: [],
+    catalogs: [
+      {
+        type: 'movie',
+        id: 'movie_catalog',
+        name: 'Movies'
+      },
+      {
+        type: 'series',
+        id: 'series_catalog',
+        name: 'Series'
+      },
+      {
+        type: 'anime',
+        id: 'anime_catalog',
+        name: 'Anime'
+      }
+    ],
     idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
   },
   server: {
