@@ -88,6 +88,7 @@ class MagnetAddon {
     }
 
     // Configurar handlers comunes
+    this.#setupCatalogHandler();
     this.#setupMetaHandler();
   }
 
@@ -114,15 +115,21 @@ class MagnetAddon {
       
       // Inicializar handler de TV
       this.#tvHandler = new TvHandler(this.#tvRepository, this.#config, this.#logger);
-
-      // Configurar handler de catálogo para TV
-      this.#addonBuilder.defineCatalogHandler(this.#createCombinedCatalogHandler());
       
       this.#logger.info(`TvHandler configurado para TV M3U con URL: ${m3uUrl}`);
     } catch (error) {
       this.#logger.error('Error configurando TvHandler:', error);
       throw error;
     }
+  }
+
+  /**
+   * Configura handler de catálogo combinado para todos los tipos.
+   * @private
+   */
+  #setupCatalogHandler() {
+    this.#addonBuilder.defineCatalogHandler(this.#createCombinedCatalogHandler());
+    this.#logger.info('Handler de catálogo combinado configurado para todos los tipos.');
   }
 
   /**
