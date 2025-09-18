@@ -117,7 +117,7 @@ export class Tv {
       awards: null,
       website: null,
       behaviorHints: {
-        defaultVideoId: 'live',
+        defaultVideoId: this.#id,
         hasScheduledVideos: false
       }
     };
