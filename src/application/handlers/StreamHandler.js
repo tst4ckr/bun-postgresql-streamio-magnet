@@ -529,7 +529,14 @@ export class StreamHandler {
       try {
         const parsedMagnet = parseMagnet(magnet.magnet);
         const infoHash = parsedMagnet.infoHash;
-        const trackers = parsedMagnet.tr || [];
+        // Filtrar solo trackers válidos (HTTP/HTTPS/UDP)
+        const trackers = (parsedMagnet.tr || []).filter(tracker => {
+          return tracker && (
+            tracker.startsWith('http://') || 
+            tracker.startsWith('https://') || 
+            tracker.startsWith('udp://')
+          );
+        });
 
         if (!infoHash) {
           this.#logger.warn(`Magnet sin infoHash, saltando: ${magnet.magnet}`);
@@ -555,35 +562,14 @@ export class StreamHandler {
           stream.fileIdx = magnet.fileIdx;
         }
 
-        // Agregar información adicional si está disponible
-        if (magnet.seeders && magnet.seeders > 0) {
-          stream.behaviorHints.seeders = magnet.seeders;
-        }
-
-        if (magnet.leechers && magnet.leechers >= 0) {
-          stream.behaviorHints.leechers = magnet.leechers;
-        }
-
+        // Agregar propiedades oficiales de behaviorHints según SDK
         if (magnet.size) {
           stream.behaviorHints.videoSize = magnet.size;
         }
 
-        // Agregar información de calidad si está disponible
-        if (magnet.quality) {
-          stream.behaviorHints.videoQuality = magnet.quality;
-        }
-
-        // Agregar información del proveedor
-        if (magnet.provider) {
-          stream.behaviorHints.provider = magnet.provider;
-        }
-
-        // Personalizar según tipo de contenido
-        if (type === 'anime') {
-          stream.behaviorHints.contentType = 'anime';
-          if (metadata?.year) {
-            stream.behaviorHints.year = metadata.year;
-          }
+        // Agregar filename si está disponible (recomendado para subtítulos)
+        if (magnet.filename) {
+          stream.behaviorHints.filename = magnet.filename;
         }
 
         return stream;
@@ -593,22 +579,18 @@ export class StreamHandler {
       }
     }).filter(Boolean); // Eliminar nulos si los hubiera
 
-    // Ordenar streams por calidad y seeders
+    // Ordenar streams por tamaño de archivo (proxy de calidad) para mejor rendimiento
     streams.sort((a, b) => {
-      // Priorizar por seeders si están disponibles
-      const seedersA = a.behaviorHints?.seeders || 0;
-      const seedersB = b.behaviorHints?.seeders || 0;
+      // Priorizar por tamaño de archivo (mayor tamaño = mejor calidad generalmente)
+      const sizeA = a.behaviorHints?.videoSize || 0;
+      const sizeB = b.behaviorHints?.videoSize || 0;
       
-      if (seedersA !== seedersB) {
-        return seedersB - seedersA; // Mayor número de seeders primero
+      if (sizeA !== sizeB) {
+        return sizeB - sizeA; // Mayor tamaño primero
       }
       
-      // Luego por calidad (si está disponible)
-      const qualityOrder = { '2160p': 4, '1080p': 3, '720p': 2, '480p': 1 };
-      const qualityA = qualityOrder[a.behaviorHints?.videoQuality] || 0;
-      const qualityB = qualityOrder[b.behaviorHints?.videoQuality] || 0;
-      
-      return qualityB - qualityA;
+      // Fallback: ordenar alfabéticamente por nombre para consistencia
+      return a.name.localeCompare(b.name);
     });
 
     return streams;
@@ -794,20 +776,11 @@ export class StreamHandler {
    * @returns {Object}
    */
   #createStreamResponse(streams, metadata = null) {
-    const response = {
+    // Formato oficial del protocolo Stremio: solo streams y cacheMaxAge
+    return {
       streams,
-      // Cache más largo para magnets, ya que no cambian frecuentemente.
-      cacheMaxAge: this.#config.cache.streamCacheMaxAge,
-      staleRevalidate: this.#config.cache.streamStaleRevalidate,
-      staleError: this.#config.cache.streamStaleError
+      cacheMaxAge: this.#config.cache.streamCacheMaxAge
     };
-    
-    // Agregar metadatos si están disponibles
-    if (metadata) {
-      response.metadata = metadata;
-    }
-    
-    return response;
   }
 
   /**
