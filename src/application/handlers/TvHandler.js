@@ -86,7 +86,8 @@ export class TvHandler {
 
     // Obtener parámetros de paginación y filtros
     const skip = parseInt(extra.skip) || 0;
-    const limit = Math.min(parseInt(extra.limit) || 100, 100); // Máximo 100 por página
+    const maxChannels = this.#config.repository?.maxTvChannels || 1000;
+    const limit = Math.min(parseInt(extra.limit) || 100, maxChannels); // Usar configuración maxTvChannels
     const search = extra.search?.trim();
     const genre = extra.genre?.trim();
 
