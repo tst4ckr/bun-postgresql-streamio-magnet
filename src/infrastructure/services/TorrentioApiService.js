@@ -5,13 +5,12 @@
 
 import { writeFileSync, appendFileSync, existsSync, mkdirSync, readFileSync } from 'fs';
 import { dirname } from 'path';
-import net from 'net';
 import { Magnet } from '../../domain/entities/Magnet.js';
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 import { addonConfig } from '../../config/addonConfig.js';
 import { CONSTANTS } from '../../config/constants.js';
-import { SocksProxyAgent } from 'socks-proxy-agent';
 import { ConfigurationCommandFactory } from '../patterns/ConfigurationCommand.js';
+import { TorService } from './TorService.js';
 
 /**
  * Clase de error específica para TorrentioApiService
@@ -51,14 +50,7 @@ export class TorrentioApiService {
   #providerConfigs;
   #manifestCache;
   #manifestCacheExpiry;
-  #torEnabled;
-  #torHost;
-  #torPort;
-  #torControlPort;
-    #torControlHost;
-    #torRotationInterval;
-  #maxRetries;
-  #retryDelay;
+  #torService;
   #configInvoker;
 
 
@@ -78,26 +70,18 @@ export class TorrentioApiService {
     this.#logger = logger || new EnhancedLogger('TorrentioApiService');
     this.#timeout = timeout;
     
-    this.#torEnabled = torConfig.enabled ?? true;
-    this.#torHost = torConfig.host ?? CONSTANTS.NETWORK.TOR_DEFAULT_HOST;
-    this.#torPort = torConfig.port ?? CONSTANTS.NETWORK.TOR_DEFAULT_PORT;
-    this.#torControlHost = torConfig.controlHost ?? CONSTANTS.NETWORK.TOR_CONTROL_DEFAULT_HOST;
-    this.#torControlPort = torConfig.controlPort ?? CONSTANTS.NETWORK.TOR_CONTROL_DEFAULT_PORT;
-    this.#maxRetries = torConfig.maxRetries ?? CONSTANTS.NETWORK.MAX_RETRIES;
-    this.#retryDelay = torConfig.retryDelay ?? CONSTANTS.TIME.TOR_RETRY_DELAY;
+    // Inicializar TorService con configuración completa
+    this.#torService = new TorService({
+      ...torConfig,
+      timeout: timeout
+    }, this.#logger);
     
     this.#configInvoker = ConfigurationCommandFactory.createInvoker(this.#logger);
     this.#providerConfigs = this.#initializeProviderConfigs();
     this.#manifestCache = new Map();
     this.#manifestCacheExpiry = CONSTANTS.TIME.MANIFEST_CACHE_EXPIRY;
-    this.#torRotationInterval = null;
     
     this.#ensureTorrentioFileExists();
-    this.#startTorRotation();
-    
-    if (this.#torEnabled) {
-      this.#logger.info(`Tor configurado en ${this.#torHost}:${this.#torPort}`);
-    }
   }
 
   /**
@@ -120,10 +104,13 @@ export class TorrentioApiService {
    *   - episode: Episodio (solo para series/anime)
    */
   async searchMagnetsById(contentId, type = 'auto', season = null, episode = null) {
+    let detectedType = type; // Declarar fuera del try para que esté disponible en catch
+    let streamUrl = ''; // Declarar fuera del try para que esté disponible en catch
+    
     try {
       // Validar que tengamos un ID válido
       if (!contentId || typeof contentId !== 'string') {
-        this.#logger.warn(`ID inválido para Torrentio API: ${contentId}`);
+        this.#logger.log('warn', `ID inválido para Torrentio API: ${contentId}`, { component: 'TorrentioApiService' });
         return [];
       }
       
@@ -142,8 +129,8 @@ export class TorrentioApiService {
       }
       
       // Detectar tipo automáticamente si es necesario
-      const detectedType = type === 'auto' ? this.#detectContentType(baseContentId, finalSeason, finalEpisode) : type;
-      this.#logger.info(`Buscando magnets en API Torrentio para: ${contentId} (tipo: ${detectedType}, season: ${finalSeason}, episode: ${finalEpisode})`);
+      detectedType = type === 'auto' ? this.#detectContentType(baseContentId, finalSeason, finalEpisode) : type;
+      this.#logger.log('info', `Buscando magnets en API Torrentio para: ${contentId} (tipo: ${detectedType}, season: ${finalSeason}, episode: ${finalEpisode})`, { component: 'TorrentioApiService' });
       
       // Procesar el ID para obtener el formato correcto para Torrentio
       const { finalContentId } = this.#processContentId(baseContentId);
@@ -152,7 +139,7 @@ export class TorrentioApiService {
       let finalStreamId = finalContentId;
       if ((detectedType === 'series' || detectedType === 'anime') && finalSeason !== null && finalEpisode !== null) {
         finalStreamId = `${finalContentId}:${finalSeason}:${finalEpisode}`;
-        this.#logger.info(`Formato de serie/anime: ${finalStreamId}`);
+        this.#logger.log('info', `Formato de serie/anime: ${finalStreamId}`, { component: 'TorrentioApiService' });
       }
       
       // Construir URL según el tipo de contenido con proveedores optimizados
@@ -173,12 +160,12 @@ export class TorrentioApiService {
           break;
       }
       
-      const streamUrl = `${optimizedBaseUrl}/stream/${urlContentType}/${finalStreamId}.json`;
-      this.#logger.info(`URL construida: ${streamUrl}`);
-      const response = await this.#fetchWithTor(streamUrl);
+      streamUrl = `${optimizedBaseUrl}/stream/${urlContentType}/${finalStreamId}.json`;
+      this.#logger.log('info', `URL construida: ${streamUrl}`, { component: 'TorrentioApiService' });
+      const response = await this.#fetchWithTorService(streamUrl);
       
       if (!response.ok) {
-        this.#logger.warn(`API Torrentio respondió con status ${response.status} para ${finalStreamId}`);
+        this.#logger.log('warn', `API Torrentio respondió con status ${response.status} para ${finalStreamId}`, { component: 'TorrentioApiService' });
         return [];
       }
       
@@ -187,7 +174,7 @@ export class TorrentioApiService {
       
       if (magnets.length > 0) {
         await this.#saveMagnetsToFile(magnets);
-        this.#logger.info(`Guardados ${magnets.length} magnets de API Torrentio para ${finalStreamId}`);
+        this.#logger.log('info', `Guardados ${magnets.length} magnets de API Torrentio para ${finalStreamId}`, { component: 'TorrentioApiService' });
       }
       
       return magnets;
@@ -204,7 +191,7 @@ export class TorrentioApiService {
         url: streamUrl
       };
       
-      this.#logger.error('Error en búsqueda de API Torrentio:', apiError);
+      this.#logger.log('error', 'Error en búsqueda de API Torrentio:', { component: 'TorrentioApiService', ...apiError });
       return [];
     }
   }
@@ -245,7 +232,7 @@ export class TorrentioApiService {
       // Obtener configuraciones de idioma para el tipo de contenido
       const typeConfig = addonConfig.torrentio[detectedType];
       if (!typeConfig || !typeConfig.languageConfigs) {
-        this.#logger.warn(`No hay configuraciones de idioma para tipo: ${detectedType}`);
+        this.#logger.log('warn', `No hay configuraciones de idioma para tipo: ${detectedType}`, { component: 'TorrentioApiService' });
         return this.searchMagnetsById(finalContentId, detectedType, finalSeason, finalEpisode);
       }
       
@@ -275,7 +262,7 @@ export class TorrentioApiService {
           }
         }
         
-        this.#logger.warn(`No se encontraron resultados para ${contentId}`);
+        this.#logger.log('warn', `No se encontraron resultados para ${contentId}`, { component: 'TorrentioApiService' });
         return [];
       }
       
@@ -346,7 +333,7 @@ export class TorrentioApiService {
       return [];
       
     } catch (error) {
-      this.#logger.error(`Error en búsqueda con fallback de idioma para ${contentId}:`, error);
+      this.#logger.log('error', `Error en búsqueda con fallback de idioma para ${contentId}:`, { component: 'TorrentioApiService', error });
       throw error;
     }
   }
@@ -498,7 +485,7 @@ export class TorrentioApiService {
     for (const stream of streams) {
       try {
         if (!stream.infoHash) {
-          this.#logger.debug(`Stream sin infoHash ignorado para ${contentId}:`, stream);
+          this.#logger.log('debug', `Stream sin infoHash ignorado para ${contentId}:`, { component: 'TorrentioApiService', stream });
           continue;
         }
         
@@ -516,7 +503,7 @@ export class TorrentioApiService {
         // Filtrar por tamaño: solo menores a 9GB
         const sizeInGB = this.#convertSizeToGB(size);
         if (sizeInGB >= 9) {
-          this.#logger.debug(`Stream descartado por tamaño (${size}): ${fullName}`);
+          this.#logger.log('debug', `Stream descartado por tamaño (${size}): ${fullName}`, { component: 'TorrentioApiService' });
           continue;
         }
         
@@ -563,7 +550,7 @@ export class TorrentioApiService {
         candidates.push(magnet);
         
       } catch (error) {
-        this.#logger.error(`Error al procesar stream de Torrentio para ${contentId}:`, { error, stream });
+        this.#logger.log('error', `Error al procesar stream de Torrentio para ${contentId}:`, { component: 'TorrentioApiService', error, stream });
       }
     }
     
@@ -625,7 +612,7 @@ export class TorrentioApiService {
     );
     
     if (validCandidates.length === 0) {
-      this.#logger.warn(`Ningún magnet cumple el mínimo de ${config.minSeeders} seeders`);
+      this.#logger.log('warn', `Ningún magnet cumple el mínimo de ${config.minSeeders} seeders`, { component: 'TorrentioApiService' });
       return [];
     }
     
@@ -647,7 +634,7 @@ export class TorrentioApiService {
     const bestCandidate = sortedCandidates[0];
     
     if (config.enableSelectionLogging) {
-      this.#logger.info(`Mejor magnet seleccionado (estrategia: ${config.strategy}): ${bestCandidate.name} (${bestCandidate.quality}, ${bestCandidate.seeders || 0} seeders)`);
+      this.#logger.log('info', `Mejor magnet seleccionado (estrategia: ${config.strategy}): ${bestCandidate.name} (${bestCandidate.quality}, ${bestCandidate.seeders || 0} seeders)`, { component: 'TorrentioApiService' });
     }
     
     return [bestCandidate];
@@ -1035,7 +1022,7 @@ export class TorrentioApiService {
     
     // Si no hay ruta de archivo especificada, omitir el guardado
     if (!targetFilePath || targetFilePath.trim() === '') {
-      this.#logger.debug(`No se especificó ruta para archivo ${fileName}, omitiendo guardado`);
+      this.#logger.log('debug', `No se especificó ruta para archivo ${fileName}, omitiendo guardado`, { component: 'TorrentioApiService' });
       return;
     }
     
@@ -1043,7 +1030,7 @@ export class TorrentioApiService {
       // Verificar permisos de escritura antes de intentar escribir
       const fileDir = dirname(targetFilePath);
       if (!existsSync(fileDir)) {
-        this.#logger.warn(`Directorio ${fileDir} no existe, creando...`);
+        this.#logger.log('warn', `Directorio ${fileDir} no existe, creando...`, { component: 'TorrentioApiService' });
         mkdirSync(fileDir, { recursive: true });
       }
       
@@ -1071,7 +1058,7 @@ export class TorrentioApiService {
       });
       
       if (newMagnets.length === 0) {
-        this.#logger.debug(`Todos los magnets ya existen en ${fileName}, omitiendo guardado`);
+        this.#logger.log('debug', `Todos los magnets ya existen en ${fileName}, omitiendo guardado`, { component: 'TorrentioApiService' });
         return;
       }
       
@@ -1080,7 +1067,7 @@ export class TorrentioApiService {
         appendFileSync(targetFilePath, csvLine + '\n', 'utf8');
       }
       
-      this.#logger.info(`Guardados ${newMagnets.length} magnets nuevos en ${fileName} (${magnets.length - newMagnets.length} duplicados omitidos)`);
+      this.#logger.log('info', `Guardados ${newMagnets.length} magnets nuevos en ${fileName} (${magnets.length - newMagnets.length} duplicados omitidos)`, { component: 'TorrentioApiService' });
     } catch (error) {
       // Crear objeto de error detallado para debugging
       const fileError = {
@@ -1098,15 +1085,15 @@ export class TorrentioApiService {
         timestamp: new Date().toISOString()
       };
       
-      this.#logger('error', `Error al guardar magnets en ${fileName}:`, fileError);
+      this.#logger.log('error', `Error al guardar magnets en ${fileName}:`, { component: 'TorrentioApiService', ...fileError });
       
       // En caso de error de permisos, continuar sin interrumpir el flujo
       if (error.code === 'EACCES') {
-        this.#logger.warn('Permisos insuficientes para escribir archivo CSV. Continuando sin guardar.');
+        this.#logger.log('warn', 'Permisos insuficientes para escribir archivo CSV. Continuando sin guardar.', { component: 'TorrentioApiService' });
       } else if (error.code === 'ENOENT') {
-        this.#logger.warn('Archivo o directorio no encontrado. Continuando sin guardar.');
+        this.#logger.log('warn', 'Archivo o directorio no encontrado. Continuando sin guardar.', { component: 'TorrentioApiService' });
       } else {
-        this.#logger.warn(`Error de sistema (${error.code}). Continuando sin guardar.`);
+        this.#logger.log('warn', `Error de sistema (${error.code}). Continuando sin guardar.`, { component: 'TorrentioApiService' });
       }
     }
   }
@@ -1594,7 +1581,7 @@ export class TorrentioApiService {
     const validLanguages = ['spanish', 'latino', 'english', 'french', 'portuguese', 'russian', 'japanese', 'korean', 'chinese', 'german', 'italian', 'dutch'];
     
     if (!validLanguages.includes(language.toLowerCase())) {
-      this.#logger.warn(`Idioma no válido: ${language}. Idiomas soportados: ${validLanguages.join(', ')}`);
+      this.#logger.log('warn', `Idioma no válido: ${language}. Idiomas soportados: ${validLanguages.join(', ')}`, { component: 'TorrentioApiService' });
       return;
     }
     
@@ -1603,7 +1590,7 @@ export class TorrentioApiService {
       this.#providerConfigs[type].priorityLanguage = language.toLowerCase();
     });
     
-    this.#logger.info(`Idioma prioritario configurado a: ${language}`);
+    this.#logger.log('info', `Idioma prioritario configurado a: ${language}`, { component: 'TorrentioApiService' });
   }
 
   /**
@@ -1624,7 +1611,7 @@ export class TorrentioApiService {
    */
   setProviderConfig(type, config) {
     if (!this.#providerConfigs[type]) {
-      this.#logger.warn(`Tipo de contenido no válido: ${type}`);
+      this.#logger.log('warn', `Tipo de contenido no válido: ${type}`, { component: 'TorrentioApiService' });
       return;
     }
     
@@ -1650,7 +1637,7 @@ export class TorrentioApiService {
   #ensureTorrentioFileExists() {
     // Si no hay ruta de archivo especificada, omitir la creación del archivo
     if (!this.#torrentioFilePath || this.#torrentioFilePath.trim() === '') {
-      this.#logger.debug('No se especificó ruta para archivo torrentio.csv, omitiendo creación');
+      this.#logger.log('debug', 'No se especificó ruta para archivo torrentio.csv, omitiendo creación', { component: 'TorrentioApiService' });
       return;
     }
     
@@ -1659,12 +1646,12 @@ export class TorrentioApiService {
       const dir = dirname(this.#torrentioFilePath);
       if (!existsSync(dir)) {
         mkdirSync(dir, { recursive: true });
-        this.#logger.info(`Directorio creado: ${dir}`);
+        this.#logger.log('info', `Directorio creado: ${dir}`, { component: 'TorrentioApiService' });
       }
       
       const headers = CONSTANTS.FILE.CSV_HEADERS;
       writeFileSync(this.#torrentioFilePath, headers, 'utf8');
-      this.#logger.info(`Archivo torrentio.csv creado en: ${this.#torrentioFilePath}`);
+      this.#logger.log('info', `Archivo torrentio.csv creado en: ${this.#torrentioFilePath}`, { component: 'TorrentioApiService' });
     }
   }
 
@@ -1681,12 +1668,12 @@ export class TorrentioApiService {
     // Verificar cache
     const cached = this.#manifestCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp) < this.#manifestCacheExpiry) {
-      this.#logger.debug('Usando manifest desde cache');
+      this.#logger.log('debug', 'Usando manifest desde cache', { component: 'TorrentioApiService' });
       return cached.data;
     }
     
     // Obtener manifest fresco
-    this.#logger.debug('Obteniendo manifest fresco desde API');
+    this.#logger.log('debug', 'Obteniendo manifest fresco desde API', { component: 'TorrentioApiService' });
     const response = await this.#fetchWithTimeout(manifestUrl);
     
     if (!response.ok) {
@@ -1733,186 +1720,24 @@ export class TorrentioApiService {
    * @param {number} attempt - Intento actual (para recursión)
    * @returns {Promise<Object>} Respuesta HTTP simulada compatible con fetch
    */
-  async #fetchWithTor(url, attempt = 1) {
-    if (!this.#torEnabled) {
+  async #fetchWithTorService(url) {
+    if (!this.#torService.isEnabled()) {
       // Fallback a fetch normal si Tor está deshabilitado
       return this.#fetchWithTimeout(url);
     }
 
-    // Verificar si Tor está disponible antes del primer intento
-    if (attempt === 1) {
-      const torAvailable = await this.#checkTorAvailability();
-      if (!torAvailable) {
-        this.#logger.log('warn', 'Tor no está disponible, usando fallback sin proxy', { component: 'TorrentioApiService' });
-        return this.#fetchWithTimeout(url);
-      }
-    }
-
     try {
-      this.#logger.log('info', `Intento ${attempt}/${this.#maxRetries} - Consultando vía Tor: ${url}`, { component: 'TorrentioApiService' });
-      
-      const agent = new SocksProxyAgent(`socks5h://${this.#torHost}:${this.#torPort}`);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.#timeout);
-
-      const response = await fetch(url, {
-        agent: agent,
-        signal: controller.signal,
-        headers: {
-          'User-Agent': CONSTANTS.NETWORK.FIREFOX_USER_AGENT,
-          'Accept': 'application/json'
-        }
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        this.#logger('info', `Respuesta exitosa vía Tor (${response.status}) en intento ${attempt}`);
-        return response;
-      }
-
-      if (response.status === 502 && attempt < this.#maxRetries) {
-        this.#logger.log('warn', `Error 502 detectado, rotando sesión Tor e intentando nuevamente (${attempt}/${this.#maxRetries})`, { component: 'TorrentioApiService' });
-        await this.#rotateTorSession();
-        await this.#delay(this.#retryDelay);
-        return this.#fetchWithTor(url, attempt + 1);
-      }
-
-      this.#logger.log('warn', `Respuesta no exitosa vía Tor: ${response.status} en intento ${attempt}`, { component: 'TorrentioApiService' });
-      return response;
-
+      return await this.#torService.fetch(url);
     } catch (error) {
-      if (error.name === 'AbortError') {
-        error = new Error(`Timeout de ${this.#timeout}ms excedido para: ${url}`);
-      }
-
-      if (error.code === 'ECONNREFUSED') {
-        this.#logger.log('warn', `Tor no está ejecutándose en ${this.#torHost}:${this.#torPort}, usando fallback sin proxy`, { component: 'TorrentioApiService' });
+      if (error.message.includes('Tor no está disponible') || error.message.includes('Tor no está ejecutándose')) {
+        this.#logger.log('warn', `${error.message}, usando fallback sin proxy`, { component: 'TorrentioApiService' });
         return this.#fetchWithTimeout(url);
       }
-      
-      if (attempt < this.#maxRetries && (error.code === 'ETIMEDOUT' || error.message.includes('Timeout'))) {
-        this.#logger.log('warn', `Error de conexión, rotando sesión Tor e intentando nuevamente (${attempt}/${this.#maxRetries}): ${error.message}`, { component: 'TorrentioApiService' });
-        await this.#rotateTorSession();
-        await this.#delay(this.#retryDelay);
-        return this.#fetchWithTor(url, attempt + 1);
-      }
-
-      this.#logger.log('error', `Error en petición Tor después de ${attempt} intentos: ${error.message}`, { component: 'TorrentioApiService' });
       throw error;
     }
   }
 
-  /**
-   * Verifica si Tor está disponible y ejecutándose
-   * @private
-   * @returns {Promise<boolean>} - true si Tor está disponible
-   */
-  async #checkTorAvailability() {
-    return new Promise((resolve) => {
-      this.#logger.log('debug', `Verificando disponibilidad de Tor en ${this.#torHost}:${this.#torPort}`, { component: 'TorrentioApiService' });
-      const socket = new net.Socket();
-      
-      const timeout = setTimeout(() => {
-        this.#logger.log('warn', 'Timeout al verificar Tor - considerando no disponible', { component: 'TorrentioApiService' });
-        socket.destroy();
-        resolve(false);
-      }, CONSTANTS.NETWORK.TOR_CHECK_TIMEOUT); // 3 segundos de timeout
-      
-      socket.connect(this.#torPort, this.#torHost, () => {
-        this.#logger.log('info', 'Tor detectado y disponible', { component: 'TorrentioApiService' });
-        clearTimeout(timeout);
-        socket.destroy();
-        resolve(true);
-      });
-      
-      socket.on('error', (err) => {
-        this.#logger.log('warn', `Error al conectar con Tor: ${err.message}`, { component: 'TorrentioApiService' });
-        clearTimeout(timeout);
-        resolve(false);
-      });
-    });
-  }
 
-  /**
-   * Inicia la rotación automática de circuitos Tor cada 5 minutos
-   * @private
-   */
-  #startTorRotation() {
-    if (!this.#torEnabled) {
-      this.#logger.log('debug', 'Tor no está habilitado, omitiendo rotación automática', { component: 'TorrentioApiService' });
-      return;
-    }
-
-    // Rotar circuitos cada 5 minutos (300000 ms)
-    this.#torRotationInterval = setInterval(async () => {
-      try {
-        await this.#rotateTorSession();
-        this.#logger.log('info', 'Rotación automática de circuitos Tor completada', { component: 'TorrentioApiService' });
-      } catch (error) {
-        this.#logger.log('error', 'Error en rotación automática de Tor:', error, { component: 'TorrentioApiService' });
-      }
-    }, 300000);
-
-    this.#logger.log('info', 'Rotación automática de circuitos Tor iniciada (cada 5 minutos)', { component: 'TorrentioApiService' });
-  }
-
-  /**
-   * Detiene la rotación automática de circuitos Tor
-   * @private
-   */
-  #stopTorRotation() {
-    if (this.#torRotationInterval) {
-      clearInterval(this.#torRotationInterval);
-      this.#torRotationInterval = null;
-      this.#logger.log('info', 'Rotación automática de circuitos Tor detenida', { component: 'TorrentioApiService' });
-    }
-  }
-
-  /**
-   * Rota la sesión de Tor para obtener nueva IP
-   * @private
-   */
-  async #rotateTorSession() {
-    // Validar configuración de control de Tor
-    if (!this.#torControlPort || !this.#torControlHost) {
-      this.#logger.log('warn', 'Control de Tor no configurado correctamente - saltando rotación', { component: 'TorrentioApiService' });
-      return;
-    }
-
-    return new Promise((resolve) => {
-      const socket = net.createConnection({ port: this.#torControlPort, host: this.#torControlHost }, () => {
-        socket.write('AUTHENTICATE ""\r\n');
-        socket.write('SIGNAL NEWNYM\r\n');
-        socket.write('QUIT\r\n');
-      });
-
-      socket.on('data', (data) => {
-        const response = data.toString();
-        if (response.includes('250 OK')) {
-          this.#logger.log('info', 'Sesión Tor rotada exitosamente - nueva IP obtenida', { component: 'TorrentioApiService' });
-        }
-      });
-
-      socket.on('end', () => {
-        resolve();
-      });
-
-      socket.on('error', (err) => {
-        this.#logger.log('warn', `No se pudo rotar sesión Tor: ${err.message}`, { component: 'TorrentioApiService' });
-        resolve(); // Resolve anyway to not block the process
-      });
-    });
-  }
-
-  /**
-   * Delay helper para reintentos
-   * @private
-   * @param {number} ms - Milisegundos a esperar
-   */
-  async #delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
 
   /**
    * Método de fallback para peticiones sin Tor
