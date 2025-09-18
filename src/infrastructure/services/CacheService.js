@@ -1,7 +1,6 @@
 /**
- * Servicio de cache para optimizar búsquedas frecuentes
+ * Servicio de cache optimizado para búsquedas frecuentes
  * Implementa cache en memoria con TTL y estrategias de invalidación
- * Sigue principios de arquitectura limpia y responsabilidad única
  */
 
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
@@ -12,30 +11,18 @@ export class CacheService {
   constructor() {
     this.logger = new EnhancedLogger('CacheService');
     this.cache = new Map();
-    this.stats = {
-      hits: 0,
-      misses: 0,
-      sets: 0,
-      deletes: 0,
-      clears: 0
-    };
+    this.stats = { hits: 0, misses: 0, sets: 0, deletes: 0, clears: 0 };
     
-    // Configuración de cache desde addonConfig
+    // Configuración centralizada
     this.config = {
-      defaultTTL: addonConfig.cache?.defaultTTL || 3600000, // 1 hora
+      defaultTTL: addonConfig.cache?.defaultTTL || 3600000,
       maxSize: addonConfig.cache?.maxSize || CONSTANTS.CACHE.MAX_CACHE_SIZE,
-      cleanupInterval: addonConfig.cache?.cleanupInterval || 300000, // 5 minutos
+      cleanupInterval: addonConfig.cache?.cleanupInterval || 300000,
       enableStats: addonConfig.cache?.enableStats !== false
     };
     
-    // Inicializar limpieza automática
     this.#startCleanupTimer();
-    
-    this.logger.info('CacheService inicializado', {
-      defaultTTL: this.config.defaultTTL,
-      maxSize: this.config.maxSize,
-      cleanupInterval: this.config.cleanupInterval
-    });
+    this.logger.info('CacheService inicializado', this.config);
   }
 
   /**
@@ -51,7 +38,6 @@ export class CacheService {
       return null;
     }
     
-    // Verificar si ha expirado
     if (Date.now() > entry.expiresAt) {
       this.cache.delete(key);
       this.#incrementStat('misses');
@@ -59,10 +45,8 @@ export class CacheService {
       return null;
     }
     
-    // Actualizar último acceso
     entry.lastAccessed = Date.now();
     entry.accessCount++;
-    
     this.#incrementStat('hits');
     this.logger.debug(`Cache hit para clave: ${key}`);
     
@@ -78,7 +62,6 @@ export class CacheService {
    */
   set(key, value, ttl = null) {
     try {
-      // Verificar límite de tamaño
       if (this.cache.size >= this.config.maxSize && !this.cache.has(key)) {
         this.#evictLeastRecentlyUsed();
       }
@@ -95,7 +78,6 @@ export class CacheService {
       
       this.cache.set(key, entry);
       this.#incrementStat('sets');
-      
       this.logger.debug(`Valor cacheado para clave: ${key}, TTL: ${actualTTL}ms`);
       return true;
       

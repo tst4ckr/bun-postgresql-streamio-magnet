@@ -1,73 +1,60 @@
 /**
- * Servicio para detectar dinámicamente el tipo de ID de contenido
- * Implementa detección autónoma sin hardcodeos siguiendo principios SOLID
+ * Servicio optimizado para detección de tipos de ID de contenido
+ * Implementa detección autónoma con patrones reutilizables
  */
 
 export class IdDetectorService {
   constructor() {
-    // Patrones de detección configurables y extensibles
-    this.detectionPatterns = new Map([
-      ['imdb', {
-        pattern: /^tt\d+$/,
-        prefix: 'tt',
-        description: 'IMDb ID format (tt followed by digits)',
-        validator: (id) => this.#validateImdbFormat(id)
-      }],
-      ['imdb_series', {
-        pattern: /^tt\d+:\d+:\d+$/,
-        prefix: 'tt',
-        description: 'IMDb series episode format (tt:season:episode)',
-        validator: (id) => this.#validateImdbSeriesFormat(id)
-      }],
-      ['kitsu', {
-        pattern: /^kitsu:\d+$/,
-        prefix: 'kitsu:',
-        description: 'Kitsu ID format (kitsu: prefix required followed by digits)',
-        validator: (id) => this.#validateKitsuFormat(id)
-      }],
-      ['kitsu_series', {
-        pattern: /^kitsu:\d+:\d+$/,
-        prefix: 'kitsu:',
-        description: 'Kitsu series episode format (kitsu:id:episode)',
-        validator: (id) => this.#validateKitsuSeriesFormat(id)
-      }],
-      ['mal', {
-        pattern: /^(?:mal:)?\d+$/,
-        prefix: 'mal:',
-        description: 'MyAnimeList ID format (mal: prefix optional followed by digits)',
-        validator: (id) => this.#validateNumericFormat(id, 'mal')
-      }],
-      ['mal_series', {
-        pattern: /^(?:mal:)?\d+:\d+:\d+$/,
-        prefix: 'mal:',
-        description: 'MyAnimeList series episode format (mal:id:season:episode)',
-        validator: (id) => this.#validateAnimeSeriesFormat(id, 'mal')
-      }],
-      ['anilist', {
-        pattern: /^(?:anilist:)?\d+$/,
-        prefix: 'anilist:',
-        description: 'AniList ID format (anilist: prefix optional followed by digits)',
-        validator: (id) => this.#validateNumericFormat(id, 'anilist')
-      }],
-      ['anilist_series', {
-        pattern: /^(?:anilist:)?\d+:\d+:\d+$/,
-        prefix: 'anilist:',
-        description: 'AniList series episode format (anilist:id:season:episode)',
-        validator: (id) => this.#validateAnimeSeriesFormat(id, 'anilist')
-      }],
-      ['anidb', {
-        pattern: /^(?:anidb:)?\d+$/,
-        prefix: 'anidb:',
-        description: 'AniDB ID format (anidb: prefix optional followed by digits)',
-        validator: (id) => this.#validateNumericFormat(id, 'anidb')
-      }],
-      ['anidb_series', {
-        pattern: /^(?:anidb:)?\d+:\d+:\d+$/,
-        prefix: 'anidb:',
-        description: 'AniDB series episode format (anidb:id:season:episode)',
-        validator: (id) => this.#validateAnimeSeriesFormat(id, 'anidb')
-      }]
-    ]);
+    this.detectionPatterns = this.#initializePatterns();
+    this.urlPatterns = this.#initializeUrlPatterns();
+  }
+
+  #initializePatterns() {
+    const animeServices = ['mal', 'anilist', 'anidb'];
+    const patterns = new Map();
+    
+    // IMDb patterns
+    patterns.set('imdb', {
+      pattern: /^tt\d+$/,
+      prefix: 'tt',
+      validator: (id) => this.#validateImdbFormat(id)
+    });
+    
+    patterns.set('imdb_series', {
+      pattern: /^tt\d+:\d+:\d+$/,
+      prefix: 'tt',
+      validator: (id) => this.#validateImdbSeriesFormat(id)
+    });
+    
+    // Kitsu patterns
+    patterns.set('kitsu', {
+      pattern: /^kitsu:\d+$/,
+      prefix: 'kitsu:',
+      validator: (id) => this.#validateKitsuFormat(id)
+    });
+    
+    patterns.set('kitsu_series', {
+      pattern: /^kitsu:\d+:\d+$/,
+      prefix: 'kitsu:',
+      validator: (id) => this.#validateKitsuSeriesFormat(id)
+    });
+    
+    // Anime service patterns
+    animeServices.forEach(service => {
+      patterns.set(service, {
+        pattern: new RegExp(`^(?:${service}:)?\\d+$`),
+        prefix: `${service}:`,
+        validator: (id) => this.#validateNumericFormat(id, service)
+      });
+      
+      patterns.set(`${service}_series`, {
+        pattern: new RegExp(`^(?:${service}:)?\\d+:\\d+:\\d+$`),
+        prefix: `${service}:`,
+        validator: (id) => this.#validateAnimeSeriesFormat(id, service)
+      });
+    });
+    
+    return patterns;
   }
 
   /**
@@ -81,10 +68,19 @@ export class IdDetectorService {
     }
 
     const normalizedId = contentId.trim();
-    
-    // Detectar tipo usando patrones configurables
-    for (const [type, config] of this.detectionPatterns) {
-      if (config.pattern.test(normalizedId) && config.validator(normalizedId)) {
+
+    const validators = [
+      { type: 'imdb', validator: () => this.detectionPatterns.get('imdb')?.validator(normalizedId) },
+      { type: 'kitsu', validator: () => this.detectionPatterns.get('kitsu')?.validator(normalizedId) },
+      { type: 'mal', validator: () => this.detectionPatterns.get('mal')?.validator(normalizedId) },
+      { type: 'anilist', validator: () => this.detectionPatterns.get('anilist')?.validator(normalizedId) },
+      { type: 'anidb', validator: () => this.detectionPatterns.get('anidb')?.validator(normalizedId) },
+      { type: 'imdb_series', validator: () => this.detectionPatterns.get('imdb_series')?.validator(normalizedId) },
+      { type: 'kitsu_series', validator: () => this.detectionPatterns.get('kitsu_series')?.validator(normalizedId) }
+    ];
+
+    for (const { type, validator } of validators) {
+      if (validator()) {
         const cleanId = this.#extractCleanId(normalizedId, type);
         return this.#createDetectionResult(type, cleanId, true, `Detectado como ${type.toUpperCase()}`);
       }
@@ -94,31 +90,25 @@ export class IdDetectorService {
   }
 
   /**
-   * Extrae el ID preservando formato original para URLs
-   * @param {string} id - ID original
-   * @param {string} type - Tipo de ID detectado
-   * @returns {string} ID preservado para construcción de URLs
+   * Extrae el ID limpio del formato completo
+   * @param {string} id - ID completo
+   * @param {string} type - Tipo de ID
+   * @returns {string} ID limpio
    */
   #extractCleanId(id, type) {
-    const config = this.detectionPatterns.get(type);
-    if (!config) return id;
+    const prefixMap = {
+      'kitsu': 'kitsu:',
+      'mal': 'mal:',
+      'anilist': 'anilist:',
+      'anidb': 'anidb:'
+    };
 
-    switch (type) {
-      case 'imdb':
-        return id; // IMDb IDs mantienen el prefijo 'tt'
-      case 'imdb_series':
-        return id; // Series IMDb mantienen formato completo ttXXXXXXX:season:episode
-      case 'kitsu':
-        return id; // Preservar formato completo 'kitsu:XXXXX' para URLs
-      case 'mal':
-        return id; // Preservar formato completo 'mal:XXXXX' para URLs
-      case 'anilist':
-        return id; // Preservar formato completo 'anilist:XXXXX' para URLs
-      case 'anidb':
-        return id; // Preservar formato completo 'anidb:XXXXX' para URLs
-      default:
-        return id;
+    if (prefixMap[type]) {
+      return id.replace(prefixMap[type], '');
     }
+
+    // Mantener el formato completo para series
+    return id;
   }
 
   /**
@@ -127,9 +117,7 @@ export class IdDetectorService {
    * @returns {boolean} True si es válido
    */
   #validateImdbFormat(id) {
-    if (!id.startsWith('tt')) return false;
-    const numericPart = id.slice(2);
-    return /^\d+$/.test(numericPart) && numericPart.length >= 7;
+    return id.startsWith('tt') && /^\d{7,}$/.test(id.slice(2));
   }
 
   /**
@@ -138,26 +126,14 @@ export class IdDetectorService {
    * @returns {boolean} True si es válido
    */
   #validateImdbSeriesFormat(id) {
-    // Validación de entrada
     if (!id || typeof id !== 'string') return false;
     
-    const parts = id.split(':');
-    if (parts.length !== 3) return false;
+    const [imdbPart, seasonPart, episodePart] = id.split(':');
+    if (!imdbPart || !seasonPart || !episodePart) return false;
     
-    const [imdbPart, seasonPart, episodePart] = parts;
-    
-    // Validar parte IMDb con early return
-    if (!imdbPart || !imdbPart.startsWith('tt')) return false;
-    if (!/^\d+$/.test(imdbPart.slice(2))) return false;
-    
-    // Validar temporada y episodio con early returns
-    const season = parseInt(seasonPart);
-    if (isNaN(season) || season < 1) return false;
-    
-    const episode = parseInt(episodePart);
-    if (isNaN(episode) || episode < 1) return false;
-    
-    return true;
+    return this.#validateImdbFormat(imdbPart) && 
+           this.#validatePositiveInteger(seasonPart) && 
+           this.#validatePositiveInteger(episodePart);
   }
 
   /**
@@ -166,16 +142,10 @@ export class IdDetectorService {
    * @returns {boolean} True si es válido
    */
   #validateKitsuFormat(id) {
-    // Validación de entrada
     if (!id || typeof id !== 'string') return false;
     
     const cleanId = id.replace(/^kitsu:/, '');
-    if (!/^\d+$/.test(cleanId)) return false;
-    
-    const numericId = parseInt(cleanId);
-    if (isNaN(numericId) || numericId <= 0) return false;
-    
-    return true;
+    return /^\d+$/.test(cleanId) && parseInt(cleanId) > 0;
   }
 
   /**
@@ -184,20 +154,22 @@ export class IdDetectorService {
    * @returns {boolean} True si es válido
    */
   #validateKitsuSeriesFormat(id) {
-    // Validación de entrada
     if (!id || typeof id !== 'string') return false;
     
-    const parts = id.split(':');
-    if (parts.length !== 3) return false;
-    if (parts[0] !== 'kitsu') return false;
-    
-    const animeId = parseInt(parts[1]);
-    if (isNaN(animeId) || animeId < 1) return false;
-    
-    const episode = parseInt(parts[2]);
-    if (isNaN(episode) || episode < 1) return false;
-    
-    return true;
+    const [prefix, animeId, episode] = id.split(':');
+    return prefix === 'kitsu' && 
+           this.#validatePositiveInteger(animeId) && 
+           this.#validatePositiveInteger(episode);
+  }
+
+  /**
+   * Valida que un string sea un entero positivo
+   * @param {string} value - Valor a validar
+   * @returns {boolean} True si es un entero positivo válido
+   */
+  #validatePositiveInteger(value) {
+    const num = parseInt(value);
+    return !isNaN(num) && num > 0;
   }
 
   /**
@@ -207,17 +179,20 @@ export class IdDetectorService {
    * @returns {boolean} True si es válido
    */
   #validateNumericFormat(id, prefix) {
-    // Validación de entrada
+    return this.#validateNumericId(id, prefix);
+  }
+
+  /**
+   * Valida formato de ID numérico con prefijo
+   * @param {string} id - ID a validar
+   * @param {string} prefix - Prefijo esperado
+   * @returns {boolean} True si es válido
+   */
+  #validateNumericId(id, prefix) {
     if (!id || typeof id !== 'string') return false;
-    if (!prefix || typeof prefix !== 'string') return false;
     
     const cleanId = id.replace(new RegExp(`^${prefix}:`), '');
-    if (!/^\d+$/.test(cleanId)) return false;
-    
-    const numericId = parseInt(cleanId);
-    if (isNaN(numericId) || numericId <= 0) return false;
-    
-    return true;
+    return /^\d+$/.test(cleanId) && parseInt(cleanId) > 0;
   }
 
   /**
@@ -278,6 +253,76 @@ export class IdDetectorService {
       timestamp: new Date().toISOString(),
       confidence: isValid ? 1.0 : 0.0
     };
+  }
+
+  /**
+   * Inicializa patrones para extracción desde URLs
+   * @returns {Object} Patrones de extracción
+   */
+  #initializeUrlPatterns() {
+    return {
+      imdb: /(?:imdb\.com\/title\/)(tt\d+)/,
+      kitsu: /(?:kitsu\.io\/anime\/)(\d+)/,
+      mal: /(?:myanimelist\.net\/anime\/)(\d+)/,
+      anilist: /(?:anilist\.co\/anime\/)(\d+)/,
+      anidb: /(?:anidb\.net\/anime\/)(\d+)/
+    };
+  }
+
+  /**
+   * Extrae ID de una URL usando el patrón especificado
+   * @param {string} url - URL a procesar
+   * @param {RegExp} pattern - Patrón de extracción
+   * @returns {string|null} ID extraído o null
+   */
+  #extractId(url, pattern) {
+    const match = url.match(pattern);
+    return match ? match[1] : null;
+  }
+
+  /**
+   * Extrae ID de IMDb de una URL
+   * @param {string} url - URL a procesar
+   * @returns {string|null} ID extraído o null
+   */
+  #extractImdbId(url) {
+    return this.#extractId(url, this.urlPatterns.imdb);
+  }
+
+  /**
+   * Extrae ID de Kitsu de una URL
+   * @param {string} url - URL a procesar
+   * @returns {string|null} ID extraído o null
+   */
+  #extractKitsuId(url) {
+    return this.#extractId(url, this.urlPatterns.kitsu);
+  }
+
+  /**
+   * Extrae ID de MAL de una URL
+   * @param {string} url - URL a procesar
+   * @returns {string|null} ID extraído o null
+   */
+  #extractMalId(url) {
+    return this.#extractId(url, this.urlPatterns.mal);
+  }
+
+  /**
+   * Extrae ID de AniList de una URL
+   * @param {string} url - URL a procesar
+   * @returns {string|null} ID extraído o null
+   */
+  #extractAnilistId(url) {
+    return this.#extractId(url, this.urlPatterns.anilist);
+  }
+
+  /**
+   * Extrae ID de AniDB de una URL
+   * @param {string} url - URL a procesar
+   * @returns {string|null} ID extraído o null
+   */
+  #extractAnidbId(url) {
+    return this.#extractId(url, this.urlPatterns.anidb);
   }
 
 

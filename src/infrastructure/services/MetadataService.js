@@ -10,13 +10,29 @@ import { cacheService } from './CacheService.js';
 import { errorHandler, withErrorHandling, createError, ERROR_TYPES, safeExecute } from '../errors/ErrorHandler.js';
 
 export class MetadataService {
-  constructor() {
-    this.logger = new EnhancedLogger('MetadataService');
-    this.cache = new Map();
-    this.config = addonConfig.metadata;
+  /**
+   * Constructor del servicio de metadatos
+   * @param {Object} dependencies - Dependencias del servicio
+   * @param {EnhancedLogger} dependencies.logger - Logger mejorado
+   * @param {CacheService} dependencies.cacheService - Servicio de caché
+   * @param {ErrorHandler} dependencies.errorHandler - Manejador de errores
+   * @param {Object} dependencies.config - Configuración del addon
+   */
+  constructor({ logger, cacheService, errorHandler, config }) {
+    this.logger = logger;
+    this.cacheService = cacheService;
+    this.errorHandler = errorHandler;
+    this.config = config;
     
-    // Inicializar configuración de metadatos
-    this.#initializeMetadataConfig();
+    this.METADATA_CACHE_TTL = config.cache?.metadataTtl || 3600;
+    this.MAX_RETRIES = config.metadata?.maxRetries || 3;
+    this.RETRY_DELAY = config.metadata?.retryDelay || 1000;
+    
+    this.logger.info('MetadataService inicializado', {
+      cacheTtl: this.METADATA_CACHE_TTL,
+      maxRetries: this.MAX_RETRIES,
+      retryDelay: this.RETRY_DELAY
+    });
   }
 
   /**

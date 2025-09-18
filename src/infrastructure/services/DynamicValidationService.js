@@ -9,12 +9,22 @@ import { unifiedIdService } from './UnifiedIdService.js';
 import { CONSTANTS } from '../../config/constants.js';
 
 export class DynamicValidationService {
-  constructor(detectorService, unifiedService) {
-    this.detectorService = detectorService;
-    this.unifiedService = unifiedService;
+  constructor({ idDetectorService, unifiedIdService, logger, config }) {
+    this.idDetectorService = idDetectorService;
+    this.unifiedIdService = unifiedIdService;
+    this.logger = logger;
+    this.config = config;
     
-    // Reglas de validación configurables por tipo
-    this.validationRules = new Map([
+    this.validationRules = this.#initializeValidationRules();
+    
+    this.logger.info('DynamicValidationService inicializado', {
+      rulesCount: this.validationRules.size,
+      contexts: Array.from(this.validationRules.keys())
+    });
+  }
+
+  #initializeValidationRules() {
+    return new Map([
       ['imdb', {
         minLength: 9, // tt + 7 dígitos mínimo
         maxLength: 15,
@@ -122,101 +132,107 @@ export class DynamicValidationService {
   }
 
   /**
-   * Valida un ID de contenido de forma dinámica
+   * Valida un ID según su tipo detectado
    * @param {string} contentId - ID a validar
-   * @param {string} context - Contexto de validación
-   * @param {Object} options - Opciones adicionales
-   * @returns {Promise<Object>} Resultado de validación
+   * @param {string} context - Contexto de validación (stream_request, api_endpoint, diagnostic)
+   * @returns {Object} Resultado de validación
    */
-  async validateContentId(contentId, context = 'stream_request', options = {}) {
-    // Validación de entrada con early returns
+  validateId(contentId, context = 'stream_request') {
     if (!contentId || typeof contentId !== 'string') {
-      return this.#createValidationResult(false, contentId, {
-        error: 'ID de contenido requerido y debe ser string',
-        provided: typeof contentId
-      });
-    }
-
-    if (contentId.trim().length === 0) {
-      return this.#createValidationResult(false, contentId, {
-        error: 'ID de contenido no puede estar vacío'
-      });
-    }
-
-    if (!context || typeof context !== 'string') {
-      return this.#createValidationResult(false, contentId, {
-        error: 'Contexto de validación requerido y debe ser string',
-        provided: typeof context
-      });
-    }
-
-    if (!options || typeof options !== 'object') {
-      return this.#createValidationResult(false, contentId, {
-        error: 'Opciones deben ser un objeto',
-        provided: typeof options
-      });
-    }
-
-    try {
-      // Obtener contexto de validación
-      const validationContext = this.validationContexts.get(context);
-      if (!validationContext) {
-        return this.#createValidationResult(false, contentId, {
-          error: `Contexto de validación '${context}' no reconocido`,
-          availableContexts: Array.from(this.validationContexts.keys())
-        });
-      }
-
-      // Detectar tipo de ID
-      const detection = this.detectorService.detectIdType(contentId);
-      if (!detection.isValid) {
-        return this.#createValidationResult(false, contentId, {
-          error: 'Formato de ID inválido',
-          detection,
-          context: validationContext.description
-        });
-      }
-
-      // Verificar si el tipo es soportado en este contexto
-      if (!validationContext.requiredTypes.includes(detection.type)) {
-        return this.#createValidationResult(false, contentId, {
-          error: `Tipo '${detection.type}' no soportado en contexto '${context}'`,
-          supportedTypes: validationContext.requiredTypes,
-          detectedType: detection.type
-        });
-      }
-
-      // Aplicar reglas de validación específicas del tipo
-      const typeValidation = await this.#validateByType(detection, validationContext, options);
-      if (!typeValidation.isValid) {
-        return typeValidation;
-      }
-
-      // Validar conversión si es necesaria y permitida
-      const conversionValidation = await this.#validateConversion(
-        detection, 
-        validationContext, 
-        options
-      );
-      if (!conversionValidation.isValid) {
-        return conversionValidation;
-      }
-
-      return this.#createValidationResult(true, contentId, {
-        detection,
-        context: validationContext.description,
-        typeValidation: typeValidation.details,
-        conversionValidation: conversionValidation.details,
-        recommendations: this.#generateRecommendations(detection, validationContext)
-      });
-
-    } catch (error) {
-      return this.#createValidationResult(false, contentId, {
-        error: 'Error interno durante validación',
-        details: error.message,
+      return {
+        isValid: false,
+        error: 'ID inválido: debe ser una cadena no vacía',
         context
-      });
+      };
     }
+
+    const detectionResult = this.idDetectorService.detectIdType(contentId);
+    
+    if (!detectionResult.isValid) {
+      return {
+        isValid: false,
+        error: detectionResult.error || 'Tipo de ID no reconocido',
+        context,
+        idType: 'unknown'
+      };
+    }
+
+    const idType = detectionResult.type;
+    const rules = this.validationRules.get(idType);
+    
+    if (!rules) {
+      return {
+        isValid: false,
+        error: `No hay reglas de validación para el tipo: ${idType}`,
+        context,
+        idType
+      };
+    }
+
+    const validation = this.#validateAgainstRules(contentId, rules, idType, context);
+    if (!validation.isValid) {
+      return validation;
+    }
+
+    return {
+      isValid: true,
+      idType,
+      context,
+      normalizedId: contentId,
+      metadata: {
+        service: idType.split('_')[0],
+        hasPrefix: contentId.includes(':'),
+        length: contentId.length
+      }
+    };
+  }
+
+  /**
+   * Valida un ID contra las reglas específicas
+   * @param {string} contentId - ID a validar
+   * @param {Object} rules - Reglas de validación
+   * @param {string} idType - Tipo de ID
+   * @param {string} context - Contexto de validación
+   * @returns {Object} Resultado de validación
+   */
+  #validateAgainstRules(contentId, rules, idType, context) {
+    if (contentId.length < rules.minLength) {
+      return {
+        isValid: false,
+        error: `ID demasiado corto para ${idType}. Mínimo: ${rules.minLength}, actual: ${contentId.length}`,
+        context,
+        idType
+      };
+    }
+
+    if (contentId.length > rules.maxLength) {
+      return {
+        isValid: false,
+        error: `ID demasiado largo para ${idType}. Máximo: ${rules.maxLength}, actual: ${contentId.length}`,
+        context,
+        idType
+      };
+    }
+
+    if (rules.allowedChars && !rules.allowedChars.test(contentId)) {
+      return {
+        isValid: false,
+        error: `Formato inválido para ${idType}`,
+        context,
+        idType
+      };
+    }
+
+    if (context === 'stream_request' && rules.requiredPrefix && !contentId.includes(':')) {
+      return {
+        isValid: false,
+        error: `ID debe incluir prefijo de servicio para ${idType} (ej: mal:12345)`,
+        context,
+        idType
+      };
+    }
+
+    return { isValid: true };
   }
 
   /**
