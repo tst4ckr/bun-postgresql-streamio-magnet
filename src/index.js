@@ -182,7 +182,7 @@ class MagnetAddon {
   }
 
   /**
-   * Configura Meta Handler básico.
+   * Configura Meta Handler mejorado para TV y otros contenidos.
    * @private
    */
   #setupMetaHandler() {
@@ -190,7 +190,24 @@ class MagnetAddon {
       this.#logger.info('Meta request received', { type: args.type, id: args.id });
       
       try {
-        // Retornar metadatos básicos
+        // Para canales de TV, buscar el canal real en el repositorio
+        if (args.type === 'tv' && this.#tvHandler) {
+          // Mapear ID alternativo si es necesario (reutilizar lógica de TvHandler)
+          const actualId = this.#mapAlternativeTvId(args.id);
+          const tv = await this.#tvRepository.getTvById(actualId);
+          
+          if (tv) {
+            this.#logger.info(`TV channel found for meta: ${tv.name} (${actualId})`);
+            return {
+              meta: tv.toStremioMeta(),
+              cacheMaxAge: this.#config.cache.metadataCacheMaxAge
+            };
+          } else {
+            this.#logger.warn(`TV channel not found for meta: ${args.id} (mapped: ${actualId})`);
+          }
+        }
+        
+        // Para otros tipos o si no se encontró el canal, retornar metadatos básicos
         const meta = {
           id: args.id,
           type: args.type,
@@ -209,7 +226,7 @@ class MagnetAddon {
       }
     });
 
-    this.#logger.info('MetaHandler básico configurado.');
+    this.#logger.info('MetaHandler configurado con soporte para TV.');
   }
 
   /**
@@ -256,6 +273,33 @@ class MagnetAddon {
     this.#logger.info(`✅ Addon iniciado en: ${baseUrl}`);
     this.#logger.info(`🔗 Manifiesto: ${baseUrl}/manifest.json`);
     this.#logger.info(`🚀 Servidor optimizado con SDK nativo de Stremio`);
+  }
+
+  /**
+   * Mapea IDs alternativos de TV a IDs correctos (reutiliza lógica de TvHandler).
+   * @private
+   * @param {string} id - ID original
+   * @returns {string} ID mapeado o el original si no hay mapeo
+   */
+  #mapAlternativeTvId(id) {
+    // Mapeo de IDs alternativos comunes para TV
+    const idMappings = {
+      // Bob Esponja - mapeos comunes
+      'tv_ch_kids_bobesponjala': 'tv_ch_kids_bobesponjalatam',
+      'tv_ch_kids_bobesponja': 'tv_ch_kids_bobesponjalatam',
+      'tv_ch_kids_bobespoja': 'tv_ch_kids_bobesponjalatam',
+      'tv_ch_kids_spongebob': 'tv_ch_kids_bobesponjalatam',
+      
+      // Bob l'éponge - versión francesa
+      'tv_ch_kids_boblponge': 'tv_ch_kids_boblponge',
+      'tv_ch_kids_bobleponge': 'tv_ch_kids_boblponge',
+      
+      // Pluto TV Bob Esponja
+      'tv_ch_kids_plutotvbobesponja': 'tv_ch_kids_plutotvbobesponja720p',
+      'tv_ch_kids_plutotvspongebob': 'tv_ch_kids_plutotvbobesponja720p'
+    };
+
+    return idMappings[id] || id;
   }
 
   /**
