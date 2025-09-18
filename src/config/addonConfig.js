@@ -78,26 +78,9 @@ const config = {
       }
     ],
     types: ['movie', 'series', 'anime'],
-    catalogs: [
-      {
-        type: 'movie',
-        id: 'torrent_search_movies',
-        name: 'Torrent Search Movies',
-        extra: [{ name: 'search', isRequired: false }]
-      },
-      {
-        type: 'series',
-        id: 'torrent_search_series',
-        name: 'Torrent Search Series',
-        extra: [{ name: 'search', isRequired: false }]
-      },
-      {
-        type: 'anime',
-        id: 'torrent_search_anime',
-        name: 'Torrent Search Anime',
-        extra: [{ name: 'search', isRequired: false }]
-      }
-    ],
+    // Stremio genera dinámicamente catálogos para movies, series y anime
+    // Solo se incluyen catálogos personalizados para tipos específicos como TV
+    catalogs: [],
     idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
   },
   server: {
@@ -296,17 +279,18 @@ function generateManifest() {
   const uniqueTypes = [...new Set(config.addon.resources.flatMap(r => r.types))];
   const uniqueIdPrefixes = [...new Set(config.addon.resources.flatMap(r => r.idPrefixes))];
 
-  // Optimizar catálogos con configuración avanzada
-  const optimizedCatalogs = config.addon.catalogs.map(catalog => ({
-    ...catalog,
-    extra: [
-      { name: 'search', isRequired: false },
-      { name: 'skip', isRequired: false },
-      { name: 'genre', isRequired: false, options: ['action', 'comedy', 'drama', 'horror', 'sci-fi', 'anime'] }
-    ]
+  // Stremio genera dinámicamente catálogos para movies, series y anime
+  // Solo se procesan catálogos personalizados (ej: TV)
+  const optimizedCatalogs = config.addon.catalogs;
+
+  // Generar manifest estándar de Stremio (solo campos oficiales)
+  const cleanResources = config.addon.resources.map(resource => ({
+    name: resource.name,
+    types: resource.types,
+    idPrefixes: resource.idPrefixes
+    // Campos internos como typeSpecific, cascadeEnabled se mantienen privados
   }));
 
-  // Generar manifest optimizado aprovechando configuración existente
   const manifest = {
     id: config.addon.id,
     version: config.addon.version,
@@ -314,7 +298,7 @@ function generateManifest() {
     description: config.addon.description,
     logo: config.addon.logo,
     background: config.addon.background,
-    resources: config.addon.resources,
+    resources: cleanResources,
     types: uniqueTypes,
     catalogs: optimizedCatalogs,
     idPrefixes: uniqueIdPrefixes,
@@ -322,48 +306,10 @@ function generateManifest() {
       configurable: process.env.ADDON_CONFIGURABLE === 'true' || false,
       configurationRequired: false,
       adult: process.env.ADDON_ADULT_CONTENT === 'true' || false,
-      p2p: true,
-      // Aprovechar configuración de cache existente
-      cacheMaxAge: config.cache.streamCacheMaxAge,
-      // Indicar soporte para búsqueda avanzada
-      searchable: true,
-      // Aprovechar sistema de cascada
-      cascadeSearch: config.cascadeSearch.enabled
-    },
-    // Metadatos adicionales aprovechando configuración existente
-    contactEmail: process.env.ADDON_CONTACT_EMAIL || undefined,
-    // Configuración de rendimiento basada en configuración existente
-    performance: {
-      torEnabled: config.tor.enabled,
-      cascadeSearchEnabled: config.cascadeSearch.enabled,
-      maxRetries: config.cascadeSearch.maxRetries,
-      timeout: config.cascadeSearch.timeout,
-      cacheStrategy: {
-        streams: config.cache.streamCacheMaxAge,
-        metadata: config.cache.metadataCacheMaxAge,
-        anime: config.cache.animeCacheMaxAge
-      }
-    },
-    // Configuración de proveedores por tipo
-    providerConfig: {
-      movie: {
-        providers: config.torrentio.movie.providers,
-        qualityFilter: config.torrentio.movie.qualityFilter,
-        language: config.torrentio.movie.priorityLanguage
-      },
-      series: {
-        providers: config.torrentio.series.providers,
-        qualityFilter: config.torrentio.series.qualityFilter,
-        language: config.torrentio.series.priorityLanguage
-      },
-      anime: {
-        providers: config.torrentio.anime.providers,
-        qualityFilter: config.torrentio.anime.qualityFilter,
-        language: config.torrentio.anime.priorityLanguage,
-        subtitles: config.torrentio.anime.enableSubtitles,
-        fansubs: config.torrentio.anime.preferredFansubs
-      }
+      p2p: true
+      // Campos internos como cacheMaxAge, cascadeSearch se mantienen privados
     }
+    // Datos internos como performance, providerConfig, typeSpecific se mantienen privados
   };
 
   // Actualizar cache
