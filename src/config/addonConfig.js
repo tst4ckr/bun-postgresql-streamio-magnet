@@ -40,17 +40,17 @@ const config = {
       {
         name: 'catalog',
         types: ['movie', 'series', 'anime', 'tv'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv_']
       },
       {
         name: 'meta',
         types: ['movie', 'series', 'anime', 'tv'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv_']
       },
       {
         name: 'stream',
         types: ['movie', 'series', 'anime', 'tv'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:']
+        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv_']
       }
     ],
     types: ['movie', 'series', 'anime', 'tv'],
@@ -76,7 +76,7 @@ const config = {
         name: 'TV Channels'
       }
     ],
-    idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv:']
+    idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv:', 'tv_']
   },
   server: {
     port: process.env.PORT || CONSTANTS.NETWORK.DEFAULT_SERVER_PORT,
