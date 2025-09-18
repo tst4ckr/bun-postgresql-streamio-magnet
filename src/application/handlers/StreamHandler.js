@@ -637,16 +637,28 @@ export class StreamHandler {
     // Dividir por ':' para extraer partes
     const parts = contentId.split(':');
     
-    // Para formatos como kitsu:6448:11, tt1234567:1:5, etc.
-    if (parts.length >= 3) {
+    // Solo extraer season/episode si hay más de 2 partes Y las últimas dos son números
+    // Esto evita interpretar IDs como 'kitsu:6448' como season:episode
+    if (parts.length > 2) {
       const seasonPart = parts[parts.length - 2]; // Penúltima parte
       const episodePart = parts[parts.length - 1]; // Última parte
       
-      // Validar que sean números válidos
-      const season = /^\d+$/.test(seasonPart) ? parseInt(seasonPart, 10) : undefined;
-      const episode = /^\d+$/.test(episodePart) ? parseInt(episodePart, 10) : undefined;
+      // Validar que ambas sean números válidos para confirmar que son season/episode
+      const seasonIsNumber = /^\d+$/.test(seasonPart);
+      const episodeIsNumber = /^\d+$/.test(episodePart);
       
-      return { season, episode };
+      if (seasonIsNumber && episodeIsNumber) {
+        // Verificar que no sea un ID base (como kitsu:6448)
+        // Si solo hay 2 partes numéricas, probablemente es un ID, no season/episode
+        if (parts.length === 2) {
+          return { season: undefined, episode: undefined };
+        }
+        
+        const season = parseInt(seasonPart, 10);
+        const episode = parseInt(episodePart, 10);
+        
+        return { season, episode };
+      }
     }
     
     return { season: undefined, episode: undefined };
