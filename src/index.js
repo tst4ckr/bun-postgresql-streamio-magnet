@@ -138,8 +138,6 @@ class MagnetAddon {
     const baseUrl = `http://127.0.0.1:${port}`;
     this.#logger.info(`✅ Addon iniciado en: ${baseUrl}`);
     this.#logger.info(`🔗 Manifiesto: ${baseUrl}/manifest.json`);
-    this.#logger.info(`🌐 Configuración de idioma: Disponible mediante StreamHandler`);
-    this.#logger.info(`📝 Idioma actual: ${this.#streamHandler.getPriorityLanguage() || 'spanish (por defecto)'}`);
   }
 
   /**
