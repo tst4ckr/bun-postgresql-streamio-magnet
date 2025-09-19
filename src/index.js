@@ -94,20 +94,47 @@ class MagnetAddon {
    */
   #setupStreamHandler() {
     this.#addonBuilder.defineStreamHandler(async (args) => {
+      this.#logger.info(`[DEBUG] Main Stream Handler - Incoming request:`, {
+        type: args.type,
+        id: args.id,
+        fullArgs: args,
+        timestamp: new Date().toISOString()
+      });
+
       try {
         // Delegar a StreamHandler para todo tipo excepto TV
         if (args.type !== 'tv') {
-          return await this.#streamHandler.createAddonHandler()(args);
+          this.#logger.debug(`[DEBUG] Delegating to StreamHandler for type: ${args.type}`);
+          const result = await this.#streamHandler.createAddonHandler()(args);
+          this.#logger.debug(`[DEBUG] StreamHandler result:`, {
+            streamsCount: result?.streams?.length || 0,
+            hasStreams: !!(result?.streams?.length)
+          });
+          return result;
         }
         
         // Para TV, usar TvHandler si está disponible
+        this.#logger.debug(`[DEBUG] Processing TV request - TvHandler available: ${!!this.#tvHandler}`);
         if (this.#tvHandler) {
-          return await this.#tvHandler.createStreamHandler()(args);
+          this.#logger.debug(`[DEBUG] Delegating to TvHandler for TV type`);
+          const result = await this.#tvHandler.createStreamHandler()(args);
+          this.#logger.debug(`[DEBUG] TvHandler result:`, {
+            streamsCount: result?.streams?.length || 0,
+            hasStreams: !!(result?.streams?.length),
+            cacheMaxAge: result?.cacheMaxAge
+          });
+          return result;
         }
         
+        this.#logger.warn(`[DEBUG] No TvHandler available for TV request - returning empty streams`);
         return { streams: [] };
       } catch (error) {
-        this.#logger.error('Error in stream handler', { error: error.message, args });
+        this.#logger.error('[DEBUG] Error in main stream handler', { 
+          error: error.message, 
+          stack: error.stack,
+          args,
+          errorType: error.constructor.name
+        });
         return { streams: [] };
       }
     });
@@ -162,16 +189,38 @@ class MagnetAddon {
    */
   #setupMetaHandler() {
     this.#addonBuilder.defineMetaHandler(async (args) => {
+      this.#logger.info(`[DEBUG] Main Meta Handler - Incoming request:`, {
+        type: args.type,
+        id: args.id,
+        fullArgs: args,
+        timestamp: new Date().toISOString()
+      });
+
       try {
         // Delegar a TvHandler para TV
         if (args.type === 'tv' && this.#tvHandler) {
-          return await this.#tvHandler.createMetaHandler()(args);
+          this.#logger.debug(`[DEBUG] Delegating to TvHandler for TV meta request`);
+          const result = await this.#tvHandler.createMetaHandler()(args);
+          this.#logger.debug(`[DEBUG] TvHandler meta result:`, {
+            hasMetaId: !!result?.meta?.id,
+            metaType: result?.meta?.type,
+            metaName: result?.meta?.name,
+            defaultVideoId: result?.meta?.behaviorHints?.defaultVideoId,
+            cacheMaxAge: result?.cacheMaxAge
+          });
+          return result;
         }
         
+        this.#logger.debug(`[DEBUG] Non-TV meta request or no TvHandler - returning empty meta`);
         // Respuesta por defecto para otros tipos
         return { meta: {} };
       } catch (error) {
-        this.#logger.error('Error in meta handler', { error: error.message, args });
+        this.#logger.error('[DEBUG] Error in main meta handler', { 
+          error: error.message, 
+          stack: error.stack,
+          args,
+          errorType: error.constructor.name
+        });
         return { meta: {} };
       }
     });

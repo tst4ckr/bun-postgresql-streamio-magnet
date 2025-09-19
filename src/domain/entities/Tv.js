@@ -97,7 +97,14 @@ export class Tv {
    * @returns {Object} Metadatos en formato Stremio
    */
   toStremioMeta() {
-    return {
+    console.log(`[DEBUG] Tv.toStremioMeta() - Generating meta for channel:`, {
+      id: this.#id,
+      name: this.#name,
+      group: this.#group,
+      logo: this.#logo
+    });
+
+    const meta = {
       id: this.#id,
       type: 'tv',
       name: this.#name,
@@ -121,6 +128,16 @@ export class Tv {
         hasScheduledVideos: false
       }
     };
+
+    console.log(`[DEBUG] Tv.toStremioMeta() - Generated meta:`, {
+      id: meta.id,
+      type: meta.type,
+      name: meta.name,
+      defaultVideoId: meta.behaviorHints.defaultVideoId,
+      hasScheduledVideos: meta.behaviorHints.hasScheduledVideos
+    });
+
+    return meta;
   }
 
   /**
@@ -128,26 +145,43 @@ export class Tv {
    * @returns {Object} Stream en formato Stremio
    */
   toStremioStream() {
-    const behaviorHints = {
-      // Forzar `notWebReady: true` para usar siempre el servidor de streaming de Stremio.
-      // Esto mejora la compatibilidad con HLS y otros formatos, y evita problemas de CORS.
-      notWebReady: true,
-      bingeGroup: `tv-${this.#group}`,
-      // Las cabeceras de proxy son seguras aquí porque notWebReady es true.
-      proxyHeaders: {
-        request: {
-          'User-Agent': 'Stremio/4.4.0'
+    console.log(`[DEBUG] Tv.toStremioStream() - Generating stream for channel:`, {
+      id: this.#id,
+      name: this.#name,
+      group: this.#group,
+      streamUrl: this.#streamUrl,
+      streamUrlType: typeof this.#streamUrl,
+      streamUrlLength: this.#streamUrl?.length
+    });
+
+    const stream = {
+      name: this.#name,
+      title: this.#name,
+      description: `Canal: ${this.#name}${this.#group ? ` (${this.#group})` : ''}`,
+      url: this.#streamUrl,
+      behaviorHints: {
+        notWebReady: true,
+        bingeGroup: `tv-${this.#group}`,
+        proxyHeaders: {
+          request: {
+            'User-Agent': 'Stremio/4.4.142 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
         }
       }
     };
 
-    return {
-      name: `📺 ${this.#name}`,
-      title: `Canal en vivo: ${this.#name}`,
-      description: `Grupo: ${this.#group || 'General'}`,
-      url: this.#streamUrl,
-      behaviorHints: behaviorHints
-    };
+    console.log(`[DEBUG] Tv.toStremioStream() - Generated stream:`, {
+      name: stream.name,
+      title: stream.title,
+      url: stream.url,
+      urlValid: !!stream.url,
+      notWebReady: stream.behaviorHints.notWebReady,
+      bingeGroup: stream.behaviorHints.bingeGroup,
+      hasProxyHeaders: !!stream.behaviorHints.proxyHeaders,
+      userAgent: stream.behaviorHints.proxyHeaders?.request?.['User-Agent']
+    });
+
+    return stream;
   }
 
   /**

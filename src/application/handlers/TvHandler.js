@@ -74,24 +74,51 @@ export class TvHandler {
    */
   createMetaHandler() {
     return async (args) => {
-      this.#logger.info(`Request for TV meta: id=${args.id}`);
+      this.#logger.info(`[DEBUG] TV Meta Request - Args:`, { 
+        type: args.type, 
+        id: args.id, 
+        fullArgs: args 
+      });
 
       try {
+        this.#logger.debug(`[DEBUG] Searching for TV channel with ID: ${args.id}`);
         const tv = await this.#tvRepository.getTvById(args.id);
+        
         if (!tv) {
-          this.#logger.warn(`TV channel not found for meta request: ${args.id}`);
+          this.#logger.warn(`[DEBUG] TV channel NOT FOUND for meta request: ${args.id}`);
+          this.#logger.debug(`[DEBUG] Available channels count:`, await this.#tvRepository.getAllTvs().then(tvs => tvs.length));
           return Promise.reject(new Error(`TV channel not found: ${args.id}`));
         }
 
+        this.#logger.debug(`[DEBUG] TV channel FOUND:`, {
+          id: tv.id,
+          name: tv.name,
+          streamUrl: tv.streamUrl,
+          group: tv.group
+        });
+
         const meta = tv.toStremioMeta();
-        this.#logger.info(`Found meta for TV channel: ${tv.name}`);
+        this.#logger.debug(`[DEBUG] Generated meta:`, {
+          id: meta.id,
+          type: meta.type,
+          name: meta.name,
+          defaultVideoId: meta.behaviorHints?.defaultVideoId,
+          hasScheduledVideos: meta.behaviorHints?.hasScheduledVideos
+        });
+
+        this.#logger.info(`[DEBUG] Successfully found meta for TV channel: ${tv.name}`);
 
         return {
           meta,
           cacheMaxAge: this.#config.cache.metadataCacheMaxAge
         };
       } catch (error) {
-        this.#logger.error('Error fetching TV meta', { error: error.message, stack: error.stack, args });
+        this.#logger.error('[DEBUG] Error fetching TV meta', { 
+          error: error.message, 
+          stack: error.stack, 
+          args,
+          errorType: error.constructor.name
+        });
         return Promise.reject(error);
       }
     };
@@ -103,24 +130,62 @@ export class TvHandler {
    */
   createStreamHandler() {
     return async (args) => {
-      this.#logger.info(`Request for TV stream: id=${args.id}`);
+      this.#logger.info(`[DEBUG] TV Stream Request - Args:`, { 
+        type: args.type, 
+        id: args.id, 
+        fullArgs: args 
+      });
 
       try {
+        this.#logger.debug(`[DEBUG] Searching for TV channel with ID: ${args.id}`);
         const tv = await this.#tvRepository.getTvById(args.id);
+        
         if (!tv) {
-          this.#logger.warn(`TV channel not found for stream request: ${args.id}`);
+          this.#logger.warn(`[DEBUG] TV channel NOT FOUND for stream request: ${args.id}`);
+          this.#logger.debug(`[DEBUG] Available channels count:`, await this.#tvRepository.getAllTvs().then(tvs => tvs.length));
+          this.#logger.debug(`[DEBUG] Returning empty streams array`);
           return { streams: [] };
         }
 
-        const stream = tv.toStremioStream();
-        this.#logger.info(`Found stream for TV channel: ${tv.name}`);
+        this.#logger.debug(`[DEBUG] TV channel FOUND for stream:`, {
+          id: tv.id,
+          name: tv.name,
+          streamUrl: tv.streamUrl,
+          group: tv.group
+        });
 
-        return {
+        const stream = tv.toStremioStream();
+        this.#logger.debug(`[DEBUG] Generated stream:`, {
+          name: stream.name,
+          title: stream.title,
+          url: stream.url,
+          notWebReady: stream.behaviorHints?.notWebReady,
+          bingeGroup: stream.behaviorHints?.bingeGroup,
+          proxyHeaders: stream.behaviorHints?.proxyHeaders
+        });
+
+        this.#logger.info(`[DEBUG] Successfully found stream for TV channel: ${tv.name}`);
+
+        const response = {
           streams: [stream],
           cacheMaxAge: this.#config.cache.tvCacheMaxAge
         };
+
+        this.#logger.debug(`[DEBUG] Final stream response:`, {
+          streamsCount: response.streams.length,
+          cacheMaxAge: response.cacheMaxAge,
+          firstStreamUrl: response.streams[0]?.url
+        });
+
+        return response;
       } catch (error) {
-        this.#logger.error('Error fetching TV stream', { error: error.message, stack: error.stack, args });
+        this.#logger.error('[DEBUG] Error fetching TV stream', { 
+          error: error.message, 
+          stack: error.stack, 
+          args,
+          errorType: error.constructor.name
+        });
+        this.#logger.debug(`[DEBUG] Returning empty streams due to error`);
         return { streams: [] };
       }
     };
