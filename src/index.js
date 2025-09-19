@@ -152,6 +152,18 @@ class MagnetAddon {
       this.#tvRepository = new M3UTvRepository(m3uUrl, this.#config, this.#logger);
       this.#tvHandler = new TvHandler(this.#tvRepository, this.#config, this.#logger);
       this.#logger.info('TvHandler configurado');
+
+      // Iniciar el refresco periódico de canales de TV
+      const refreshInterval = 5 * 60 * 1000; // 5 minutos
+      setInterval(async () => {
+        try {
+          this.#logger.info('Refrescando canales de TV desde la fuente M3U...');
+          await this.#tvRepository.refreshTvs();
+          this.#logger.info('Canales de TV refrescados con éxito.');
+        } catch (error) {
+          this.#logger.error('Error al refrescar los canales de TV:', error);
+        }
+      }, refreshInterval);
     } catch (error) {
       this.#logger.error('Error configurando TvHandler:', error);
       throw error;

@@ -156,7 +156,6 @@ export class Tv {
 
     const stream = {
       name: this.#name,
-      title: this.#name,
       description: `Canal: ${this.#name}${this.#group ? ` (${this.#group})` : ''}`,
       url: this.#streamUrl,
       behaviorHints: {
@@ -172,7 +171,7 @@ export class Tv {
 
     console.log(`[DEBUG] Tv.toStremioStream() - Generated stream:`, {
       name: stream.name,
-      title: stream.title,
+      description: stream.description,
       url: stream.url,
       urlValid: !!stream.url,
       notWebReady: stream.behaviorHints.notWebReady,
