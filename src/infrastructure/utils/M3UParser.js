@@ -12,24 +12,25 @@ import { Tv } from '../../domain/entities/Tv.js';
 export class M3UParser {
   /**
    * Parsea contenido M3U y retorna array de canales de TV.
-   * @param {string} m3uContent - Contenido del archivo M3U
+   * @param {string} m3uContent - Contenido del archito M3U
    * @returns {Tv[]} Array de canales de TV parseados
    */
   static parse(m3uContent) {
-    if (!m3uContent || typeof m3uContent !== 'string') {
+    if (!m3uContent || typeof m3uContent !== 'string' || m3uContent.trim().length === 0) {
       throw new Error('M3U content must be a non-empty string');
     }
 
-    const lines = m3uContent.split('\n').map(line => line.trim()).filter(Boolean);
+    const lines = m3uContent.split('\n');
     const tvs = [];
     
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
+      const line = lines[i].trim();
+      if (!line) continue;
       
       // Buscar líneas EXTINF que definen canales de TV
       if (line.startsWith('#EXTINF:')) {
         const tvInfo = this.#parseExtinfLine(line);
-        const nextLine = lines[i + 1];
+        const nextLine = i + 1 < lines.length ? lines[i + 1].trim() : null;
         
         // La siguiente línea debe ser la URL del stream
         if (nextLine && !nextLine.startsWith('#')) {
@@ -45,7 +46,7 @@ export class M3UParser {
             i++; // Saltar la línea de URL ya procesada
           } catch (error) {
             // Continuar con el siguiente canal si hay error en uno específico
-            console.warn(`Error creating tv: ${error.message}`, tvInfo);
+            console.warn(`Error creating tv from line ${i}: ${error.message}`);
           }
         }
       }
@@ -109,7 +110,7 @@ export class M3UParser {
   }
 
   /**
-   * Extrae atributos de una línea EXTINF usando regex.
+   * Extrae atributos de una línea EXTINF usando parsing manual más eficiente.
    * @private
    * @param {string} line - Línea EXTINF
    * @returns {Object} Objeto con atributos extraídos
@@ -117,13 +118,36 @@ export class M3UParser {
   static #extractAttributes(line) {
     const attributes = {};
     
-    // Regex para extraer atributos del formato key="value"
-    const attributeRegex = /(\w+(?:-\w+)*)="([^"]*)"/g;
-    let match;
+    // Extraer sección de atributos (después de : y antes de la última coma)
+    const attrSection = line.slice(line.indexOf(':') + 1, line.lastIndexOf(',')).trim();
     
-    while ((match = attributeRegex.exec(line)) !== null) {
-      const [, key, value] = match;
-      attributes[key] = value;
+    if (!attrSection) return attributes;
+    
+    // Parsear atributos manualmente para mejor rendimiento
+    let currentPos = 0;
+    while (currentPos < attrSection.length) {
+      // Buscar inicio de key
+      const keyStart = attrSection.indexOf(' ', currentPos);
+      if (keyStart === -1) break;
+      
+      // Buscar igual y comillas
+      const equalsPos = attrSection.indexOf('=', keyStart);
+      if (equalsPos === -1) break;
+      
+      const quoteStart = attrSection.indexOf('"', equalsPos);
+      if (quoteStart === -1) break;
+      
+      const quoteEnd = attrSection.indexOf('"', quoteStart + 1);
+      if (quoteEnd === -1) break;
+      
+      const key = attrSection.slice(keyStart + 1, equalsPos).trim();
+      const value = attrSection.slice(quoteStart + 1, quoteEnd);
+      
+      if (key && value) {
+        attributes[key] = value;
+      }
+      
+      currentPos = quoteEnd + 1;
     }
     
     return attributes;
@@ -135,19 +159,20 @@ export class M3UParser {
    * @returns {boolean} True si es M3U válido
    */
   static isValidM3U(content) {
-    if (!content || typeof content !== 'string') {
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
       return false;
     }
 
-    const lines = content.split('\n').map(line => line.trim());
+    // Verificar rápidamente las primeras líneas sin split completo
+    const firstLine = content.substring(0, 100).split('\n')[0].trim();
     
     // Debe empezar con #EXTM3U
-    if (!lines[0] || !lines[0].startsWith('#EXTM3U')) {
+    if (!firstLine.startsWith('#EXTM3U')) {
       return false;
     }
 
-    // Debe tener al menos una línea EXTINF
-    return lines.some(line => line.startsWith('#EXTINF:'));
+    // Verificar rápidamente si hay al menos una línea EXTINF
+    return content.includes('#EXTINF:');
   }
 
   

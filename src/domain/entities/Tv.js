@@ -51,16 +51,11 @@ export class Tv {
       throw new Error('Tv data must be an object');
     }
 
-    if (!tvData.id || typeof tvData.id !== 'string') {
-      throw new Error('Tv ID is required and must be a string');
-    }
-
-    if (!tvData.name || typeof tvData.name !== 'string') {
-      throw new Error('Tv name is required and must be a string');
-    }
-
-    if (!tvData.streamUrl || typeof tvData.streamUrl !== 'string') {
-      throw new Error('Tv stream URL is required and must be a string');
+    const requiredFields = ['id', 'name', 'streamUrl'];
+    for (const field of requiredFields) {
+      if (!tvData[field] || typeof tvData[field] !== 'string') {
+        throw new Error(`Tv ${field} is required and must be a string`);
+      }
     }
 
     if (!this.#isValidStreamUrl(tvData.streamUrl)) {
@@ -152,11 +147,11 @@ export class Tv {
    * @returns {string} ID único generado
    */
   static generateId(name) {
-    if (!name || typeof name !== 'string') {
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return `tv_invalid_${Date.now()}`;
     }
+    
     const cleanName = name
-      .toString()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
@@ -165,6 +160,6 @@ export class Tv {
       .replace(/[^\w-]+/g, '')
       .replace(/--+/g, '-');
     
-    return `tv_${cleanName}`;
+    return cleanName ? `tv_${cleanName}` : `tv_unnamed_${Date.now()}`;
   }
 }
