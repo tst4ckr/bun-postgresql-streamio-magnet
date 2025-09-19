@@ -81,8 +81,11 @@ export class TvHandler {
       });
 
       try {
-        this.#logger.debug(`[DEBUG] Searching for TV channel with ID: ${args.id}`);
-        const tv = await this.#tvRepository.getTvById(args.id);
+        const channelId = args.id.split(':')[0];
+        this.#logger.debug(`[DEBUG] Parsing stream ID. Original: "${args.id}", Parsed: "${channelId}"`);
+
+        this.#logger.debug(`[DEBUG] Searching for TV channel with ID: ${channelId}`);
+        const tv = await this.#tvRepository.getTvById(channelId);
         
         if (!tv) {
           this.#logger.warn(`[DEBUG] TV channel NOT FOUND for meta request: ${args.id}`);
