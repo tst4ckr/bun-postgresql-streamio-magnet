@@ -19,7 +19,7 @@ export class DynamicValidationService {
     this.validationRules = this.#initializeValidationRules();
     this.validationContexts = this.#initializeValidationContexts();
     
-    this.logger.info('DynamicValidationService inicializado', {
+    this.logger.debug('DynamicValidationService inicializado', {
       rulesCount: this.validationRules.size,
       contextsCount: this.validationContexts.size,
       contexts: Array.from(this.validationContexts.keys())

@@ -28,7 +28,7 @@ export class UnifiedIdService {
       anidb: 5
     };
     
-    this.logger.info('UnifiedIdService inicializado', {
+    this.logger.debug('UnifiedIdService inicializado', {
       supportedServices: this.SUPPORTED_SERVICES,
       cacheTtl: this.CONVERSION_CACHE_TTL,
       priorities: this.SERVICE_PRIORITIES

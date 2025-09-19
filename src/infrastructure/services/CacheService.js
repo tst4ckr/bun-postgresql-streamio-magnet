@@ -21,7 +21,7 @@ export class CacheService {
     };
     
     this.#startCleanupTimer();
-    this.logger.info('CacheService inicializado', this.config);
+    this.logger.debug('CacheService inicializado', this.config);
   }
 
   /**

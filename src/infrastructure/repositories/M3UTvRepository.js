@@ -66,7 +66,7 @@ export class M3UTvRepository {
    * @returns {Promise<Object>} Objeto con estadísticas
    */
   async getStats() {
-    this.#logger.info('[DEBUG] Fetching TV channels statistics');
+    this.#logger.debug('[DEBUG] Fetching TV channels statistics');
     
     try {
       await this.#ensureTvsLoaded();
@@ -135,7 +135,7 @@ export class M3UTvRepository {
       
       // Si hay canales de TV en cache, usarlos aunque estén expirados
       if (this.#tvs.size > 0) {
-        this.#logger.warn('Using expired cache due to fetch error');
+        this.#logger.debug('Using expired cache due to fetch error');
         return;
       }
       
@@ -149,7 +149,7 @@ export class M3UTvRepository {
    * @returns {Promise<void>}
    */
   async #loadTvsFromSource() {
-    this.#logger.info(`Fetching M3U from: ${this.#m3uUrl}`);
+    this.#logger.debug(`Fetching M3U from: ${this.#m3uUrl}`);
     
     const response = await fetch(this.#m3uUrl, {
       headers: {
@@ -179,7 +179,7 @@ export class M3UTvRepository {
     
     this.#lastFetch = Date.now();
     
-    this.#logger.info(`Loaded ${tvs.length} tvs from M3U source`);
+    this.#logger.debug(`Loaded ${tvs.length} tvs from M3U source`);
   }
 
   /**

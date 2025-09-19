@@ -54,7 +54,7 @@ export class StreamHandler {
         handler: 'StreamHandler.createAddonHandler'
       };
       
-      this.#logger.info(`Stream request: ${JSON.stringify(args)}`);
+      this.#logger.debug(`Stream request: ${JSON.stringify(args)}`);
       
       const result = await safeExecute(
         () => this.#handleStreamRequest(args),
@@ -64,12 +64,12 @@ export class StreamHandler {
       const duration = Date.now() - startTime;
       
       if (result.error || result.degraded) {
-        this.#logger.warn(`Stream request completed with issues in ${duration}ms`, {
+        this.#logger.debug(`Stream request completed with issues in ${duration}ms`, {
           error: result.error,
           degraded: result.degraded
         });
       } else {
-        this.#logger.info(`Stream request completed in ${duration}ms`);
+        this.#logger.debug(`Stream request completed in ${duration}ms`);
       }
       
       // Si hay error, devolver respuesta de error apropiada
@@ -91,14 +91,14 @@ export class StreamHandler {
     const { type, id } = args;
     const startTime = Date.now();
     
-    this.#logger.info(`Petición de stream iniciada para content ID: ${id} (${type})`);
+    this.#logger.debug(`Petición de stream iniciada para content ID: ${id} (${type})`);
     
     const idDetection = this.#detectContentIdType(id);
     
     if (!idDetection.isValid) {
-      this.#logger.warn(`ID potencialmente inválido: ${id} - ${idDetection.error}`);
+      this.#logger.debug(`ID potencialmente inválido: ${id} - ${idDetection.error}`);
     } else {
-      this.#logger.info(`Tipo de ID detectado: ${idDetection.type} para ${id}`);
+      this.#logger.debug(`Tipo de ID detectado: ${idDetection.type} para ${id}`);
     }
     
     const { season, episode } = this.#extractSeasonEpisode(id);
@@ -106,11 +106,14 @@ export class StreamHandler {
     const cachedStreams = await safeExecute(
       () => cacheService.get(streamCacheKey),
       { operation: 'cache.get', cacheKey: streamCacheKey }
-    );
+    ).catch(error => {
+      this.#logger.warn(`Cache error for ${streamCacheKey}:`, { error: error.message });
+      return null;
+    });
     
     if (cachedStreams && !cachedStreams.error) {
       const duration = Date.now() - startTime;
-      this.#logger.info(`Streams obtenidos desde cache para ${id} (${idDetection.type}) en ${duration}ms`);
+      this.#logger.debug(`Streams obtenidos desde cache para ${id} (${idDetection.type}) en ${duration}ms`);
       return cachedStreams;
     }
     
@@ -148,7 +151,7 @@ export class StreamHandler {
       try {
         metadata = await this.#getEnhancedMetadata(id, type, idDetection);
         if (metadata) {
-          this.#logger.info(`Metadatos obtenidos para ${id}: ${metadata.title || 'Sin título'}`);
+          this.#logger.debug(`Metadatos obtenidos para ${id}: ${metadata.title || 'Sin título'}`);
         }
       } catch (error) {
         this.#logger.warn(`No se pudieron obtener metadatos para ${id}: ${error.message}`);
@@ -179,7 +182,7 @@ export class StreamHandler {
     const streams = this.#createStreamsFromMagnets(magnets, type, metadata);
     const duration = Date.now() - startTime;
     
-    this.#logger.info(`Stream generado para ${id} (${idDetection.type}): ${streams.length} streams encontrados en ${duration}ms`);
+    this.#logger.debug(`Stream generado para ${id} (${idDetection.type}): ${streams.length} streams encontrados en ${duration}ms`);
     
     const streamResponse = this.#createStreamResponse(streams, {
       contentId: id,
@@ -350,7 +353,7 @@ export class StreamHandler {
       );
     }
 
-    this.#logger.debug(`Validación exitosa para ID ${args.id}:`, {
+    this.#logger.trace(`Validación exitosa para ID ${args.id}:`, {
       type: validationResult.details?.detection?.type,
       confidence: validationResult.details?.detection?.confidence
     });
@@ -383,16 +386,16 @@ export class StreamHandler {
    * @returns {Promise<Array|null>} Lista de magnets o null si no se encuentran
    */
   async #getMagnets(contentId, type = 'movie') {
-    this.#logger.info(`Iniciando búsqueda de magnets para ${contentId} (${type})`);
+    this.#logger.debug(`Iniciando búsqueda de magnets para ${contentId} (${type})`);
     
 
     const idDetection = this.#detectContentIdType(contentId);
     
     if (!idDetection.isValid) {
-      this.#logger.warn(`ID inválido detectado: ${contentId} - ${idDetection.error}`);
+      this.#logger.debug(`ID inválido detectado: ${contentId} - ${idDetection.error}`);
 
     } else {
-      this.#logger.info(`Tipo de ID detectado: ${idDetection.type} para ${contentId}`);
+      this.#logger.debug(`Tipo de ID detectado: ${idDetection.type} para ${contentId}`);
     }
     
     // Intentar búsqueda con ID original primero
@@ -408,14 +411,14 @@ export class StreamHandler {
     }
     
     if (magnetsResult && magnetsResult.length > 0) {
-      this.#logger.info(`Encontrados ${magnetsResult.length} magnets para ${contentId}`);
+      this.#logger.debug(`Encontrados ${magnetsResult.length} magnets para ${contentId}`);
       
 
       const sources = [...new Set(magnetsResult.map(m => m.provider || 'Unknown'))];
       const qualities = [...new Set(magnetsResult.map(m => m.quality || 'Unknown'))];
       
-      this.#logger.info(`Fuentes para ${contentId}: ${sources.join(', ')}`);
-      this.#logger.info(`Calidades disponibles: ${qualities.join(', ')}`);
+      this.#logger.debug(`Fuentes para ${contentId}: ${sources.join(', ')}`);
+      this.#logger.debug(`Calidades disponibles: ${qualities.join(', ')}`);
     }
     
     return magnetsResult;
@@ -464,7 +467,7 @@ export class StreamHandler {
    * @returns {Promise<Array|null>} Lista de magnets
    */
   async #searchMagnetsWithConversion(contentId, type, idDetection) {
-    this.#logger.info(`Intentando conversión de ID ${idDetection.type} a IMDb para ${contentId}`);
+    this.#logger.debug(`Intentando conversión de ID ${idDetection.type} a IMDb para ${contentId}`);
     
     try {
       // Intentar conversión a IMDb
@@ -479,7 +482,7 @@ export class StreamHandler {
       }
       
       const imdbId = conversionResult.convertedId;
-      this.#logger.info(`ID convertido: ${contentId} -> ${imdbId}`);
+      this.#logger.debug(`ID convertido: ${contentId} -> ${imdbId}`);
       
 
       const magnetsResult = await safeExecute(
@@ -501,7 +504,7 @@ export class StreamHandler {
       }
       
       if (magnetsResult && magnetsResult.length > 0) {
-        this.#logger.info(`Encontrados ${magnetsResult.length} magnets usando ID convertido ${imdbId}`);
+        this.#logger.debug(`Encontrados ${magnetsResult.length} magnets usando ID convertido ${imdbId}`);
       }
       
       return magnetsResult;
@@ -920,7 +923,7 @@ export class StreamHandler {
     
     try {
       const detection = this.#idDetectorService.detectIdType(contentId);
-      this.#logger.debug(`ID detectado: ${contentId} -> ${detection.type} (válido: ${detection.isValid})`);
+      this.#logger.trace(`ID detectado: ${contentId} -> ${detection.type} (válido: ${detection.isValid})`);
       return detection;
     } catch (error) {
       this.#logger.error(`Error detectando tipo de ID para ${contentId}: ${error.message}`);
