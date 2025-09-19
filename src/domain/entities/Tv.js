@@ -97,14 +97,7 @@ export class Tv {
    * @returns {Object} Metadatos en formato Stremio
    */
   toStremioMeta() {
-    console.log(`[DEBUG] Tv.toStremioMeta() - Generating meta for channel:`, {
-      id: this.#id,
-      name: this.#name,
-      group: this.#group,
-      logo: this.#logo
-    });
-
-    const meta = {
+    return {
       id: this.#id,
       type: 'tv',
       name: this.#name,
@@ -128,16 +121,6 @@ export class Tv {
         hasScheduledVideos: false
       }
     };
-
-    console.log(`[DEBUG] Tv.toStremioMeta() - Generated meta:`, {
-      id: meta.id,
-      type: meta.type,
-      name: meta.name,
-      defaultVideoId: meta.behaviorHints.defaultVideoId,
-      hasScheduledVideos: meta.behaviorHints.hasScheduledVideos
-    });
-
-    return meta;
   }
 
   /**
@@ -145,16 +128,7 @@ export class Tv {
    * @returns {Object} Stream en formato Stremio
    */
   toStremioStream() {
-    console.log(`[DEBUG] Tv.toStremioStream() - Generating stream for channel:`, {
-      id: this.#id,
-      name: this.#name,
-      group: this.#group,
-      streamUrl: this.#streamUrl,
-      streamUrlType: typeof this.#streamUrl,
-      streamUrlLength: this.#streamUrl?.length
-    });
-
-    const stream = {
+    return {
       name: this.#name,
       description: `Canal: ${this.#name}${this.#group ? ` (${this.#group})` : ''}`,
       url: this.#streamUrl,
@@ -168,63 +142,9 @@ export class Tv {
         }
       }
     };
-
-    console.log(`[DEBUG] Tv.toStremioStream() - Generated stream:`, {
-      name: stream.name,
-      description: stream.description,
-      url: stream.url,
-      urlValid: !!stream.url,
-      notWebReady: stream.behaviorHints.notWebReady,
-      bingeGroup: stream.behaviorHints.bingeGroup,
-      hasProxyHeaders: !!stream.behaviorHints.proxyHeaders,
-      userAgent: stream.behaviorHints.proxyHeaders?.request?.['User-Agent']
-    });
-
-    return stream;
   }
 
-  /**
-   * Crea una nueva instancia de Tv con datos actualizados.
-   * @param {Object} updates - Datos a actualizar
-   * @returns {Tv} Nueva instancia con datos actualizados
-   */
-  withUpdates(updates) {
-    return new Tv({
-      id: this.#id,
-      name: this.#name,
-      streamUrl: this.#streamUrl,
-      logo: this.#logo,
-      group: this.#group,
-      tvgId: this.#tvgId,
-      tvgName: this.#tvgName,
-      ...updates
-    });
-  }
 
-  /**
-   * Convierte el canal a objeto plano.
-   * @returns {Object} Representación en objeto plano
-   */
-  toPlainObject() {
-    return {
-      id: this.#id,
-      name: this.#name,
-      streamUrl: this.#streamUrl,
-      logo: this.#logo,
-      group: this.#group,
-      tvgId: this.#tvgId,
-      tvgName: this.#tvgName
-    };
-  }
-
-  /**
-   * Crea una instancia de Tv desde un objeto plano.
-   * @param {Object} plainObject - Objeto plano con datos del canal
-   * @returns {Tv} Nueva instancia de Tv
-   */
-  static fromPlainObject(plainObject) {
-    return new Tv(plainObject);
-  }
 
   /**
    * Genera un ID único para el canal basado en su nombre.

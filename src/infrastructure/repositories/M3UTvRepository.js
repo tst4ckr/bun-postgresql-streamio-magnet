@@ -51,17 +51,6 @@ export class M3UTvRepository {
   }
 
   /**
-   * Obtiene canales de TV filtrados por grupo.
-   * @param {string} group - Grupo a filtrar
-   * @returns {Promise<Tv[]>} Array de canales de TV del grupo
-   */
-  async getTvsByGroup(group) {
-    await this.#ensureTvsLoaded();
-    return Array.from(this.#tvs.values())
-      .filter(tv => tv.group === group);
-  }
-
-  /**
    * Obtiene todos los grupos disponibles.
    * @returns {Promise<string[]>} Array de grupos únicos
    */
@@ -73,46 +62,36 @@ export class M3UTvRepository {
   }
 
   /**
-   * Busca canales de TV por nombre.
-   * @param {string} searchTerm - Término de búsqueda
-   * @returns {Promise<Tv[]>} Array de canales de TV que coinciden
-   */
-  async searchTvs(searchTerm) {
-    if (!searchTerm || typeof searchTerm !== 'string') {
-      return [];
-    }
-
-    await this.#ensureTvsLoaded();
-    const term = searchTerm.toLowerCase();
-    
-    return Array.from(this.#tvs.values())
-      .filter(tv => 
-        tv.name.toLowerCase().includes(term) ||
-        tv.group.toLowerCase().includes(term) ||
-        (tv.tvgName && tv.tvgName.toLowerCase().includes(term))
-      );
-  }
-
-  /**
-   * Obtiene estadísticas del repositorio.
-   * @returns {Promise<Object>} Estadísticas de canales de TV
+   * Obtiene estadísticas de los canales de TV.
+   * @returns {Promise<Object>} Objeto con estadísticas
    */
   async getStats() {
-    await this.#ensureTvsLoaded();
+    this.#logger.info('[DEBUG] Fetching TV channels statistics');
     
-    const groups = new Map();
-    this.#tvs.forEach(tv => {
-      const count = groups.get(tv.group) || 0;
-      groups.set(tv.group, count + 1);
-    });
-
-    return {
-      totalTvs: this.#tvs.size,
-      totalGroups: groups.size,
-      groupStats: Object.fromEntries(groups),
-      lastUpdate: this.#lastFetch,
-      cacheTimeout: this.#cacheTimeout
-    };
+    try {
+      await this.#ensureTvsLoaded();
+      const total = this.#tvs.size;
+      const groups = new Set();
+      this.#tvs.forEach(tv => groups.add(tv.group));
+      
+      const stats = {
+        total,
+        groups: groups.size,
+        groupNames: Array.from(groups).sort(),
+        lastUpdated: this.#lastFetch
+      };
+      
+      this.#logger.debug('[DEBUG] TV channels statistics:', stats);
+      return stats;
+    } catch (error) {
+      this.#logger.error('[DEBUG] Error fetching TV statistics', error);
+      return {
+        total: 0,
+        groups: 0,
+        groupNames: [],
+        lastUpdated: null
+      };
+    }
   }
 
   /**

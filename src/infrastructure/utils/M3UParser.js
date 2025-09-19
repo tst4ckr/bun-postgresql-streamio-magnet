@@ -150,37 +150,5 @@ export class M3UParser {
     return lines.some(line => line.startsWith('#EXTINF:'));
   }
 
-  /**
-   * Obtiene estadísticas del contenido M3U parseado.
-   * @param {string} m3uContent - Contenido M3U
-   * @returns {Object} Estadísticas del parseo
-   */
-  static getParseStats(m3uContent) {
-    if (!this.isValidM3U(m3uContent)) {
-      return {
-        isValid: false,
-        totalLines: 0,
-        channelCount: 0,
-        groups: []
-      };
-    }
-
-    const lines = m3uContent.split('\n').map(line => line.trim()).filter(Boolean);
-    const extinfLines = lines.filter(line => line.startsWith('#EXTINF:'));
-    const groups = new Set();
-
-    extinfLines.forEach(line => {
-      const attributes = this.#extractAttributes(line);
-      if (attributes['group-title']) {
-        groups.add(attributes['group-title']);
-      }
-    });
-
-    return {
-      isValid: true,
-      totalLines: lines.length,
-      channelCount: extinfLines.length,
-      groups: Array.from(groups).sort()
-    };
-  }
+  
 }
