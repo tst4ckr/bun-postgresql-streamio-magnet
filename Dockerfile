@@ -43,7 +43,7 @@ EXPOSE 7000
 CMD ["./start.sh"]
 
 # Healthcheck para verificar que Tor está funcionando
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD nc -z 127.0.0.1 9050 || exit 1
+#HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+#    CMD nc -z 127.0.0.1 9050 || exit 1
 
 
