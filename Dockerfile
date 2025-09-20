@@ -3,7 +3,7 @@ FROM oven/bun:debian
 
 # Instalar Tor, gosu y dependencias en una sola capa
 RUN apt-get update && \
-    apt-get install -y tor gosu && \
+    apt-get install -y tor gosu netcat-openbsd && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -12,7 +12,8 @@ RUN useradd --system --no-create-home appuser
 
 # Crear y configurar Tor de forma más limpia
 RUN mkdir -p /etc/tor /var/lib/tor && \
-    echo "SocksPort 127.0.0.1:9050" > /etc/tor/torrc && \
+    echo "User debian-tor" > /etc/tor/torrc && \
+    echo "SocksPort 127.0.0.1:9050" >> /etc/tor/torrc && \
     echo "ControlPort 127.0.0.1:9051" >> /etc/tor/torrc && \
     echo "DataDirectory /var/lib/tor" >> /etc/tor/torrc && \
     echo "Log notice stdout" >> /etc/tor/torrc && \
@@ -43,7 +44,7 @@ EXPOSE 7000
 CMD ["./start.sh"]
 
 # Healthcheck para verificar que Tor está funcionando
-#HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-#    CMD nc -z 127.0.0.1 9050 || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD nc -z 127.0.0.1 9050 || exit 1
 
 

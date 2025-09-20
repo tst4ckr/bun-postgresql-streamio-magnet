@@ -1,16 +1,19 @@
 #!/bin/sh
 set -e
 
-# Iniciar Tor en segundo plano
-/usr/bin/tor -f /etc/tor/torrc &
+# Iniciar Tor en segundo plano como el usuario debian-tor
+echo "Iniciando Tor..."
+gosu debian-tor /usr/bin/tor -f /etc/tor/torrc &
 TOR_PID=$!
 
 # Esperar a que Tor se inicialice y verificar que esté corriendo
+echo "Esperando a que Tor se inicie..."
 sleep 5
 if ! kill -0 $TOR_PID 2>/dev/null; then
     echo "Error: Tor no se pudo iniciar correctamente" >&2
     exit 1
 fi
+echo "Tor iniciado correctamente."
 
 # Determinar el usuario para ejecutar la aplicación
 if [ -z "$WINDOWS_DEV" ]; then
