@@ -1,1 +1,0 @@
-# 🎬 Stremio Torrent Search Addon
