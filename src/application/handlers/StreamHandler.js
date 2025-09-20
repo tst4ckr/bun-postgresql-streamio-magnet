@@ -353,7 +353,7 @@ export class StreamHandler {
       );
     }
 
-    this.#logger.trace(`Validación exitosa para ID ${args.id}:`, {
+    this.#logger.debug(`Validación exitosa para ID ${args.id}:`, {
       type: validationResult.details?.detection?.type,
       confidence: validationResult.details?.detection?.confidence
     });
@@ -923,7 +923,7 @@ export class StreamHandler {
     
     try {
       const detection = this.#idDetectorService.detectIdType(contentId);
-      this.#logger.trace(`ID detectado: ${contentId} -> ${detection.type} (válido: ${detection.isValid})`);
+      this.#logger.debug(`ID detectado: ${contentId} -> ${detection.type} (válido: ${detection.isValid})`);
       return detection;
     } catch (error) {
       this.#logger.error(`Error detectando tipo de ID para ${contentId}: ${error.message}`);
