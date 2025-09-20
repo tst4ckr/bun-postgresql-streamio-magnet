@@ -12,11 +12,11 @@ RUN useradd --system --no-create-home appuser
 
 # Crear y configurar Tor de forma más limpia
 RUN mkdir -p /etc/tor /var/lib/tor && \
-    echo "User debian-tor" > /etc/tor/torrc && \
-    echo "SocksPort 127.0.0.1:9050" >> /etc/tor/torrc && \
+    echo "SocksPort 127.0.0.1:9050" > /etc/tor/torrc && \
     echo "ControlPort 127.0.0.1:9051" >> /etc/tor/torrc && \
     echo "DataDirectory /var/lib/tor" >> /etc/tor/torrc && \
     echo "Log notice stdout" >> /etc/tor/torrc && \
+    echo "CookieAuthentication 1" >> /etc/tor/torrc && \
     chown -R debian-tor:debian-tor /var/lib/tor && \
     chmod 700 /var/lib/tor
 
