@@ -31,6 +31,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
   #idService;
   #configInvoker;
   #cacheService;
+  #exhaustedSourcesCache = new Map(); // Cache de fuentes agotadas por contentId
 
 
 
@@ -274,14 +275,31 @@ export class CascadingMagnetRepository extends MagnetRepository {
       
       // Buscar en todas las fuentes locales simultáneamente usando Promise.allSettled
       // para evitar que un error en una fuente cancele las demás búsquedas
-      const searchPromises = [
-        this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv'),
-        this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv')
-      ];
+      const searchPromises = [];
       
-      // Para anime, priorizar búsqueda en repositorio de anime
+      // Verificar si las fuentes locales ya fueron agotadas para evitar búsquedas redundantes
+      if (!this.#isSourceExhausted(contentId, 'magnets.csv')) {
+        searchPromises.push(this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv'));
+      } else {
+        searchPromises.push(Promise.resolve([]));
+        this.#logger.debug(`Saltando búsqueda en magnets.csv - fuente agotada para ${contentId}`);
+      }
+      
+      if (!this.#isSourceExhausted(contentId, 'torrentio.csv')) {
+        searchPromises.push(this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv'));
+      } else {
+        searchPromises.push(Promise.resolve([]));
+        this.#logger.debug(`Saltando búsqueda en torrentio.csv - fuente agotada para ${contentId}`);
+      }
+      
+      // Para anime, verificar también si ya fue agotado
       if (type === 'anime' || idType === 'kitsu' || idType === 'mal' || idType === 'anilist') {
-        searchPromises.push(this.#searchInRepositoryByContentId(this.#animeRepository, contentId, 'anime.csv'));
+        if (!this.#isSourceExhausted(contentId, 'anime.csv')) {
+          searchPromises.push(this.#searchInRepositoryByContentId(this.#animeRepository, contentId, 'anime.csv'));
+        } else {
+          searchPromises.push(Promise.resolve([]));
+          this.#logger.debug(`Saltando búsqueda en anime.csv - fuente agotada para ${contentId}`);
+        }
       } else {
         searchPromises.push(Promise.resolve([]));
       }
@@ -293,11 +311,24 @@ export class CascadingMagnetRepository extends MagnetRepository {
       const secondaryResults = searchResults[1].status === 'fulfilled' ? searchResults[1].value : [];
       const animeResults = searchResults[2].status === 'fulfilled' ? searchResults[2].value : [];
       
+      // Marcar fuentes como agotadas si no encontraron resultados
+      if (primaryResults.length === 0) {
+        this.#markSourceAsExhausted(contentId, 'magnets.csv');
+      }
+      if (secondaryResults.length === 0) {
+        this.#markSourceAsExhausted(contentId, 'torrentio.csv');
+      }
+      if (animeResults.length === 0 && (type === 'anime' || idType === 'kitsu' || idType === 'mal' || idType === 'anilist')) {
+        this.#markSourceAsExhausted(contentId, 'anime.csv');
+      }
+      
       // Loggear errores de búsquedas fallidas sin interrumpir el proceso
       searchResults.forEach((result, index) => {
         if (result.status === 'rejected') {
           const sources = ['magnets.csv', 'torrentio.csv', 'anime.csv'];
           this.#logger.warn(`Error en búsqueda de ${sources[index]} para ${contentId}:`, result.reason?.message, { component: 'CascadingMagnetRepository' });
+          // Marcar como agotada también en caso de error
+          this.#markSourceAsExhausted(contentId, sources[index]);
         }
       });
       
@@ -330,96 +361,117 @@ export class CascadingMagnetRepository extends MagnetRepository {
         return finalResults;
       }
       
-      // Paso 1: Buscar en API de Torrentio en español
-      this.#logger.info(`No se encontraron magnets locales, consultando API Torrentio en español para ${contentId} (${type})`, { component: 'CascadingMagnetRepository' });
-      const spanishApiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFallback(contentId, type);
-      
-      if (spanishApiResults.length > 0) {
-        this.#logger.info(`Encontrados ${spanishApiResults.length} magnets en API Torrentio español para ${contentId}`);
+      // Paso 1: Buscar en API de Torrentio en español (solo si no fue agotada)
+      if (!this.#isSourceExhausted(contentId, 'api-spanish')) {
+        this.#logger.info(`No se encontraron magnets locales, consultando API Torrentio en español para ${contentId} (${type})`, { component: 'CascadingMagnetRepository' });
+        const spanishApiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFallback(contentId, type);
         
-        // Enriquecer resultados de API con metadatos
-        const enrichedSpanishResults = this.#enrichMagnetsWithMetadata(spanishApiResults, metadata);
-        
-        // Cachear resultados de API con TTL más corto
-        const apiCacheTTL = this.#getCacheTTL(type, enrichedSpanishResults.length, true);
-        cacheService.set(cacheKey, enrichedSpanishResults, apiCacheTTL, {
-          contentType: type,
-          metadata: { 
-            resultCount: enrichedSpanishResults.length, 
-            source: 'api',
-            language: 'spanish',
-            duration: Date.now() - startTime
-          }
-        });
-        
-        // Reinicializar repositorio secundario para incluir nuevos datos
-        await this.#reinitializeSecondaryRepository();
-        
-        const duration = Date.now() - startTime;
-        this.#logger.info(`Búsqueda completada con API español en ${duration}ms`);
-        return enrichedSpanishResults;
-      }
-      
-      // Paso 2: Buscar en archivo english.csv
-      this.#logger.info(`No se encontraron magnets en API español, buscando en english.csv para ${contentId}`, { component: 'CascadingMagnetRepository' });
-      const englishResults = await this.#searchInRepositoryByContentId(this.#englishRepository, contentId, 'english.csv');
-      
-      if (englishResults.length > 0) {
-        const enrichedEnglishResults = this.#enrichMagnetsWithMetadata(englishResults, metadata);
-        const finalEnglishResults = this.#prioritizeResults({
-          primary: [],
-          secondary: [],
-          anime: [],
-          english: enrichedEnglishResults
-        }, type, contentId);
-        
-        if (finalEnglishResults.length > 0) {
-          // Cachear resultados de english.csv
-          const cacheTTL = this.#getCacheTTL(type, finalEnglishResults.length);
-          cacheService.set(cacheKey, finalEnglishResults, cacheTTL, {
+        if (spanishApiResults.length > 0) {
+          this.#logger.info(`Encontrados ${spanishApiResults.length} magnets en API Torrentio español para ${contentId}`);
+          
+          // Enriquecer resultados de API con metadatos
+          const enrichedSpanishResults = this.#enrichMagnetsWithMetadata(spanishApiResults, metadata);
+          
+          // Cachear resultados de API con TTL más corto
+          const apiCacheTTL = this.#getCacheTTL(type, enrichedSpanishResults.length, true);
+          cacheService.set(cacheKey, enrichedSpanishResults, apiCacheTTL, {
             contentType: type,
             metadata: { 
-              resultCount: finalEnglishResults.length, 
-              source: 'repository',
+              resultCount: enrichedSpanishResults.length, 
+              source: 'api',
+              language: 'spanish',
+              duration: Date.now() - startTime
+            }
+          });
+          
+          // Reinicializar repositorio secundario para incluir nuevos datos
+          await this.#reinitializeSecondaryRepository();
+          
+          const duration = Date.now() - startTime;
+          this.#logger.info(`Búsqueda completada con API español en ${duration}ms`);
+          return enrichedSpanishResults;
+        } else {
+          // Marcar API español como agotada
+          this.#markSourceAsExhausted(contentId, 'api-spanish');
+        }
+      } else {
+        this.#logger.debug(`Saltando API Torrentio español - fuente agotada para ${contentId}`);
+      }
+      
+      // Paso 2: Buscar en archivo english.csv (solo si no fue agotada)
+      if (!this.#isSourceExhausted(contentId, 'english.csv')) {
+        this.#logger.info(`No se encontraron magnets en API español, buscando en english.csv para ${contentId}`, { component: 'CascadingMagnetRepository' });
+        const englishResults = await this.#searchInRepositoryByContentId(this.#englishRepository, contentId, 'english.csv');
+        
+        if (englishResults.length > 0) {
+          const enrichedEnglishResults = this.#enrichMagnetsWithMetadata(englishResults, metadata);
+          const finalEnglishResults = this.#prioritizeResults({
+            primary: [],
+            secondary: [],
+            anime: [],
+            english: enrichedEnglishResults
+          }, type, contentId);
+          
+          if (finalEnglishResults.length > 0) {
+            // Cachear resultados de english.csv
+            const cacheTTL = this.#getCacheTTL(type, finalEnglishResults.length);
+            cacheService.set(cacheKey, finalEnglishResults, cacheTTL, {
+              contentType: type,
+              metadata: { 
+                resultCount: finalEnglishResults.length, 
+                source: 'repository',
+                language: 'english',
+                duration: Date.now() - startTime
+              }
+            });
+            
+            const duration = Date.now() - startTime;
+            this.#logger.info(`Encontrados ${finalEnglishResults.length} magnets en english.csv para ${contentId} en ${duration}ms`);
+            return finalEnglishResults;
+          }
+        } else {
+          // Marcar english.csv como agotada
+          this.#markSourceAsExhausted(contentId, 'english.csv');
+        }
+      } else {
+        this.#logger.debug(`Saltando english.csv - fuente agotada para ${contentId}`);
+      }
+      
+      // Paso 3: Buscar en API de Torrentio en inglés (solo si no fue agotada)
+      if (!this.#isSourceExhausted(contentId, 'api-english')) {
+        this.#logger.info(`No se encontraron magnets en english.csv, consultando API Torrentio en inglés para ${contentId}`, { component: 'CascadingMagnetRepository' });
+        const englishApiResults = await this.#torrentioApiService.searchMagnetsInEnglish(contentId, type);
+        
+        if (englishApiResults.length > 0) {
+          this.#logger.info(`Encontrados ${englishApiResults.length} magnets en API Torrentio inglés para ${contentId}`);
+          
+          // Enriquecer resultados de API con metadatos
+          const enrichedEnglishApiResults = this.#enrichMagnetsWithMetadata(englishApiResults, metadata);
+          
+          // Cachear resultados de API con TTL más corto
+          const apiCacheTTL = this.#getCacheTTL(type, enrichedEnglishApiResults.length, true);
+          cacheService.set(cacheKey, enrichedEnglishApiResults, apiCacheTTL, {
+            contentType: type,
+            metadata: { 
+              resultCount: enrichedEnglishApiResults.length, 
+              source: 'api',
               language: 'english',
               duration: Date.now() - startTime
             }
           });
           
+          // Reinicializar repositorio de inglés para incluir nuevos datos
+          await this.#reinitializeRepository(this.#englishRepository, 'english.csv');
+          
           const duration = Date.now() - startTime;
-          this.#logger.info(`Encontrados ${finalEnglishResults.length} magnets en english.csv para ${contentId} en ${duration}ms`);
-          return finalEnglishResults;
+          this.#logger.info(`Búsqueda completada con API inglés en ${duration}ms`);
+          return enrichedEnglishApiResults;
+        } else {
+          // Marcar API inglesa como agotada
+          this.#markSourceAsExhausted(contentId, 'api-english');
         }
-      }
-      
-      // Paso 3: Buscar en API de Torrentio en inglés
-      this.#logger.info(`No se encontraron magnets en english.csv, consultando API Torrentio en inglés para ${contentId}`, { component: 'CascadingMagnetRepository' });
-      const englishApiResults = await this.#torrentioApiService.searchMagnetsInEnglish(contentId, type);
-      
-      if (englishApiResults.length > 0) {
-        this.#logger.info(`Encontrados ${englishApiResults.length} magnets en API Torrentio inglés para ${contentId}`);
-        
-        // Enriquecer resultados de API con metadatos
-        const enrichedEnglishApiResults = this.#enrichMagnetsWithMetadata(englishApiResults, metadata);
-        
-        // Cachear resultados de API con TTL más corto
-        const apiCacheTTL = this.#getCacheTTL(type, enrichedEnglishApiResults.length, true);
-        cacheService.set(cacheKey, enrichedEnglishApiResults, apiCacheTTL, {
-          contentType: type,
-          metadata: { 
-            resultCount: enrichedEnglishApiResults.length, 
-            source: 'api',
-            language: 'english',
-            duration: Date.now() - startTime
-          }
-        });
-        
-        // Reinicializar repositorio de inglés para incluir nuevos datos
-        await this.#reinitializeRepository(this.#englishRepository, 'english.csv');
-        
-        const duration = Date.now() - startTime;
-        this.#logger.info(`Búsqueda completada con API inglés en ${duration}ms`);
-        return enrichedEnglishApiResults;
+      } else {
+        this.#logger.debug(`Saltando API Torrentio inglés - fuente agotada para ${contentId}`);
       }
       
       // No se encontraron magnets en ninguna fuente
@@ -510,6 +562,51 @@ export class CascadingMagnetRepository extends MagnetRepository {
     } catch (error) {
       this.#logger.error('Error al reinicializar repositorio secundario:', error, { component: 'CascadingMagnetRepository' });
     }
+  }
+
+  /**
+   * Verifica si una fuente ya fue agotada para un contentId específico.
+   * @private
+   * @param {string} contentId - ID del contenido
+   * @param {string} source - Nombre de la fuente
+   * @returns {boolean} true si la fuente fue agotada recientemente
+   */
+  #isSourceExhausted(contentId, source) {
+    const key = `${contentId}:${source}`;
+    const exhaustedTime = this.#exhaustedSourcesCache.get(key);
+    
+    if (!exhaustedTime) return false;
+    
+    // TTL de 5 minutos para fuentes agotadas
+    const TTL = 5 * 60 * 1000;
+    const isExpired = Date.now() - exhaustedTime > TTL;
+    
+    if (isExpired) {
+      this.#exhaustedSourcesCache.delete(key);
+      return false;
+    }
+    
+    return true;
+  }
+
+  /**
+   * Marca una fuente como agotada para un contentId específico.
+   * @private
+   * @param {string} contentId - ID del contenido
+   * @param {string} source - Nombre de la fuente
+   */
+  #markSourceAsExhausted(contentId, source) {
+    const key = `${contentId}:${source}`;
+    this.#exhaustedSourcesCache.set(key, Date.now());
+    this.#logger.debug(`Fuente ${source} marcada como agotada para ${contentId}`);
+  }
+
+  /**
+   * Limpia el cache de fuentes agotadas (útil para testing).
+   */
+  clearExhaustedSourcesCache() {
+    this.#exhaustedSourcesCache.clear();
+    this.#logger.info('Cache de fuentes agotadas limpiado');
   }
 
   /**
