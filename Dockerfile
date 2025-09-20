@@ -1,7 +1,7 @@
 # Usar la imagen oficial de Bun basada en Debian
 FROM oven/bun:debian
 
-# Instalar Tor, gosu y dependencias
+# Instalar Tor, gosu y dependencias en una sola capa
 RUN apt-get update && \
     apt-get install -y tor gosu && \
     apt-get clean && \
@@ -10,37 +10,26 @@ RUN apt-get update && \
 # Crear un usuario no-root para la aplicación
 RUN useradd --system --no-create-home appuser
 
-# Crear directorio para configuración de Tor
-RUN mkdir -p /etc/tor
-
-# Crear archivo de configuración de Tor
-RUN echo "SocksPort 127.0.0.1:9050" > /etc/tor/torrc && \
+# Crear y configurar Tor de forma más limpia
+RUN mkdir -p /etc/tor /var/lib/tor && \
+    echo "SocksPort 127.0.0.1:9050" > /etc/tor/torrc && \
     echo "ControlPort 127.0.0.1:9051" >> /etc/tor/torrc && \
     echo "DataDirectory /var/lib/tor" >> /etc/tor/torrc && \
-    echo "Log notice stdout" >> /etc/tor/torrc
-
-# Crear y asegurar el directorio de datos de Tor
-RUN mkdir -p /var/lib/tor && \
+    echo "Log notice stdout" >> /etc/tor/torrc && \
     chown -R debian-tor:debian-tor /var/lib/tor && \
     chmod 700 /var/lib/tor
 
 WORKDIR /app
 
-# Copiar archivos de la aplicación y establecer permisos
+# Copiar solo los archivos necesarios para instalar dependencias
 COPY --chown=appuser:appuser package.json bun.lock ./
-RUN bun install
+RUN bun install --production
+
+# Copiar el resto de la aplicación
 COPY --chown=appuser:appuser . .
 
-# Asegurar permisos de escritura en el directorio data después de copiar archivos
-RUN mkdir -p /app/data && \
-    chown -R appuser:appuser /app/data && \
-    chmod -R 775 /app/data
-
-# Dar permisos de ejecución al script de inicio
-RUN chmod +x start.sh
-
-# Asegurar que appuser tenga permisos completos sobre toda la aplicación
-RUN chown -R appuser:appuser /app
+# Asegurar permisos y dar permisos de ejecución al script de inicio
+RUN chmod +x start.sh && chown -R appuser:appuser /app
 
 # Variables de entorno
 ENV NODE_ENV=production
@@ -54,7 +43,7 @@ EXPOSE 7000
 CMD ["./start.sh"]
 
 # Healthcheck para verificar que Tor está funcionando
-# HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-#     CMD nc -z 127.0.0.1 9050 || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD nc -z 127.0.0.1 9050 || exit 1
 
 
