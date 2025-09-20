@@ -123,7 +123,7 @@ export const LIMIT_CONSTANTS = {
   },
   
   // Mínimos
-  MIN_SEEDERS: 0,
+  MIN_SEEDERS: 1,
   
   // Stack de comandos
   MAX_COMMAND_STACK: 10,

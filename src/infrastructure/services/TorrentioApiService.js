@@ -52,8 +52,7 @@ export class TorrentioApiService {
   #manifestCacheExpiry;
   #torService;
   #configInvoker;
-
-
+  #globalDuplicateCache;
 
   /**
    * @param {string} baseUrl - URL base de la API de Torrentio
@@ -80,6 +79,7 @@ export class TorrentioApiService {
     this.#providerConfigs = this.#initializeProviderConfigs();
     this.#manifestCache = new Map();
     this.#manifestCacheExpiry = CONSTANTS.TIME.MANIFEST_CACHE_EXPIRY;
+    this.#globalDuplicateCache = new Set(); // Cache global para prevenir duplicados entre búsquedas
     
     this.#ensureTorrentioFileExists();
   }
@@ -218,6 +218,9 @@ export class TorrentioApiService {
    * @returns {Promise<Array>} Array de magnets
    */
   async searchMagnetsWithLanguageFallback(contentId, type = 'auto', season = null, episode = null) {
+    // Limpiar cache global al inicio de cada búsqueda completa
+    this.clearGlobalDuplicateCache();
+    
     // Extraer season y episode del contentId si no se proporcionan y el ID tiene formato series
     const { finalContentId, extractedSeason, extractedEpisode } = this.#processContentId(contentId);
     const finalSeason = season !== null ? season : extractedSeason;
@@ -624,18 +627,31 @@ export class TorrentioApiService {
       return [];
     }
     
+    // Filtrar duplicados usando la cache global, pero permitir al menos un resultado
+    const uniqueCandidates = validCandidates.filter(magnet => {
+      const key = `${magnet.content_id}|${magnet.magnet}`;
+      return !this.#globalDuplicateCache.has(key);
+    });
+    
+    // Si todos están en cache, usar el primer candidato válido para permitir al menos un resultado
+    const candidatesToProcess = uniqueCandidates.length > 0 ? uniqueCandidates : validCandidates.slice(0, 1);
+    
+    if (uniqueCandidates.length === 0 && validCandidates.length > 0) {
+      this.#logger.debug(`Todos los magnets válidos ya están en cache, usando el primero`);
+    }
+    
     let sortedCandidates;
     
     switch (config.strategy) {
       case 'quality':
-        sortedCandidates = this.#sortByQuality(validCandidates, config);
+        sortedCandidates = this.#sortByQuality(candidatesToProcess, config);
         break;
       case 'balanced':
-        sortedCandidates = this.#sortByBalanced(validCandidates, config);
+        sortedCandidates = this.#sortByBalanced(candidatesToProcess, config);
         break;
       case 'seeders':
       default:
-        sortedCandidates = this.#sortBySeeders(validCandidates);
+        sortedCandidates = this.#sortBySeeders(candidatesToProcess);
         break;
     }
     
@@ -643,6 +659,12 @@ export class TorrentioApiService {
     
     if (config.enableSelectionLogging) {
       this.#logger.info(`Mejor magnet seleccionado (estrategia: ${config.strategy}): ${bestCandidate.name} (${bestCandidate.quality}, ${bestCandidate.seeders || 0} seeders)`, { component: 'TorrentioApiService' });
+    }
+    
+    // Agregar el mejor candidato a la cache global para prevenir duplicados (solo si era único)
+    const bestKey = `${bestCandidate.content_id}|${bestCandidate.magnet}`;
+    if (uniqueCandidates.includes(bestCandidate)) {
+      this.#globalDuplicateCache.add(bestKey);
     }
     
     return [bestCandidate];
@@ -1019,6 +1041,15 @@ export class TorrentioApiService {
   }
 
   /**
+   * Limpia la cache global de duplicados para una nueva búsqueda
+   * @public
+   */
+  clearGlobalDuplicateCache() {
+    this.#globalDuplicateCache.clear();
+    this.#logger.debug('Cache global de duplicados limpiada', { component: 'TorrentioApiService' });
+  }
+
+  /**
    * Guarda magnets en el archivo torrentio.csv.
    * @private
    * @param {Magnet[]} magnets - Magnets a guardar
@@ -1062,7 +1093,13 @@ export class TorrentioApiService {
       // Filtrar magnets duplicados antes de guardar
       const newMagnets = magnets.filter(magnet => {
         const key = `${magnet.content_id}|${magnet.magnet}`;
-        return !existingMagnets.has(key);
+        return !existingMagnets.has(key) && !this.#globalDuplicateCache.has(key);
+      });
+
+      // Agregar los nuevos magnets a la cache global
+      newMagnets.forEach(magnet => {
+        const key = `${magnet.content_id}|${magnet.magnet}`;
+        this.#globalDuplicateCache.add(key);
       });
       
       if (newMagnets.length === 0) {
@@ -1076,6 +1113,10 @@ export class TorrentioApiService {
       }
       
       this.#logger.info(`Guardados ${newMagnets.length} magnets nuevos en ${fileName} (${magnets.length - newMagnets.length} duplicados omitidos)`, { component: 'TorrentioApiService' });
+      
+      if (this.#globalDuplicateCache.size > 0) {
+        this.#logger.debug(`Cache global de duplicados: ${this.#globalDuplicateCache.size} items únicos`, { component: 'TorrentioApiService' });
+      }
     } catch (error) {
       // Crear objeto de error detallado para debugging
       const fileError = {
