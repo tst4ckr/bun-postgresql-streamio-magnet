@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /manifest.json
+Allow: /catalog/*
+Allow: /meta/*
+Allow: /stream/*
+Disallow: /

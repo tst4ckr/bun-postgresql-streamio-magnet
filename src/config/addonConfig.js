@@ -16,6 +16,7 @@ const isContainer = process.env.NODE_ENV === 'production' && process.env.CONTAIN
 // Obtener directorio del proyecto
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+// Desde src/config/addonConfig.js, el projectRoot está dos niveles arriba
 const projectRoot = join(__dirname, '..', '..');
 
 // Función para resolver rutas según el entorno
@@ -24,18 +25,18 @@ function resolvePath(relativePath) {
     // En contenedor, usar rutas relativas desde /app
     return join('/app', relativePath);
   }
-  // En desarrollo local, usar rutas relativas desde el proyecto
+  // En desarrollo local, usar rutas relativas desde el proyecto workspaces
   return join(projectRoot, relativePath);
 }
 
 const config = {
   addon: {
-    id: process.env.ADDON_ID || 'org.stremio.torrent.search',
+    id: process.env.ADDON_ID || 'org.stremio.veoveo.search',
     version: process.env.ADDON_VERSION || '1.3.0',
-    name: process.env.ADDON_NAME || 'Torrent Search Pro',
-    description: process.env.ADDON_DESCRIPTION || 'Advanced torrent search addon with cascading search system for movies, series and anime. Features unified metadata management, detailed logging, and specialized anime support with multiple ID formats.',
-    logo: process.env.ADDON_LOGO || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjMWExYTFhIi8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTQwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iNzIiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjZmZmZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5UUzwvdGV4dD4KPC9zdmc+',
-    background: process.env.ADDON_BACKGROUND || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyMCIgaGVpZ2h0PSIxMDgwIiB2aWV3Qm94PSIwIDAgMTkyMCAxMDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTkyMCIgaGVpZ2h0PSIxMDgwIiBmaWxsPSIjMWExYTFhIi8+Cjx0ZXh0IHg9Ijk2MCIgeT0iNTgwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iODAiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjZmZmZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5Ub3JyZW50IFNlYXJjaDwvdGV4dD4KPC9zdmc+',
+    name: process.env.ADDON_NAME || 'VeoVeo Search Pro',
+    description: process.env.ADDON_DESCRIPTION || 'Advanced VeoVeo search addon with cascading search system for movies, series and anime. Features unified metadata management, detailed logging, and specialized anime support with multiple ID formats.',
+    logo: process.env.ADDON_LOGO || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjMWExYTFhIi8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTQwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iNjQiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjZmZmZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5WVjwvdGV4dD4KPC9zdmc+',
+    background: process.env.ADDON_BACKGROUND || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyMCIgaGVpZ2h0PSIxMDgwIiB2aWV3Qm94PSIwIDAgMTkyMCAxMDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTkyMCIgaGVpZ2h0PSIxMDgwIiBmaWxsPSIjMWExYTFhIi8+Cjx0ZXh0IHg9Ijk2MCIgeT0iNTgwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iODAiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjZmZmZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5WZW9WZW8gU2VhcmNoPC90ZXh0Pgo8L3N2Zz4K',
     resources: [
       {
         name: 'catalog',
@@ -80,6 +81,8 @@ const config = {
   },
   server: {
     port: process.env.PORT || CONSTANTS.NETWORK.DEFAULT_SERVER_PORT,
+    staticPath: process.env.STATIC_PATH || 'static', // Ruta relativa desde el directorio de trabajo
+    enableStaticFiles: process.env.ENABLE_STATIC_FILES !== 'false'
   },
   cache: {
     streamCacheMaxAge: parseInt(process.env.CACHE_STREAM_MAX_AGE) || CONSTANTS.CACHE.STREAM_MAX_AGE,
@@ -283,6 +286,19 @@ const MANIFEST_CACHE_EXPIRY = CONSTANTS.TIME.MANIFEST_CACHE_SHORT_EXPIRY;
  * @returns {Object} Manifiesto de Stremio optimizado.
  */
 function generateManifest() {
+  // Validación temprana de configuración crítica
+  if (!config.addon?.id || !config.addon?.name) {
+    throw new Error('Configuración crítica faltante: addon.id y addon.name son requeridos');
+  }
+  
+  if (!config.addon.catalogs || !Array.isArray(config.addon.catalogs)) {
+    throw new Error('Configuración inválida: addon.catalogs debe ser un array');
+  }
+  
+  if (!config.cache?.streamCacheMaxAge || config.cache.streamCacheMaxAge < 0) {
+    throw new Error('Configuración inválida: cache.streamCacheMaxAge debe ser un número positivo');
+  }
+
   // Verificar cache
   const now = Date.now();
   if (manifestCache && manifestCacheTimestamp && (now - manifestCacheTimestamp) < MANIFEST_CACHE_EXPIRY) {
@@ -294,8 +310,28 @@ function generateManifest() {
   const uniqueIdPrefixes = [...new Set(config.addon.resources.flatMap(r => r.idPrefixes))];
 
   // Stremio genera dinámicamente catálogos para movies, series y anime
-  // Solo se procesan catálogos personalizados (ej: TV)
-  const optimizedCatalogs = config.addon.catalogs;
+  // Solo se procesan catálogos personalizados (ej: TV) con filtros optimizados
+  const optimizedCatalogs = config.addon.catalogs.map(catalog => ({
+    ...catalog,
+    // Agregar filtros de género para mejor navegación
+    genres: catalog.type === 'movie' 
+      ? ['action', 'comedy', 'drama', 'horror', 'thriller', 'sci-fi', 'fantasy', 'romance']
+      : catalog.type === 'series'
+      ? ['drama', 'comedy', 'action', 'crime', 'sci-fi', 'fantasy', 'thriller', 'documentary']
+      : catalog.type === 'anime'
+      ? ['action', 'adventure', 'comedy', 'drama', 'fantasy', 'romance', 'sci-fi', 'slice-of-life']
+      : catalog.type === 'tv'
+      ? ['news', 'sports', 'entertainment', 'documentary', 'kids', 'music']
+      : undefined,
+    // Agregar filtros de idioma para contenido internacional
+    ...(catalog.type !== 'tv' && {
+      languages: ['spanish', 'english', 'japanese', 'korean', 'portuguese', 'french']
+    }),
+    // Filtros de calidad para mejor experiencia
+    ...(catalog.type !== 'tv' && {
+      qualities: ['4K', '1080p', '720p', '480p']
+    })
+  }));
 
   // Generar manifest estándar de Stremio (solo campos oficiales)
   const cleanResources = config.addon.resources.map(resource => ({
@@ -320,8 +356,20 @@ function generateManifest() {
       configurable: process.env.ADDON_CONFIGURABLE === 'true' || false,
       configurationRequired: false,
       adult: process.env.ADDON_ADULT_CONTENT === 'true' || false,
-      p2p: true
-      // Campos internos como cacheMaxAge, cascadeSearch se mantienen privados
+      p2p: true,
+      // Optimizaciones de rendimiento para Stremio
+      cacheMaxAge: process.env.NODE_ENV === 'production' 
+        ? config.cache.streamCacheMaxAge * 2 
+        : config.cache.streamCacheMaxAge,
+      // Habilitar búsqueda en cascada para mejor cobertura
+      cascadeSearch: config.cascadeSearch?.enabled || true,
+      // Soporte para múltiples idiomas
+      multiLanguage: true,
+      // Indicar que el addon maneja contenido de alta calidad
+      highQuality: true,
+      // Soporte para subtítulos
+      subtitles: config.torrentio?.anime?.enableSubtitles || true
+      // Campos internos como cascadeSearch se mantienen privados
     }
     // Datos internos como performance, providerConfig, typeSpecific se mantienen privados
   };

@@ -92,16 +92,57 @@ export class TvHandler {
         const tv = await this.#getTvById(channelId);
         
         if (!tv) {
-          return Promise.reject(new Error(`TV channel not found: ${args.id}`));
+          this.#logger.warn(`TV channel not found: ${args.id}`);
+          return { 
+            meta: {},
+            cacheMaxAge: this.#config.cache.metadataCacheMaxAge,
+            // Headers de cache para respuestas vacías
+            staleRevalidate: this.#config.cache.metadataCacheMaxAge * 2,
+            staleError: this.#config.cache.metadataCacheMaxAge * 4,
+            // Metadatos de debugging en desarrollo
+            ...(process.env.NODE_ENV === 'development' && {
+              _metadata: {
+                channelFound: false,
+                channelId,
+                timestamp: new Date().toISOString()
+              }
+            })
+          };
         }
 
         return {
           meta: tv.toStremioMeta(),
-          cacheMaxAge: this.#config.cache.metadataCacheMaxAge
+          cacheMaxAge: this.#config.cache.metadataCacheMaxAge,
+          // Headers de cache optimizados para metadatos de TV
+          staleRevalidate: this.#config.cache.metadataCacheMaxAge * 3, // TV metadata es más estable
+          staleError: this.#config.cache.metadataCacheMaxAge * 6,
+          // Metadatos de debugging en desarrollo
+          ...(process.env.NODE_ENV === 'development' && {
+            _metadata: {
+              channelFound: true,
+              channelId,
+              channelName: tv.name,
+              timestamp: new Date().toISOString()
+            }
+          })
         };
       } catch (error) {
-        this.#logger.error('Error fetching TV meta', { error: error.message });
-        return Promise.reject(error);
+        this.#logger.error('Error fetching TV meta', { error: error.message, args });
+        return { 
+          meta: {},
+          cacheMaxAge: this.#config.cache.metadataCacheMaxAge,
+          // Headers de cache para respuestas de error
+          staleRevalidate: this.#config.cache.metadataCacheMaxAge,
+          staleError: this.#config.cache.metadataCacheMaxAge * 2,
+          // Metadatos de debugging en desarrollo
+          ...(process.env.NODE_ENV === 'development' && {
+            _metadata: {
+              error: true,
+              errorMessage: error.message,
+              timestamp: new Date().toISOString()
+            }
+          })
+        };
       }
     };
   }
@@ -117,7 +158,11 @@ export class TvHandler {
         const tv = await this.#getTvById(channelId);
         
         if (!tv) {
-          return Promise.reject(new Error(`TV channel not found: ${args.id}`));
+          this.#logger.warn(`TV channel not found: ${args.id}`);
+          return { 
+            streams: [],
+            cacheMaxAge: this.#config.cache.streamCacheMaxAge 
+          };
         }
 
         return {
@@ -125,8 +170,11 @@ export class TvHandler {
           cacheMaxAge: this.#config.cache.streamCacheMaxAge
         };
       } catch (error) {
-        this.#logger.error('Error fetching TV stream', { error: error.message });
-        return Promise.reject(error);
+        this.#logger.error('Error fetching TV stream', { error: error.message, args });
+        return { 
+          streams: [],
+          cacheMaxAge: this.#config.cache.streamCacheMaxAge 
+        };
       }
     };
   }

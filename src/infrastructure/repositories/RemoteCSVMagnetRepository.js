@@ -94,7 +94,7 @@ export class RemoteCSVMagnetRepository extends MagnetRepository {
       const response = await fetch(url, {
         signal: controller.signal,
         headers: {
-          'User-Agent': 'Stremio-Magnet-Search-Addon/1.0.0'
+          'User-Agent': 'VeoVeo-Search-Pro/1.3.0'
         }
       });
       clearTimeout(timeoutId);

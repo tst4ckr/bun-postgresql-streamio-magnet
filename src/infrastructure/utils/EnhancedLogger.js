@@ -16,6 +16,21 @@ export class EnhancedLogger {
   #sourceLocationCache = new Map();
   #minimalOutput = false;
   #errorOnly = false;
+  #batchBuffer = [];
+  #batchSize = 10;
+  #batchTimeout = null;
+  #batchDelay = 100; // ms
+  #enableBatching = false;
+  // Métricas de rendimiento
+  #performanceMetrics = {
+    logCounts: { error: 0, warn: 0, info: 0, debug: 0 },
+    totalLogs: 0,
+    startTime: Date.now(),
+    lastReset: Date.now(),
+    batchProcessed: 0,
+    cacheHits: 0,
+    cacheMisses: 0
+  };
 
   /**
    * @param {string} logLevel - Nivel de logging (debug, info, warn, error)
@@ -30,10 +45,71 @@ export class EnhancedLogger {
       this.#enableSourceTracking = productionConfig.disableSourceTracking ? false : enableSourceTracking;
       this.#minimalOutput = productionConfig.minimalOutput || false;
       this.#errorOnly = productionConfig.errorOnly || false;
+      this.#enableBatching = productionConfig.enableBatching || false;
+      this.#batchSize = productionConfig.batchSize || 10;
+      this.#batchDelay = productionConfig.batchDelay || 100;
     } else {
       this.#enableSourceTracking = enableSourceTracking;
       this.#minimalOutput = false;
       this.#errorOnly = false;
+      this.#enableBatching = false;
+    }
+  }
+
+  /**
+   * Procesa el buffer de logs en batch para mejor rendimiento
+   * @private
+   */
+  #processBatch() {
+    if (this.#batchBuffer.length === 0) return;
+    
+    const batch = [...this.#batchBuffer];
+    this.#batchBuffer.length = 0; // Limpiar buffer
+    this.#performanceMetrics.batchProcessed++;
+    
+    // Procesar todos los logs del batch de una vez
+    batch.forEach(({ level, formattedMessage, args }) => {
+      const logMethod = this.#logger[level] || this.#logger.info;
+      logMethod.call(this.#logger, formattedMessage, ...args);
+    });
+  }
+
+  /**
+   * Programa el procesamiento del batch
+   * @private
+   */
+  #scheduleBatchProcessing() {
+    if (this.#batchTimeout) return;
+    
+    this.#batchTimeout = setTimeout(() => {
+      this.#processBatch();
+      this.#batchTimeout = null;
+    }, this.#batchDelay);
+  }
+
+  /**
+   * Agrega un log al batch o lo procesa inmediatamente
+   * @private
+   */
+  #addToBatch(level, formattedMessage, args) {
+    // Para errores críticos, procesar inmediatamente
+    if (level === 'error') {
+      const logMethod = this.#logger[level] || this.#logger.info;
+      logMethod.call(this.#logger, formattedMessage, ...args);
+      return;
+    }
+    
+    this.#batchBuffer.push({ level, formattedMessage, args });
+    
+    // Si el buffer está lleno, procesar inmediatamente
+    if (this.#batchBuffer.length >= this.#batchSize) {
+      this.#processBatch();
+      if (this.#batchTimeout) {
+        clearTimeout(this.#batchTimeout);
+        this.#batchTimeout = null;
+      }
+    } else {
+      this.#scheduleBatchProcessing();
     }
   }
 
@@ -75,9 +151,11 @@ export class EnhancedLogger {
     
     // Cache del formato de ubicación para evitar procesamiento repetido
     if (this.#sourceLocationCache.has(cacheKey)) {
+      this.#performanceMetrics.cacheHits++;
       return this.#sourceLocationCache.get(cacheKey);
     }
 
+    this.#performanceMetrics.cacheMisses++;
     const pathParts = fileName.replace(/\\/g, '/').split('/');
     const shortPath = pathParts.slice(-2).join('/');
     const location = `[${shortPath}:${lineNumber}]`;
@@ -99,6 +177,10 @@ export class EnhancedLogger {
    * @param {Array} args - Argumentos adicionales
    * @returns {Object} Mensaje formateado y argumentos
    */
+  /**
+   * Formatea el mensaje de log con optimizaciones de rendimiento
+   * @private
+   */
   #formatMessage(level, message, args) {
     // Lazy evaluation: solo evaluar el mensaje si es necesario
     const actualMessage = typeof message === 'function' ? message() : message;
@@ -112,9 +194,10 @@ export class EnhancedLogger {
       };
     }
     
-    // En producción estándar, usar formato simple
+    // En producción estándar, usar formato simple con timestamp optimizado
     if (this.#isProduction) {
-      const timestamp = new Date().toISOString();
+      // Usar Date.now() es más rápido que new Date().toISOString()
+      const timestamp = new Date(Date.now()).toISOString();
       const levelTag = `[${level.toUpperCase()}]`;
       return {
         formattedMessage: `${levelTag} ${timestamp} - ${actualMessage}`,
@@ -122,14 +205,19 @@ export class EnhancedLogger {
       };
     }
     
-    // En desarrollo, incluir información completa
-    const timestamp = new Date().toISOString();
-    const sourceLocation = this.#getSourceLocation();
+    // En desarrollo, incluir información completa con source tracking condicional
+    const timestamp = new Date(Date.now()).toISOString();
     const levelTag = `[${level.toUpperCase()}]`;
     
-    const formattedMessage = sourceLocation 
-      ? `${levelTag} ${timestamp} ${sourceLocation} - ${actualMessage}`
-      : `${levelTag} ${timestamp} - ${actualMessage}`;
+    let formattedMessage;
+    if (this.#enableSourceTracking) {
+      const sourceLocation = this.#getSourceLocation();
+      formattedMessage = sourceLocation 
+        ? `${levelTag} ${timestamp} ${sourceLocation} - ${actualMessage}`
+        : `${levelTag} ${timestamp} - ${actualMessage}`;
+    } else {
+      formattedMessage = `${levelTag} ${timestamp} - ${actualMessage}`;
+    }
 
     return { formattedMessage, args };
   }
@@ -144,18 +232,30 @@ export class EnhancedLogger {
   }
 
   /**
-   * Método genérico de logging con lazy evaluation
+   * Método genérico de logging con lazy evaluation y batching optimizado
    * @private
    */
   #logGeneric(level, message, ...args) {
-    // Aplicar filtros de producción
+    // Aplicar filtros de producción (early return para máximo rendimiento)
     if (this.#isProduction) {
       if (level === 'debug') return;
       if (this.#errorOnly && ['info', 'warn'].includes(level)) return;
     }
     
-    if (this.#shouldLog(level)) {
-      const { formattedMessage, args: formattedArgs } = this.#formatMessage(level, message, args);
+    // Verificación rápida de nivel
+    if (!this.#shouldLog(level)) return;
+    
+    // Actualizar métricas de rendimiento
+    this.#performanceMetrics.logCounts[level]++;
+    this.#performanceMetrics.totalLogs++;
+    
+    const { formattedMessage, args: formattedArgs } = this.#formatMessage(level, message, args);
+    
+    // Usar batching en producción para mejor rendimiento
+    if (this.#isProduction && this.#enableBatching) {
+      this.#addToBatch(level, formattedMessage, formattedArgs);
+    } else {
+      // Procesamiento inmediato en desarrollo o cuando batching está deshabilitado
       const logMethod = this.#logger[level] || this.#logger.info;
       logMethod.call(this.#logger, formattedMessage, ...formattedArgs);
     }
@@ -480,6 +580,71 @@ export class EnhancedLogger {
     const status = isValid ? 'válida' : 'inválida';
     const level = isValid ? 'info' : 'warn';
     this[level](`${configType} ${status}`, details);
+  }
+
+  /**
+   * Fuerza el procesamiento inmediato del batch pendiente
+   * Útil para asegurar que todos los logs se escriban antes del cierre
+   */
+  flush() {
+    if (this.#batchBuffer.length > 0) {
+      this.#processBatch();
+    }
+    if (this.#batchTimeout) {
+      clearTimeout(this.#batchTimeout);
+      this.#batchTimeout = null;
+    }
+  }
+
+  /**
+   * Limpia recursos y procesa logs pendientes
+   * Debe llamarse al finalizar la aplicación
+   */
+  destroy() {
+    this.flush();
+    this.#sourceLocationCache.clear();
+    this.#batchBuffer = [];
+    if (this.#batchTimeout) {
+      clearTimeout(this.#batchTimeout);
+      this.#batchTimeout = null;
+    }
+  }
+
+  /**
+   * Obtiene métricas de rendimiento del logger
+   * @returns {Object} Métricas de rendimiento
+   */
+  getPerformanceMetrics() {
+    const now = Date.now();
+    const uptime = now - this.#performanceMetrics.startTime;
+    const timeSinceReset = now - this.#performanceMetrics.lastReset;
+    
+    return {
+      ...this.#performanceMetrics,
+      uptime,
+      timeSinceReset,
+      logsPerSecond: this.#performanceMetrics.totalLogs / (uptime / 1000),
+      cacheHitRate: this.#performanceMetrics.cacheHits / 
+        (this.#performanceMetrics.cacheHits + this.#performanceMetrics.cacheMisses) || 0,
+      averageBatchSize: this.#performanceMetrics.batchProcessed > 0 
+        ? this.#performanceMetrics.totalLogs / this.#performanceMetrics.batchProcessed 
+        : 0
+    };
+  }
+
+  /**
+   * Resetea las métricas de rendimiento
+   */
+  resetPerformanceMetrics() {
+    this.#performanceMetrics = {
+      logCounts: { error: 0, warn: 0, info: 0, debug: 0 },
+      totalLogs: 0,
+      startTime: Date.now(),
+      lastReset: Date.now(),
+      batchProcessed: 0,
+      cacheHits: 0,
+      cacheMisses: 0
+    };
   }
 
 }

@@ -39,7 +39,7 @@ export const NETWORK_CONSTANTS = {
   DEFAULT_SERVER_PORT: 7000,
   
   // Headers HTTP
-  USER_AGENT: 'Stremio-Magnet-Search-Addon/1.0.0',
+  USER_AGENT: 'VeoVeo-Search-Pro/1.3.0',
   FIREFOX_USER_AGENT: 'Mozilla/5.0 (Windows NT 10.0; rv:102.0) Gecko/20100101 Firefox/102.0',
   
   // Timeouts específicos por proveedor
