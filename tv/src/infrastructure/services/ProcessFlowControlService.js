@@ -1,9 +1,23 @@
 import { EventEmitter } from 'events';
-import os from 'os';
+import {
+    validateConfig,
+    getMemoryUsagePercentage,
+    getCpuUsagePercentage,
+    calculateThrottledConcurrency,
+    calculateBackoffDelay,
+    calculateRestoredConcurrency,
+    shouldThrottle,
+    areResourceValuesValid,
+    createOptimizedStats,
+    rejectPendingOperations,
+    processPendingOperationsQueue
+} from './ProcessFlowControlService_tools.js';
 
 /**
  * Servicio de control de flujo para prevenir sobrecarga del proceso principal
  * Implementa throttling dinámico basado en recursos del sistema
+ * La lógica principal se concentra en la orquestación del flujo de control,
+ * mientras que las herramientas auxiliares están separadas en _tools.js
  */
 class ProcessFlowControlService extends EventEmitter {
     constructor(logger, config = {}) {
@@ -21,8 +35,8 @@ class ProcessFlowControlService extends EventEmitter {
         this.logger = logger;
         this.isDestroyed = false;
         
-        // Configuración optimizada para máxima velocidad
-        this.config = this.#validateConfig(config);
+        // Configuración optimizada para máxima velocidad usando herramientas auxiliares
+        this.config = validateConfig(config);
         
         this.currentConcurrency = this.config.maxConcurrency;
         this.backoffDelay = 0;
@@ -35,52 +49,6 @@ class ProcessFlowControlService extends EventEmitter {
         // this.startMonitoring();
     }
     
-    /**
-     * Valida y normaliza la configuración
-     */
-    #validateConfig(config = {}) {
-        const memoryThreshold = this.#validateNumber(config.memoryThreshold, 70, 1, 95);
-        const cpuThreshold = this.#validateNumber(config.cpuThreshold, 80, 1, 95);
-        const checkInterval = this.#validateNumber(config.checkInterval, 5000, 1000, 60000);
-        const backoffMultiplier = this.#validateNumber(config.backoffMultiplier, 1.5, 1.1, 3.0);
-        const maxBackoffDelay = this.#validateNumber(config.maxBackoffDelay, 30000, 1000, 300000);
-        const minConcurrency = this.#validateNumber(config.minConcurrency, 1, 1, 50);
-        const maxConcurrency = this.#validateNumber(config.maxConcurrency, 10, 1, 100);
-        
-        if (minConcurrency >= maxConcurrency) {
-            throw new Error('minConcurrency debe ser menor que maxConcurrency');
-        }
-        
-        return {
-            memoryThreshold,
-            cpuThreshold,
-            checkInterval,
-            backoffMultiplier,
-            maxBackoffDelay,
-            minConcurrency,
-            maxConcurrency
-        };
-    }
-    
-    /**
-     * Valida que un número esté en el rango permitido
-     */
-    #validateNumber(value, defaultValue, min, max) {
-        if (value === undefined || value === null) {
-            return defaultValue;
-        }
-        
-        if (typeof value !== 'number' || isNaN(value)) {
-            throw new Error(`Valor debe ser un número válido`);
-        }
-        
-        if (value < min || value > max) {
-            throw new Error(`Valor debe estar entre ${min} y ${max}`);
-        }
-        
-        return value;
-    }
-
     /**
      * Inicia el monitoreo de recursos del sistema
      */
@@ -116,6 +84,7 @@ class ProcessFlowControlService extends EventEmitter {
 
     /**
      * Verifica los recursos del sistema y ajusta la concurrencia
+     * Utiliza herramientas auxiliares para obtener métricas del sistema
      */
     async checkSystemResources() {
         if (this.isDestroyed) {
@@ -123,22 +92,25 @@ class ProcessFlowControlService extends EventEmitter {
         }
         
         try {
-            const memoryUsage = this.getMemoryUsagePercentage();
-            const cpuUsage = await this.getCpuUsagePercentage();
+            const memoryUsage = getMemoryUsagePercentage();
+            const cpuUsage = await getCpuUsagePercentage();
             
-            // Validar que los valores sean números válidos
-            if (typeof memoryUsage !== 'number' || isNaN(memoryUsage) ||
-                typeof cpuUsage !== 'number' || isNaN(cpuUsage)) {
+            // Validar que los valores sean números válidos usando herramientas auxiliares
+            if (!areResourceValuesValid(memoryUsage, cpuUsage)) {
                 this.logger.error('Control de flujo: Valores de recursos inválidos');
                 return;
             }
             
-            const shouldThrottle = memoryUsage > this.config.memoryThreshold || 
-                                 cpuUsage > this.config.cpuThreshold;
+            const shouldThrottleSystem = shouldThrottle(
+                memoryUsage, 
+                cpuUsage, 
+                this.config.memoryThreshold, 
+                this.config.cpuThreshold
+            );
             
-            if (shouldThrottle && !this.isThrottling) {
+            if (shouldThrottleSystem && !this.isThrottling) {
                 this.startThrottling(memoryUsage, cpuUsage);
-            } else if (!shouldThrottle && this.isThrottling) {
+            } else if (!shouldThrottleSystem && this.isThrottling) {
                 this.stopThrottling();
             }
             
@@ -155,15 +127,15 @@ class ProcessFlowControlService extends EventEmitter {
     }
 
     /**
-     * Inicia el throttling del sistema
+     * Inicia el throttling del sistema usando cálculos auxiliares
      */
     startThrottling(memoryUsage, cpuUsage) {
         if (this.isDestroyed) {
             return;
         }
         
-        // Validar parámetros
-        if (typeof memoryUsage !== 'number' || typeof cpuUsage !== 'number') {
+        // Validar parámetros usando herramientas auxiliares
+        if (!areResourceValuesValid(memoryUsage, cpuUsage)) {
             this.logger.error('Control de flujo: Parámetros de throttling inválidos');
             return;
         }
@@ -173,13 +145,14 @@ class ProcessFlowControlService extends EventEmitter {
         }
         
         this.isThrottling = true;
-        this.currentConcurrency = Math.max(
-            Math.floor(this.currentConcurrency / 2),
+        this.currentConcurrency = calculateThrottledConcurrency(
+            this.currentConcurrency, 
             this.config.minConcurrency
         );
         
-        this.backoffDelay = Math.min(
-            this.backoffDelay * this.config.backoffMultiplier || 1000,
+        this.backoffDelay = calculateBackoffDelay(
+            this.backoffDelay, 
+            this.config.backoffMultiplier, 
             this.config.maxBackoffDelay
         );
         
@@ -197,7 +170,7 @@ class ProcessFlowControlService extends EventEmitter {
     }
 
     /**
-     * Detiene el throttling del sistema
+     * Detiene el throttling del sistema usando cálculos auxiliares
      */
     stopThrottling() {
         if (this.isDestroyed || !this.isThrottling) {
@@ -205,8 +178,8 @@ class ProcessFlowControlService extends EventEmitter {
         }
         
         this.isThrottling = false;
-        this.currentConcurrency = Math.min(
-            this.currentConcurrency * 2,
+        this.currentConcurrency = calculateRestoredConcurrency(
+            this.currentConcurrency, 
             this.config.maxConcurrency
         );
         this.backoffDelay = 0;
@@ -251,89 +224,29 @@ class ProcessFlowControlService extends EventEmitter {
     }
 
     /**
-     * Procesa operaciones pendientes en la cola
+     * Procesa operaciones pendientes en la cola usando herramientas auxiliares
      */
     processPendingOperations() {
         if (this.isDestroyed) {
-            // Rechazar todas las operaciones pendientes
-            while (this.pendingOperations.length > 0) {
-                const { reject } = this.pendingOperations.shift();
-                if (reject) {
-                    reject(new Error('Servicio destruido'));
-                }
-            }
+            // Rechazar todas las operaciones pendientes usando herramientas auxiliares
+            rejectPendingOperations(this.pendingOperations);
             return;
         }
         
-        while (this.pendingOperations.length > 0 && 
-               this.activeOperations < this.currentConcurrency && 
-               !this.isThrottling) {
-            
-            const { resolve } = this.pendingOperations.shift();
-            if (resolve) {
-                this.activeOperations++;
-                resolve(true);
-            }
-        }
+        // Procesar operaciones pendientes usando herramientas auxiliares
+        this.activeOperations = processPendingOperationsQueue(
+            this.pendingOperations,
+            this.activeOperations,
+            this.currentConcurrency,
+            this.isThrottling
+        );
     }
 
     /**
-     * Obtiene el porcentaje de uso de memoria
-     */
-    getMemoryUsagePercentage() {
-        const totalMemory = os.totalmem();
-        const freeMemory = os.freemem();
-        const usedMemory = totalMemory - freeMemory;
-        return (usedMemory / totalMemory) * 100;
-    }
-
-    /**
-     * Obtiene el porcentaje de uso de CPU (promedio)
-     */
-    async getCpuUsagePercentage() {
-        return new Promise((resolve) => {
-            const startMeasure = this.getCpuInfo();
-            
-            setTimeout(() => {
-                const endMeasure = this.getCpuInfo();
-                const idleDifference = endMeasure.idle - startMeasure.idle;
-                const totalDifference = endMeasure.total - startMeasure.total;
-                const cpuPercentage = 100 - (100 * idleDifference / totalDifference);
-                resolve(Math.max(0, Math.min(100, cpuPercentage)));
-            }, 100);
-        });
-    }
-
-    /**
-     * Obtiene información de CPU
-     */
-    getCpuInfo() {
-        const cpus = os.cpus();
-        let idle = 0;
-        let total = 0;
-        
-        cpus.forEach(cpu => {
-            Object.keys(cpu.times).forEach(type => {
-                total += cpu.times[type];
-            });
-            idle += cpu.times.idle;
-        });
-        
-        return { idle, total };
-    }
-
-    /**
-     * Obtiene estadísticas actuales del servicio (optimizado para velocidad)
+     * Obtiene estadísticas actuales del servicio usando herramientas auxiliares
      */
     getStats() {
-        return {
-            currentConcurrency: 'unlimited',
-            activeOperations: this.activeOperations,
-            pendingOperations: 0, // Sin cola de espera
-            isThrottling: false, // Throttling deshabilitado
-            backoffDelay: 0,
-            memoryUsage: 0 // Valor numérico para compatibilidad con .toFixed()
-        };
+        return createOptimizedStats(this.activeOperations);
     }
 
     /**
