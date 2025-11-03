@@ -1,40 +1,30 @@
 {
-  "name": "bun-streamio-tv-machine",
-  "version": "1.0.0",
-  "description": "Sistema de procesamiento de canales de TV para addon de Stremio",
+  "name": "tv-channel-processor",
+  "version": "2.0.0",
+  "description": "Procesador de canales de TV con soporte para M3U y CSV",
   "type": "module",
-  "main": "src/main.js",
+  "main": "src/lib/index.js",
   "scripts": {
-    "start": "bun run src/main.js",
-    "dev": "bun --watch src/main.js",
-    "generate": "bun run src/main.js",
-    "clean": "rm -rf node_modules bun.lockb",
-    "setup": "bun install",
-    "reinstall": "bun run clean && bun run setup",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node run-processor.js",
+    "process": "node run-processor.js",
+    "process:debug": "DEBUG=* node run-processor.js",
+    "process:verbose": "LOG_LEVEL=debug node run-processor.js",
+    "test": "node test-config-only.js"
   },
   "keywords": [
-    "stremio",
-    "tv",
-    "channels",
+    "iptv",
     "m3u",
-    "csv",
+    "tv-channels",
     "streaming",
-    "bun"
+    "stremio"
   ],
-  "author": "HAZ-BUN-TV-PROD",
+  "author": "VeoVeo",
   "license": "MIT",
   "dependencies": {
-    "axios": "^1.6.2",
     "csv-parser": "^3.0.0",
-    "csv-writer": "^1.6.0",
-    "dotenv": "^16.3.1",
-    "sharp": "^0.34.4"
+    "csv-writer": "^1.6.0"
   },
   "engines": {
-    "bun": ">=1.0.0"
-  },
-  "trustedDependencies": [
-    "axios"
-  ]
+    "node": ">=18.0.0"
+  }
 }
