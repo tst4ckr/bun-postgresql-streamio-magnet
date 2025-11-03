@@ -4,11 +4,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { CsvFileInitializer } from '../../../../src/infrastructure/utils/CsvFileInitializer.js';
-import { existsSync, writeFileSync, mkdirSync, readFileSync, rmSync } from 'fs';
-import { dirname } from 'path';
-import { tmpdir } from 'os';
-import { join } from 'path';
 
 // Mock fs module
 vi.mock('fs', () => ({
@@ -19,10 +14,18 @@ vi.mock('fs', () => ({
   rmSync: vi.fn()
 }));
 
+// Mock path module
 vi.mock('path', () => ({
   dirname: vi.fn(),
   join: vi.fn()
 }));
+
+// Import mocked functions
+import { existsSync, writeFileSync, mkdirSync, readFileSync, rmSync } from 'fs';
+import { dirname, join } from 'path';
+
+// Import the class after mocking
+import { CsvFileInitializer } from '../../../../src/infrastructure/utils/CsvFileInitializer.js';
 
 describe('CsvFileInitializer', () => {
   let testDirectory;
@@ -42,9 +45,19 @@ describe('CsvFileInitializer', () => {
     // Reset all mocks
     vi.clearAllMocks();
     
-    // Default mock implementations
+    // Reset mock functions
     existsSync.mockReturnValue(false);
-    dirname.mockImplementation(path => path.split('/').slice(0, -1).join('/'));
+    writeFileSync.mockImplementation(() => {});
+    mkdirSync.mockImplementation(() => {});
+    readFileSync.mockReturnValue('');
+    rmSync.mockImplementation(() => {});
+    
+    // Default mock implementations
+    dirname.mockImplementation(path => {
+      const parts = path.split('/');
+      return parts.slice(0, -1).join('/') || '/';
+    });
+    join.mockImplementation((...paths) => paths.join('/'));
   });
 
   afterEach(() => {
@@ -149,11 +162,11 @@ describe('CsvFileInitializer', () => {
     const testFilename = 'test.csv';
 
     it('should create CSV file if it does not exist', () => {
-      existsSync.mockReturnValue(false);
+      mockFs.existsSync.mockReturnValue(false);
 
       CsvFileInitializer.ensureCsvFileExists(testFilePath, testFilename);
 
-      expect(writeFileSync).toHaveBeenCalledWith(
+      expect(mockFs.writeFileSync).toHaveBeenCalledWith(
         testFilePath,
         CsvFileInitializer.CSV_HEADER + '\n',
         'utf8'
@@ -161,15 +174,15 @@ describe('CsvFileInitializer', () => {
     });
 
     it('should not create file if it already exists', () => {
-      existsSync.mockReturnValue(true);
+      mockFs.existsSync.mockReturnValue(true);
 
       CsvFileInitializer.ensureCsvFileExists(testFilePath, testFilename);
 
-      expect(writeFileSync).not.toHaveBeenCalled();
+      expect(mockFs.writeFileSync).not.toHaveBeenCalled();
     });
 
     it('should create parent directory if it does not exist', () => {
-      existsSync.mockImplementation(path => {
+      mockFs.existsSync.mockImplementation(path => {
         if (path === testFilePath) return false;
         if (path === '/test/data') return false;
         return true;
@@ -179,20 +192,20 @@ describe('CsvFileInitializer', () => {
 
       CsvFileInitializer.ensureCsvFileExists(testFilePath, testFilename);
 
-      expect(mkdirSync).toHaveBeenCalledWith('/test/data', { recursive: true });
-      expect(writeFileSync).toHaveBeenCalled();
+      expect(mockFs.mkdirSync).toHaveBeenCalledWith('/test/data', { recursive: true });
+      expect(mockFs.writeFileSync).toHaveBeenCalled();
     });
 
     it('should handle nested directory structures', () => {
       const nestedPath = '/test/data/deep/nested/file.csv';
       
-      existsSync.mockReturnValue(false);
+      mockFs.existsSync.mockReturnValue(false);
       dirname.mockReturnValue('/test/data/deep/nested');
 
       CsvFileInitializer.ensureCsvFileExists(nestedPath, 'file.csv');
 
-      expect(mkdirSync).toHaveBeenCalledWith('/test/data/deep/nested', { recursive: true });
-      expect(writeFileSync).toHaveBeenCalledWith(
+      expect(mockFs.mkdirSync).toHaveBeenCalledWith('/test/data/deep/nested', { recursive: true });
+      expect(mockFs.writeFileSync).toHaveBeenCalledWith(
         nestedPath,
         CsvFileInitializer.CSV_HEADER + '\n',
         'utf8'
@@ -200,8 +213,8 @@ describe('CsvFileInitializer', () => {
     });
 
     it('should handle file creation errors', () => {
-      existsSync.mockReturnValue(false);
-      writeFileSync.mockImplementation(() => {
+      mockFs.existsSync.mockReturnValue(false);
+      mockFs.writeFileSync.mockImplementation(() => {
         throw new Error('Disk full');
       });
 
@@ -215,7 +228,7 @@ describe('CsvFileInitializer', () => {
     const testFilePath = '/test/data/validate.csv';
 
     it('should return false if file does not exist', () => {
-      existsSync.mockReturnValue(false);
+      mockFs.existsSync.mockReturnValue(false);
 
       const result = CsvFileInitializer.validateCsvFormat(testFilePath);
 
@@ -223,8 +236,8 @@ describe('CsvFileInitializer', () => {
     });
 
     it('should return true for correctly formatted CSV', () => {
-      existsSync.mockReturnValue(true);
-      readFileSync.mockReturnValue(CsvFileInitializer.CSV_HEADER + '\ndata,row,here');
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(CsvFileInitializer.CSV_HEADER + '\ndata,row,here');
 
       const result = CsvFileInitializer.validateCsvFormat(testFilePath);
 
@@ -232,8 +245,8 @@ describe('CsvFileInitializer', () => {
     });
 
     it('should return false for incorrectly formatted CSV', () => {
-      existsSync.mockReturnValue(true);
-      readFileSync.mockReturnValue('wrong,header,format\ndata,row,here');
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue('wrong,header,format\ndata,row,here');
 
       const result = CsvFileInitializer.validateCsvFormat(testFilePath);
 
@@ -241,8 +254,8 @@ describe('CsvFileInitializer', () => {
     });
 
     it('should handle empty files', () => {
-      existsSync.mockReturnValue(true);
-      readFileSync.mockReturnValue('');
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue('');
 
       const result = CsvFileInitializer.validateCsvFormat(testFilePath);
 
@@ -250,8 +263,8 @@ describe('CsvFileInitializer', () => {
     });
 
     it('should handle files with only whitespace', () => {
-      existsSync.mockReturnValue(true);
-      readFileSync.mockReturnValue('   \n  \n  ');
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue('   \n  \n  ');
 
       const result = CsvFileInitializer.validateCsvFormat(testFilePath);
 
@@ -259,8 +272,8 @@ describe('CsvFileInitializer', () => {
     });
 
     it('should handle header with extra whitespace', () => {
-      existsSync.mockReturnValue(true);
-      readFileSync.mockReturnValue(`  ${CsvFileInitializer.CSV_HEADER}  \ndata,row,here`);
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(`  ${CsvFileInitializer.CSV_HEADER}  \ndata,row,here`);
 
       const result = CsvFileInitializer.validateCsvFormat(testFilePath);
 
@@ -268,8 +281,8 @@ describe('CsvFileInitializer', () => {
     });
 
     it('should handle file read errors gracefully', () => {
-      existsSync.mockReturnValue(true);
-      readFileSync.mockImplementation(() => {
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockImplementation(() => {
         throw new Error('Permission denied');
       });
 
@@ -279,8 +292,8 @@ describe('CsvFileInitializer', () => {
     });
 
     it('should handle files with Windows line endings', () => {
-      existsSync.mockReturnValue(true);
-      readFileSync.mockReturnValue(CsvFileInitializer.CSV_HEADER + '\r\ndata,row,here\r\n');
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(CsvFileInitializer.CSV_HEADER + '\r\ndata,row,here\r\n');
 
       const result = CsvFileInitializer.validateCsvFormat(testFilePath);
 
@@ -288,8 +301,8 @@ describe('CsvFileInitializer', () => {
     });
 
     it('should handle files with mixed line endings', () => {
-      existsSync.mockReturnValue(true);
-      readFileSync.mockReturnValue(CsvFileInitializer.CSV_HEADER + '\r\ndata,row,here\n');
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(CsvFileInitializer.CSV_HEADER + '\r\ndata,row,here\n');
 
       const result = CsvFileInitializer.validateCsvFormat(testFilePath);
 
@@ -305,11 +318,11 @@ describe('CsvFileInitializer', () => {
       const incorrectContent = 'wrong,header,format\ndata,row,1\ndata,row,2';
       const expectedContent = `${CsvFileInitializer.CSV_HEADER}\ndata,row,1\ndata,row,2`;
 
-      readFileSync.mockReturnValue(incorrectContent);
+      mockFs.readFileSync.mockReturnValue(incorrectContent);
 
       CsvFileInitializer.repairCsvFormat(testFilePath, testFilename);
 
-      expect(writeFileSync).toHaveBeenCalledWith(
+      expect(mockFs.writeFileSync).toHaveBeenCalledWith(
         testFilePath,
         expectedContent,
         'utf8'
@@ -319,19 +332,19 @@ describe('CsvFileInitializer', () => {
     it('should not modify CSV with correct header', () => {
       const correctContent = `${CsvFileInitializer.CSV_HEADER}\ndata,row,1\ndata,row,2`;
 
-      readFileSync.mockReturnValue(correctContent);
+      mockFs.readFileSync.mockReturnValue(correctContent);
 
       CsvFileInitializer.repairCsvFormat(testFilePath, testFilename);
 
-      expect(writeFileSync).not.toHaveBeenCalled();
+      expect(mockFs.writeFileSync).not.toHaveBeenCalled();
     });
 
     it('should handle empty files', () => {
-      readFileSync.mockReturnValue('');
+      mockFs.readFileSync.mockReturnValue('');
 
       CsvFileInitializer.repairCsvFormat(testFilePath, testFilename);
 
-      expect(writeFileSync).toHaveBeenCalledWith(
+      expect(mockFs.writeFileSync).toHaveBeenCalledWith(
         testFilePath,
         CsvFileInitializer.CSV_HEADER,
         'utf8'
@@ -341,11 +354,11 @@ describe('CsvFileInitializer', () => {
     it('should handle files with only header', () => {
       const headerOnlyContent = 'wrong,header';
 
-      readFileSync.mockReturnValue(headerOnlyContent);
+      mockFs.readFileSync.mockReturnValue(headerOnlyContent);
 
       CsvFileInitializer.repairCsvFormat(testFilePath, testFilename);
 
-      expect(writeFileSync).toHaveBeenCalledWith(
+      expect(mockFs.writeFileSync).toHaveBeenCalledWith(
         testFilePath,
         CsvFileInitializer.CSV_HEADER,
         'utf8'
@@ -356,11 +369,11 @@ describe('CsvFileInitializer', () => {
       const contentWithData = 'old,header,format\nrow1,data1,value1\nrow2,data2,value2';
       const expectedContent = `${CsvFileInitializer.CSV_HEADER}\nrow1,data1,value1\nrow2,data2,value2`;
 
-      readFileSync.mockReturnValue(contentWithData);
+      mockFs.readFileSync.mockReturnValue(contentWithData);
 
       CsvFileInitializer.repairCsvFormat(testFilePath, testFilename);
 
-      expect(writeFileSync).toHaveBeenCalledWith(
+      expect(mockFs.writeFileSync).toHaveBeenCalledWith(
         testFilePath,
         expectedContent,
         'utf8'
@@ -371,11 +384,11 @@ describe('CsvFileInitializer', () => {
       const contentWithWhitespace = '  wrong , header , format  \ndata,row,here';
       const expectedContent = `${CsvFileInitializer.CSV_HEADER}\ndata,row,here`;
 
-      readFileSync.mockReturnValue(contentWithWhitespace);
+      mockFs.readFileSync.mockReturnValue(contentWithWhitespace);
 
       CsvFileInitializer.repairCsvFormat(testFilePath, testFilename);
 
-      expect(writeFileSync).toHaveBeenCalledWith(
+      expect(mockFs.writeFileSync).toHaveBeenCalledWith(
         testFilePath,
         expectedContent,
         'utf8'
@@ -383,7 +396,7 @@ describe('CsvFileInitializer', () => {
     });
 
     it('should handle read errors gracefully', () => {
-      readFileSync.mockImplementation(() => {
+      mockFs.readFileSync.mockImplementation(() => {
         throw new Error('File not readable');
       });
 
@@ -393,8 +406,8 @@ describe('CsvFileInitializer', () => {
     });
 
     it('should handle write errors gracefully', () => {
-      readFileSync.mockReturnValue('wrong,header\ndata,row');
-      writeFileSync.mockImplementation(() => {
+      mockFs.readFileSync.mockReturnValue('wrong,header\ndata,row');
+      mockFs.writeFileSync.mockImplementation(() => {
         throw new Error('Disk full');
       });
 
@@ -407,11 +420,11 @@ describe('CsvFileInitializer', () => {
       const windowsContent = 'wrong,header\r\ndata,row,1\r\ndata,row,2\r\n';
       const expectedContent = `${CsvFileInitializer.CSV_HEADER}\r\ndata,row,1\r\ndata,row,2\r\n`;
 
-      readFileSync.mockReturnValue(windowsContent);
+      mockFs.readFileSync.mockReturnValue(windowsContent);
 
       CsvFileInitializer.repairCsvFormat(testFilePath, testFilename);
 
-      expect(writeFileSync).toHaveBeenCalledWith(
+      expect(mockFs.writeFileSync).toHaveBeenCalledWith(
         testFilePath,
         expectedContent,
         'utf8'
@@ -422,11 +435,11 @@ describe('CsvFileInitializer', () => {
       const mixedContent = 'wrong,header\r\ndata,row,1\ndata,row,2\r\n';
       const expectedContent = `${CsvFileInitializer.CSV_HEADER}\r\ndata,row,1\ndata,row,2\r\n`;
 
-      readFileSync.mockReturnValue(mixedContent);
+      mockFs.readFileSync.mockReturnValue(mixedContent);
 
       CsvFileInitializer.repairCsvFormat(testFilePath, testFilename);
 
-      expect(writeFileSync).toHaveBeenCalledWith(
+      expect(mockFs.writeFileSync).toHaveBeenCalledWith(
         testFilePath,
         expectedContent,
         'utf8'
@@ -582,15 +595,15 @@ describe('CsvFileInitializer', () => {
     it('should handle Unicode characters in content', () => {
       const unicodeContent = 'título,descripción,enlace\nPelícula española,Descripción con ñ,magnet:?xt=urn';
       
-      existsSync.mockReturnValue(true);
-      readFileSync.mockReturnValue(unicodeContent);
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(unicodeContent);
 
       const isValid = CsvFileInitializer.validateCsvFormat('/test/unicode.csv');
       expect(isValid).toBe(false);
 
       CsvFileInitializer.repairCsvFormat('/test/unicode.csv', 'unicode.csv');
 
-      expect(writeFileSync).toHaveBeenCalledWith(
+      expect(mockFs.writeFileSync).toHaveBeenCalledWith(
         '/test/unicode.csv',
         expect.stringContaining(CsvFileInitializer.CSV_HEADER),
         'utf8'
@@ -600,7 +613,7 @@ describe('CsvFileInitializer', () => {
     it('should handle extremely long file paths', () => {
       const longPath = '/test/' + 'very-long-directory-name-'.repeat(10) + 'file.csv';
       
-      existsSync.mockReturnValue(false);
+      mockFs.existsSync.mockReturnValue(false);
 
       expect(() => {
         CsvFileInitializer.ensureCsvFileExists(longPath, 'file.csv');
@@ -610,11 +623,11 @@ describe('CsvFileInitializer', () => {
     it('should handle files with no extension', () => {
       const noExtPath = '/test/data/csvfile';
       
-      existsSync.mockReturnValue(false);
+      mockFs.existsSync.mockReturnValue(false);
 
       CsvFileInitializer.ensureCsvFileExists(noExtPath, 'csvfile');
 
-      expect(writeFileSync).toHaveBeenCalledWith(
+      expect(mockFs.writeFileSync).toHaveBeenCalledWith(
         noExtPath,
         CsvFileInitializer.CSV_HEADER + '\n',
         'utf8'
