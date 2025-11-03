@@ -1,7 +1,7 @@
 /**
  * @fileoverview Punto de entrada principal para VeoVeo Search Pro addon.
  * @description Addon avanzado de Stremio para búsqueda de contenido multimedia con sistema de búsqueda en cascada.
- * Configura e inicia el servidor del addon de Stremio.
+ * Configura e inicia el servidor del addon de Stremio con inicialización por fases ordenada.
  */
 
 import { addonBuilder, serveHTTP } from 'stremio-addon-sdk';
@@ -11,10 +11,348 @@ import { StreamHandler } from './application/handlers/StreamHandler.js';
 import { TvHandler } from './application/handlers/TvHandler.js';
 import { M3UTvRepository } from './infrastructure/repositories/M3UTvRepository.js';
 import { EnhancedLogger } from './infrastructure/utils/EnhancedLogger.js';
+import { TorService } from './infrastructure/services/TorService.js';
 
 /**
- * Gestor centralizado de errores para el addon.
+ * Gestor de inicialización por fases para dependencias tecnológicas.
+ * Garantiza orden correcto y estabilidad en el arranque del sistema.
  */
+class TechnicalBootstrapManager {
+  #logger;
+  #config;
+  #phases;
+  #currentPhase;
+  #bootstrapState;
+
+  constructor(config, logger) {
+    this.#config = config;
+    this.#logger = logger;
+    this.#currentPhase = 0;
+    this.#bootstrapState = new Map();
+    this.#phases = [
+      { name: 'RUNTIME_VALIDATION', handler: this.#validateRuntimeEnvironment.bind(this) },
+      { name: 'TOR_INITIALIZATION', handler: this.#initializeTorService.bind(this) },
+      { name: 'NETWORK_VALIDATION', handler: this.#validateNetworkConnectivity.bind(this) },
+      { name: 'STORAGE_PREPARATION', handler: this.#prepareStorageLayer.bind(this) },
+      { name: 'SERVICE_DEPENDENCIES', handler: this.#initializeServiceDependencies.bind(this) }
+    ];
+  }
+
+  /**
+   * Ejecuta todas las fases de inicialización en orden secuencial.
+   * @returns {Promise<Object>} Estado de inicialización completo
+   */
+  async executeBootstrap() {
+    this.#logger.info('🚀 Iniciando bootstrap tecnológico por fases...');
+    
+    try {
+      for (const phase of this.#phases) {
+        await this.#executePhase(phase);
+      }
+      
+      this.#logger.info('✅ Bootstrap tecnológico completado exitosamente');
+      return this.#getBootstrapSummary();
+    } catch (error) {
+      this.#logger.error(`❌ Bootstrap falló en fase ${this.#getCurrentPhaseName()}:`, {
+        phase: this.#getCurrentPhaseName(),
+        error: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+      throw new Error(`Bootstrap tecnológico falló: ${error.message}`);
+    }
+  }
+
+  /**
+   * Ejecuta una fase específica con validación y logging.
+   * @private
+   * @param {Object} phase - Configuración de la fase
+   */
+  async #executePhase(phase) {
+    const startTime = Date.now();
+    this.#logger.info(`📋 Ejecutando fase: ${phase.name}`);
+    
+    try {
+      const result = await phase.handler();
+      const duration = Date.now() - startTime;
+      
+      this.#bootstrapState.set(phase.name, {
+        status: 'SUCCESS',
+        result,
+        duration,
+        timestamp: new Date().toISOString()
+      });
+      
+      this.#logger.info(`✅ Fase ${phase.name} completada (${duration}ms)`);
+      this.#currentPhase++;
+    } catch (error) {
+      this.#bootstrapState.set(phase.name, {
+        status: 'FAILED',
+        error: error.message,
+        duration: Date.now() - startTime,
+        timestamp: new Date().toISOString()
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * FASE 1: Validación del entorno de ejecución (Bun, Node.js, etc.)
+   * @private
+   */
+  async #validateRuntimeEnvironment() {
+    this.#logger.debug('🔍 Validando entorno de ejecución...');
+    
+    const runtime = {
+      platform: process.platform,
+      arch: process.arch,
+      nodeVersion: process.version,
+      bunVersion: process.versions?.bun || 'N/A',
+      environment: process.env.NODE_ENV || 'development',
+      containerized: !!process.env.CONTAINER_ENV
+    };
+
+    // Validaciones críticas
+    if (runtime.bunVersion === 'N/A' && !process.versions?.node) {
+      throw new Error('Runtime JavaScript no detectado (Bun/Node.js requerido)');
+    }
+
+    // Validar variables de entorno críticas
+    const requiredEnvVars = ['HOST', 'PORT'];
+    const missingVars = requiredEnvVars.filter(varName => !process.env[varName] && !this.#config.server[varName.toLowerCase()]);
+    
+    if (missingVars.length > 0) {
+      this.#logger.warn(`⚠️ Variables de entorno faltantes: ${missingVars.join(', ')}`);
+    }
+
+    this.#logger.info('✅ Entorno de ejecución validado:', runtime);
+    return runtime;
+  }
+
+  /**
+   * FASE 2: Inicialización del servicio Tor
+   * @private
+   */
+  async #initializeTorService() {
+    this.#logger.debug('🔐 Inicializando servicio Tor...');
+    
+    const torService = new TorService(this.#config.tor, this.#logger);
+    
+    if (torService.isEnabled()) {
+      this.#logger.info('🔐 Tor habilitado, verificando disponibilidad...');
+      
+      const isAvailable = await torService.isAvailable();
+      if (!isAvailable) {
+        this.#logger.warn('⚠️ Tor configurado pero no disponible, continuando sin proxy');
+      } else {
+        this.#logger.info('✅ Tor disponible y funcionando correctamente');
+      }
+    } else {
+      this.#logger.info('ℹ️ Tor deshabilitado, usando conexión directa');
+    }
+
+    return {
+      service: torService,
+      enabled: torService.isEnabled(),
+      available: torService.isEnabled() ? await torService.isAvailable() : false,
+      config: torService.getConfig()
+    };
+  }
+
+  /**
+   * FASE 3: Validación de conectividad de red
+   * @private
+   */
+  async #validateNetworkConnectivity() {
+    this.#logger.debug('🌐 Validando conectividad de red...');
+    
+    const connectivityTests = [
+      { name: 'DNS_RESOLUTION', test: () => this.#testDnsResolution() },
+      { name: 'HTTP_CONNECTIVITY', test: () => this.#testHttpConnectivity() },
+      { name: 'API_ENDPOINTS', test: () => this.#testApiEndpoints() }
+    ];
+
+    const results = {};
+    
+    for (const { name, test } of connectivityTests) {
+      try {
+        results[name] = await test();
+        this.#logger.debug(`✅ ${name}: OK`);
+      } catch (error) {
+        results[name] = { error: error.message };
+        this.#logger.warn(`⚠️ ${name}: ${error.message}`);
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * FASE 4: Preparación de la capa de almacenamiento
+   * @private
+   */
+  async #prepareStorageLayer() {
+    this.#logger.debug('💾 Preparando capa de almacenamiento...');
+    
+    const { CsvFileInitializer } = await import('./infrastructure/utils/CsvFileInitializer.js');
+    
+    const csvFiles = [
+      { path: this.#config.repository.primaryCsvPath, name: 'magnets.csv' },
+      { path: this.#config.repository.secondaryCsvPath, name: 'torrentio.csv' },
+      { path: this.#config.repository.animeCsvPath, name: 'anime.csv' }
+    ];
+
+    const initResults = {};
+    
+    for (const { path, name } of csvFiles) {
+      try {
+        CsvFileInitializer.ensureCsvFileExists(path, name);
+        initResults[name] = { status: 'READY', path };
+        this.#logger.debug(`✅ ${name}: Inicializado`);
+      } catch (error) {
+        initResults[name] = { status: 'ERROR', error: error.message };
+        this.#logger.error(`❌ ${name}: ${error.message}`);
+        throw error;
+      }
+    }
+
+    return initResults;
+  }
+
+  /**
+   * FASE 5: Inicialización de dependencias de servicios
+   * @private
+   */
+  async #initializeServiceDependencies() {
+    this.#logger.debug('🔧 Inicializando dependencias de servicios...');
+    
+    // Validar que los servicios críticos estén disponibles
+    const serviceChecks = {
+      torService: this.#bootstrapState.get('TOR_INITIALIZATION')?.result?.service,
+      storageLayer: this.#bootstrapState.get('STORAGE_PREPARATION')?.result,
+      networkConnectivity: this.#bootstrapState.get('NETWORK_VALIDATION')?.result
+    };
+
+    // Verificar integridad de dependencias
+    const missingDependencies = Object.entries(serviceChecks)
+      .filter(([key, value]) => !value)
+      .map(([key]) => key);
+
+    if (missingDependencies.length > 0) {
+      throw new Error(`Dependencias faltantes: ${missingDependencies.join(', ')}`);
+    }
+
+    return {
+      dependencies: serviceChecks,
+      readyForRepositoryInitialization: true,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Prueba de resolución DNS
+   * @private
+   */
+  async #testDnsResolution() {
+    const dns = await import('dns');
+    return new Promise((resolve, reject) => {
+      dns.resolve('google.com', (err) => {
+        if (err) reject(new Error(`DNS resolution failed: ${err.message}`));
+        else resolve({ status: 'OK' });
+      });
+    });
+  }
+
+  /**
+   * Prueba de conectividad HTTP básica
+   * @private
+   */
+  async #testHttpConnectivity() {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch('https://httpbin.org/status/200', {
+        signal: controller.signal,
+        method: 'HEAD'
+      });
+      
+      clearTimeout(timeoutId);
+      return { status: response.ok ? 'OK' : 'FAILED', statusCode: response.status };
+    } catch (error) {
+      return { status: 'FAILED', error: error.message };
+    }
+  }
+
+  /**
+   * Prueba de endpoints de API críticos
+   * @private
+   */
+  async #testApiEndpoints() {
+    const endpoints = [
+      this.#config.repository.torrentioApiUrl
+    ];
+
+    const results = {};
+    
+    for (const endpoint of endpoints) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        
+        const response = await fetch(endpoint, {
+          signal: controller.signal,
+          method: 'HEAD'
+        });
+        
+        clearTimeout(timeoutId);
+        results[endpoint] = { status: response.ok ? 'OK' : 'FAILED', statusCode: response.status };
+      } catch (error) {
+        results[endpoint] = { status: 'FAILED', error: error.message };
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Obtiene el nombre de la fase actual
+   * @private
+   */
+  #getCurrentPhaseName() {
+    return this.#phases[this.#currentPhase]?.name || 'UNKNOWN';
+  }
+
+  /**
+   * Genera resumen del estado de bootstrap
+   * @private
+   */
+  #getBootstrapSummary() {
+    const summary = {
+      totalPhases: this.#phases.length,
+      completedPhases: this.#currentPhase,
+      success: this.#currentPhase === this.#phases.length,
+      phases: Object.fromEntries(this.#bootstrapState),
+      totalDuration: Array.from(this.#bootstrapState.values())
+        .reduce((total, phase) => total + (phase.duration || 0), 0)
+    };
+
+    return summary;
+  }
+
+  /**
+   * Obtiene el servicio Tor inicializado
+   */
+  getTorService() {
+    return this.#bootstrapState.get('TOR_INITIALIZATION')?.result?.service || null;
+  }
+
+  /**
+   * Obtiene el estado de la capa de almacenamiento
+   */
+  getStorageState() {
+    return this.#bootstrapState.get('STORAGE_PREPARATION')?.result || null;
+  }
+}
 class ErrorManager {
   #logger;
 
@@ -542,21 +880,46 @@ class MagnetAddon {
 }
 
 /**
- * Función principal optimizada con manejo de errores robusto.
+ * Función principal de inicialización del addon con bootstrap tecnológico ordenado.
+ * Implementa inicialización por fases para garantizar estabilidad y orden.
  */
 async function main() {
   let logger;
+  let bootstrapManager;
   let addon;
   
   try {
-    // Logger para errores críticos
-    logger = new EnhancedLogger('error', false, {
-      errorOnly: true,
-      minimalOutput: true
+    // FASE PREVIA: Configuración básica y logging
+    const config = addonConfig;
+    logger = new EnhancedLogger(config.logging.logLevel, false, {
+      errorOnly: false,
+      minimalOutput: false
     });
     
-    addon = new MagnetAddon();
+    logger.info('🎬 Iniciando Stremio Addon - VeoVeo Search Pro');
+    logger.info(`📍 Entorno: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`🏗️ Runtime: ${process.versions?.bun ? `Bun ${process.versions.bun}` : `Node.js ${process.version}`}`);
+    
+    // Inicializar gestor de bootstrap tecnológico
+    bootstrapManager = new TechnicalBootstrapManager(config, logger);
+    
+    // Ejecutar bootstrap por fases
+    const bootstrapResult = await bootstrapManager.executeBootstrap();
+    logger.info('📊 Bootstrap Summary:', {
+      totalDuration: `${bootstrapResult.totalDuration}ms`,
+      phases: bootstrapResult.completedPhases,
+      success: bootstrapResult.success
+    });
+
+    // Inicializar addon con bootstrap completado
+    addon = new MagnetAddon({ config, logger });
     await addon.start();
+    
+    logger.info('🚀 Addon iniciado exitosamente con bootstrap tecnológico:', {
+      bootstrapDuration: `${bootstrapResult.totalDuration}ms`,
+      torEnabled: bootstrapManager.getTorService()?.isEnabled() || false,
+      storageFiles: Object.keys(bootstrapManager.getStorageState() || {})
+    });
     
     // Manejo de señales de cierre
     process.on('SIGINT', () => {
@@ -571,6 +934,15 @@ async function main() {
       process.exit(0);
     });
     
+    return {
+      addon,
+      bootstrap: bootstrapResult,
+      services: {
+        torService: bootstrapManager.getTorService(),
+        storageState: bootstrapManager.getStorageState()
+      }
+    };
+    
   } catch (error) {
     if (!logger) {
       logger = new EnhancedLogger('error', false, {
@@ -579,9 +951,10 @@ async function main() {
       });
     }
     
-    logger.error('❌ Error fatal al iniciar el addon', {
-      error: error.message || error,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    logger.error('❌ Error crítico durante la inicialización:', {
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      phase: bootstrapManager?.getCurrentPhaseName?.() || 'UNKNOWN'
     });
     
     if (addon) {
