@@ -205,25 +205,6 @@ const config = {
     // Habilitar logging detallado de selección
     enableSelectionLogging: process.env.MAGNET_SELECTION_LOGGING === 'true' || false
   },
-  // Configuración específica para TVChannelProcessor
-  tvProcessor: {
-    enabled: process.env.TV_PROCESSOR_ENABLED === 'true' || true,
-    customConfigPath: process.env.TV_PROCESSOR_CONFIG_PATH || null, // Ruta a configuración personalizada
-    refreshInterval: parseInt(process.env.TV_PROCESSOR_REFRESH_INTERVAL) || 300000, // 5 minutos
-    enableAutoRefresh: process.env.TV_PROCESSOR_AUTO_REFRESH !== 'false', // Por defecto true
-    // Configuración de integración con el sistema existente
-    integration: {
-      replaceM3UTvRepository: process.env.TV_PROCESSOR_REPLACE_M3U === 'true' || true,
-      enableMetrics: process.env.TV_PROCESSOR_METRICS === 'true' || true,
-      enableDetailedLogging: process.env.TV_PROCESSOR_DETAILED_LOGGING === 'true' || false
-    },
-    // Configuración de rendimiento
-    performance: {
-      maxConcurrentProcessing: parseInt(process.env.TV_PROCESSOR_MAX_CONCURRENT) || 5,
-      processingTimeout: parseInt(process.env.TV_PROCESSOR_TIMEOUT) || 30000, // 30 segundos
-      enableCaching: process.env.TV_PROCESSOR_CACHING !== 'false' // Por defecto true
-    }
-  },
   // Configuración específica para metadatos
   metadata: {
     // Configuración para películas

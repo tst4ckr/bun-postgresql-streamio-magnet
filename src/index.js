@@ -12,7 +12,6 @@ import { TvHandler } from './application/handlers/TvHandler.js';
 import { M3UTvRepository } from './infrastructure/repositories/M3UTvRepository.js';
 import { EnhancedLogger } from './infrastructure/utils/EnhancedLogger.js';
 import { TorService } from './infrastructure/services/TorService.js';
-import { TVChannelProcessorService } from './infrastructure/services/TVChannelProcessorService.js';
 
 /**
  * Gestor de inicialización por fases para dependencias tecnológicas.
@@ -35,7 +34,6 @@ class TechnicalBootstrapManager {
       { name: 'TOR_INITIALIZATION', handler: this.#initializeTorService.bind(this) },
       { name: 'NETWORK_VALIDATION', handler: this.#validateNetworkConnectivity.bind(this) },
       { name: 'STORAGE_PREPARATION', handler: this.#prepareStorageLayer.bind(this) },
-      { name: 'TV_PROCESSOR_INITIALIZATION', handler: this.#initializeTVChannelProcessor.bind(this) },
       { name: 'SERVICE_DEPENDENCIES', handler: this.#initializeServiceDependencies.bind(this) }
     ];
   }
@@ -221,63 +219,7 @@ class TechnicalBootstrapManager {
   }
 
   /**
-   * FASE 5: Inicialización del servicio TVChannelProcessor
-   * @private
-   */
-  async #initializeTVChannelProcessor() {
-    this.#logger.debug('🎬 Inicializando TVChannelProcessor...');
-    
-    try {
-      // Verificar si TVChannelProcessor está habilitado
-      if (!this.#config.tvProcessor?.enabled) {
-        this.#logger.info('📺 TVChannelProcessor deshabilitado en configuración');
-        return {
-          enabled: false, 
-          status: 'disabled',
-          message: 'TVChannelProcessor disabled in configuration'
-        };
-      }
-
-      // Crear instancia del servicio
-      const tvProcessorService = new TVChannelProcessorService(
-        this.#logger, 
-        this.#config
-      );
-
-      // Inicializar el servicio
-      await tvProcessorService.initialize();
-
-      this.#logger.info('✅ TVChannelProcessor inicializado correctamente');
-
-      return {
-        enabled: true,
-        status: 'initialized',
-        service: tvProcessorService,
-        config: tvProcessorService.getConfig(),
-        message: 'TVChannelProcessor initialized successfully'
-      };
-
-    } catch (error) {
-      this.#logger.error('❌ Error inicializando TVChannelProcessor:', error);
-      
-      // Solo lanzar error si es crítico para el funcionamiento
-      if (this.#config.tvProcessor?.integration?.replaceM3UTvRepository) {
-        throw new Error(`Critical TVChannelProcessor initialization failed: ${error.message}`);
-      }
-      
-      this.#logger.warn('⚠️ TVChannelProcessor falló pero el sistema continuará con M3UTvRepository');
-      
-      return {
-        enabled: false,
-        status: 'error',
-        error: error.message,
-        message: `TVChannelProcessor initialization failed: ${error.message}`
-      };
-    }
-  }
-
-  /**
-   * FASE 6: Inicialización de dependencias de servicios
+   * FASE 5: Inicialización de dependencias de servicios
    * @private
    */
   async #initializeServiceDependencies() {
@@ -290,22 +232,13 @@ class TechnicalBootstrapManager {
       networkConnectivity: this.#bootstrapState.get('NETWORK_VALIDATION')?.result
     };
 
-    // Agregar TVChannelProcessor al chequeo de servicios
-    serviceChecks.tvProcessor = this.#bootstrapState.get('TV_PROCESSOR_INITIALIZATION')?.result;
-
-    // Verificar integridad de dependencias críticas (excluyendo TVChannelProcessor que es opcional)
-    const criticalDependencies = {
-      torService: serviceChecks.torService,
-      storageLayer: serviceChecks.storageLayer,
-      networkConnectivity: serviceChecks.networkConnectivity
-    };
-
-    const missingDependencies = Object.entries(criticalDependencies)
+    // Verificar integridad de dependencias
+    const missingDependencies = Object.entries(serviceChecks)
       .filter(([key, value]) => !value)
       .map(([key]) => key);
 
     if (missingDependencies.length > 0) {
-      throw new Error(`Dependencias críticas faltantes: ${missingDependencies.join(', ')}`);
+      throw new Error(`Dependencias faltantes: ${missingDependencies.join(', ')}`);
     }
 
     return {
@@ -419,20 +352,6 @@ class TechnicalBootstrapManager {
   getStorageState() {
     return this.#bootstrapState.get('STORAGE_PREPARATION')?.result || null;
   }
-
-  /**
-   * Obtiene el servicio TVChannelProcessor inicializado
-   */
-  getTVChannelProcessorService() {
-    return this.#bootstrapState.get('TV_PROCESSOR_INITIALIZATION')?.result?.service || null;
-  }
-
-  /**
-   * Obtiene el estado del TVChannelProcessor
-   */
-  getTVChannelProcessorState() {
-    return this.#bootstrapState.get('TV_PROCESSOR_INITIALIZATION')?.result || null;
-  }
 }
 class ErrorManager {
   #logger;
@@ -518,36 +437,21 @@ class RepositoryFactory {
   }
 
   /**
-   * Crea el repositorio de TV apropiado basado en la configuración.
-   * @returns {Promise<M3UTvRepository|TVChannelProcessorService|null>}
+   * Crea e inicializa el repositorio de TV M3U si está configurado.
+   * @returns {Promise<M3UTvRepository|null>}
    */
   async createTvRepository() {
+    const { m3uUrl } = this.#config.repository;
+    
+    if (!m3uUrl) {
+      this.#logger.info('📺 M3U URL no configurada, omitiendo repositorio de TV');
+      return null;
+    }
+
     try {
-      // Verificar si TVChannelProcessor está disponible y habilitado para reemplazar M3UTvRepository
-      const bootstrapManager = this.#config.bootstrapManager;
-      const tvProcessorState = bootstrapManager?.getTVChannelProcessorState();
-      
-      if (tvProcessorState?.enabled && 
-          tvProcessorState?.status === 'initialized' && 
-          this.#config.tvProcessor?.integration?.replaceM3UTvRepository) {
-        
-        this.#logger.info('📺 Usando TVChannelProcessorService como repositorio de TV');
-        return tvProcessorState.service;
-      }
-
-      // Fallback al M3UTvRepository tradicional
-      const { m3uUrl } = this.#config.repository;
-      
-      if (!m3uUrl) {
-        this.#logger.info('📺 M3U URL no configurada y TVChannelProcessor no disponible, omitiendo repositorio de TV');
-        return null;
-      }
-
-      this.#logger.info('📺 Usando M3UTvRepository tradicional');
       const repository = new M3UTvRepository(m3uUrl, this.#config, this.#logger);
       this.#logger.info('✅ Repositorio de TV M3U inicializado correctamente');
       return repository;
-
     } catch (error) {
       this.#logger.warn(`⚠️ Error inicializando repositorio de TV: ${error.message}`);
       return null;
@@ -998,9 +902,6 @@ async function main() {
     
     // Inicializar gestor de bootstrap tecnológico
     bootstrapManager = new TechnicalBootstrapManager(config, logger);
-    
-    // Agregar referencia del bootstrapManager a la configuración para uso en factories
-    config.bootstrapManager = bootstrapManager;
     
     // Ejecutar bootstrap por fases
     const bootstrapResult = await bootstrapManager.executeBootstrap();
