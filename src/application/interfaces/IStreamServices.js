@@ -65,12 +65,13 @@
 export class IStreamValidationService {
   /**
    * Valida una petición de stream completa.
-   * @param {string} type - Tipo de contenido
-   * @param {string} id - ID del contenido
-   * @returns {Promise<ValidationResult>} Resultado de la validación
+   * @param {Object} args - Argumentos de la petición
+   * @param {string} args.type - Tipo de contenido
+   * @param {string} args.id - ID del contenido
+   * @returns {Promise<Object>} Resultado de validación con detalles
    * @abstract
    */
-  async validateStreamRequest(type, id) {
+  async validateStreamRequest(args) {
     throw new Error('Method validateStreamRequest must be implemented');
   }
 
@@ -85,22 +86,22 @@ export class IStreamValidationService {
   }
 
   /**
-   * Detecta el tipo de ID de contenido.
-   * @param {string} id - ID del contenido
-   * @returns {Promise<string>} Tipo de ID detectado
+   * Detecta el tipo de ID de contenido usando el servicio especializado.
+   * @param {string} contentId - ID del contenido
+   * @returns {Object} Resultado de detección con tipo y metadatos
    * @abstract
    */
-  async detectContentIdType(id) {
+  detectContentIdType(contentId) {
     throw new Error('Method detectContentIdType must be implemented');
   }
 
   /**
    * Extrae temporada y episodio de un ID.
-   * @param {string} id - ID del contenido
-   * @returns {Object} Objeto con season y episode
+   * @param {string} contentId - ID del contenido
+   * @returns {Object} Objeto con season y episode extraídos
    * @abstract
    */
-  extractSeasonEpisode(id) {
+  extractSeasonEpisode(contentId) {
     throw new Error('Method extractSeasonEpisode must be implemented');
   }
 }
@@ -111,57 +112,62 @@ export class IStreamValidationService {
  */
 export class IStreamProcessingService {
   /**
-   * Obtiene magnets para un contenido específico.
-   * @param {string} id - ID del contenido
-   * @param {string} type - Tipo de contenido
-   * @param {string} idType - Tipo de ID
-   * @returns {Promise<Array>} Lista de magnets encontrados
+   * Obtiene magnets para un contenido específico con manejo inteligente de tipos de ID.
+   * @param {string} contentId - ID del contenido
+   * @param {string} type - Tipo de contenido (movie, series, anime)
+   * @param {Object} idDetection - Resultado de detección de ID
+   * @returns {Promise<Array|null>} Lista de magnets encontrados o null
    * @abstract
    */
-  async getMagnets(id, type, idType) {
+  async getMagnets(contentId, type = 'movie', idDetection) {
     throw new Error('Method getMagnets must be implemented');
   }
 
   /**
    * Crea streams a partir de magnets.
    * @param {Array} magnets - Lista de magnets
-   * @param {Object} metadata - Metadatos del contenido
-   * @returns {Promise<ProcessingResult>} Resultado del procesamiento
+   * @param {string} type - Tipo de contenido
+   * @param {Object|null} metadata - Metadatos del contenido (opcional)
+   * @returns {Object[]} Lista de streams formateados
    * @abstract
    */
-  async createStreamsFromMagnets(magnets, metadata) {
+  createStreamsFromMagnets(magnets, type, metadata = null) {
     throw new Error('Method createStreamsFromMagnets must be implemented');
   }
 
   /**
    * Formatea el título de un stream.
    * @param {Object} magnet - Datos del magnet
-   * @param {Object} metadata - Metadatos del contenido
+   * @param {string} type - Tipo de contenido
+   * @param {Object|null} metadata - Metadatos del contenido (opcional)
+   * @param {Object|null} idDetection - Información de detección de ID (opcional)
    * @returns {string} Título formateado
    * @abstract
    */
-  formatStreamTitle(magnet, metadata) {
+  formatStreamTitle(magnet, type, metadata = null, idDetection = null) {
     throw new Error('Method formatStreamTitle must be implemented');
   }
 
   /**
    * Formatea la descripción de un stream.
    * @param {Object} magnet - Datos del magnet
-   * @param {Object} metadata - Metadatos del contenido
+   * @param {string} type - Tipo de contenido
+   * @param {Object|null} metadata - Metadatos del contenido (opcional)
+   * @param {Object|null} idDetection - Información de detección de ID (opcional)
    * @returns {string} Descripción formateada
    * @abstract
    */
-  formatStreamDescription(magnet, metadata) {
+  formatStreamDescription(magnet, type, metadata = null, idDetection = null) {
     throw new Error('Method formatStreamDescription must be implemented');
   }
 
   /**
    * Convierte tamaño de string a bytes.
-   * @param {string} sizeStr - Tamaño como string
+   * @param {string} size - Tamaño como string (ej: "2.5 GB", "1500 MB")
    * @returns {number} Tamaño en bytes
    * @abstract
    */
-  convertSizeToBytes(sizeStr) {
+  convertSizeToBytes(size) {
     throw new Error('Method convertSizeToBytes must be implemented');
   }
 }
@@ -361,9 +367,7 @@ export const SERVICE_DEPENDENCIES = {
   StreamProcessingService: [
     'magnetRepository',
     'unifiedIdService',
-    'metadataService',
-    'logger',
-    'config'
+    'logger'
   ],
   StreamCacheService: [
     'config',
