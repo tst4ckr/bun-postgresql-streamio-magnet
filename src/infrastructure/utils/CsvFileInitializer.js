@@ -92,12 +92,18 @@ export class CsvFileInitializer {
     static repairCsvFormat(filePath, filename) {
         try {
             const content = readFileSync(filePath, 'utf8');
-            const lines = content.split('\n');
+            
+            // Encontrar la primera línea y preservar el resto del contenido exactamente como está
+            const firstLineMatch = content.match(/^[^\r\n]*/);
+            if (!firstLineMatch) return;
+            
+            const firstLine = firstLineMatch[0];
+            const restOfContent = content.substring(firstLine.length);
             
             // Si la primera línea no es la cabecera correcta, reemplazarla
-            if (lines[0].trim() !== CsvFileInitializer.CSV_HEADER) {
-                lines[0] = CsvFileInitializer.CSV_HEADER;
-                writeFileSync(filePath, lines.join('\n'), 'utf8');
+            if (firstLine.trim() !== CsvFileInitializer.CSV_HEADER) {
+                const repairedContent = CsvFileInitializer.CSV_HEADER + restOfContent;
+                writeFileSync(filePath, repairedContent, 'utf8');
                 CsvFileInitializer.#logger.info(`[CsvFileInitializer] Formato reparado: ${filename}`);
             }
         } catch (error) {
