@@ -100,7 +100,7 @@ export class StreamHandler {
       
       // 4. Obtener magnets
       const startMagnetSearch = Date.now();
-      const magnets = await this.#streamProcessingService.getMagnets(contentId, type);
+      const magnets = await this.#streamProcessingService.getMagnets(contentId, type, idDetection);
       const magnetSearchTime = Date.now() - startMagnetSearch;
       
       await this.#streamMetricsService.logMagnetSearch({
@@ -116,7 +116,7 @@ export class StreamHandler {
       }
 
       // 5. Crear streams desde magnets
-      const streams = await this.#streamProcessingService.createStreamsFromMagnets(magnets, type);
+      const streams = await this.#streamProcessingService.createStreamsFromMagnets(magnets, type, null, idDetection);
       
       if (streams.length === 0) {
         await this.#streamMetricsService.logStreamRequestSuccess(metricsContext, { streams: [], metadata: null });

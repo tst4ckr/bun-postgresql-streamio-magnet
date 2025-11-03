@@ -128,10 +128,11 @@ export class IStreamProcessingService {
    * @param {Array} magnets - Lista de magnets
    * @param {string} type - Tipo de contenido
    * @param {Object|null} metadata - Metadatos del contenido (opcional)
+   * @param {Object|null} idDetection - Información de detección de ID (opcional)
    * @returns {Object[]} Lista de streams formateados
    * @abstract
    */
-  createStreamsFromMagnets(magnets, type, metadata = null) {
+  createStreamsFromMagnets(magnets, type, metadata = null, idDetection = null) {
     throw new Error('Method createStreamsFromMagnets must be implemented');
   }
 
