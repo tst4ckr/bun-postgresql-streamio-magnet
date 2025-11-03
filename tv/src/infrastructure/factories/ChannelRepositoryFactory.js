@@ -3,6 +3,7 @@
  * Implementa el Factory Pattern para desacoplar la creación de repositorios
  */
 
+import path from 'path';
 import { M3UParserService } from '../parsers/M3UParserService.js';
 import { CSVChannelRepository } from '../repositories/CSVChannelRepository.js';
 import { RemoteM3UChannelRepository } from '../repositories/RemoteM3UChannelRepository.js';
@@ -44,8 +45,10 @@ export class ChannelRepositoryFactory {
       // Usar el switch tradicional para fuentes nombradas
       switch (channelsSource) {
       case 'csv':
+        // Resolver rutas relativas del CSV con base en el archivo de configuración cargado
+        const resolvedCsvPath = this.#resolvePath(dataSources.channelsFile, config);
         repository = new CSVChannelRepository(
-          dataSources.channelsFile,
+          resolvedCsvPath,
           config,
           logger
         );
@@ -78,13 +81,14 @@ export class ChannelRepositoryFactory {
           dataSources.m3uUrl5
         ].filter(Boolean);
         
-        const localM3uFiles = [
+        const localM3uFilesRaw = [
           dataSources.localM3uLatam1,
           dataSources.localM3uLatam2,
           dataSources.localM3uLatam3,
           dataSources.localM3uLatam4,
           dataSources.localM3uIndex
         ].filter(Boolean);
+        const localM3uFiles = localM3uFilesRaw.map(fp => this.#resolvePath(fp, config));
         
         // El archivo CSV adicional se maneja automáticamente por HybridChannelRepository
         // a través de config.dataSources.localChannelsCsv - NO agregarlo a M3U
@@ -100,8 +104,9 @@ export class ChannelRepositoryFactory {
           logger.info(`Repositorio híbrido: ${remoteM3uUrls.length} URLs remotas, ${localM3uFiles.length} archivos locales`);
         }
         
+        const resolvedHybridCsv = this.#resolvePath(dataSources.channelsFile, config);
         repository = new HybridChannelRepository(
-          dataSources.channelsFile,
+          resolvedHybridCsv,
           allM3uSources,
           config,
           logger
@@ -141,6 +146,35 @@ export class ChannelRepositoryFactory {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Resuelve una ruta para archivos locales considerando la ubicación del archivo de configuración.
+   * - Si es URL, retorna tal cual.
+   * - Si es absoluta, retorna tal cual.
+   * - Si es relativa, intenta resolver respecto a config.__baseDir y luego respecto a process.cwd().
+   * @private
+   * @static
+   * @param {string} filePath
+   * @param {Object} config
+   * @returns {string}
+   */
+  static #resolvePath(filePath, config) {
+    if (!filePath || typeof filePath !== 'string') return filePath;
+    if (this.#isUrl(filePath)) return filePath;
+
+    // Si ya es absoluta
+    if (path.isAbsolute(filePath)) return filePath;
+
+    // Normalizar separadores y detectar si comienza con 'data/'
+    const normalized = filePath.replace(/\\/g, '/');
+    const startsWithData = normalized.replace(/^\.\//, '').startsWith('data/');
+
+    const baseDir = config.__baseDir || process.cwd();
+    const rootDir = config.__rootDir || path.resolve(baseDir, '..');
+    const base = startsWithData ? rootDir : baseDir;
+    const resolved = path.resolve(base, filePath);
+    return resolved;
   }
 }
 

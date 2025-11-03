@@ -62,7 +62,17 @@ export class ConfigurationManager {
             // Si es un módulo ES6, obtener el default export
             const config = fileContent.default || fileContent;
             
-            return this.#mergeConfigurations(baseConfig, config);
+            // Enriquecer con metadatos de origen para resolución de rutas relativas
+            const baseDir = path.dirname(absolutePath);
+            const rootDir = path.resolve(baseDir, '..');
+            const enriched = {
+                ...config,
+                __source: absolutePath,
+                __baseDir: baseDir,
+                __rootDir: rootDir
+            };
+            
+            return this.#mergeConfigurations(baseConfig, enriched);
         } catch (error) {
             if (error.code === 'MODULE_NOT_FOUND' || error.code === 'ENOENT') {
                 throw new Error(`Archivo de configuración no encontrado: ${filePath}`);
@@ -98,10 +108,42 @@ export class ConfigurationManager {
      * @returns {Object} Configuración por defecto
      */
     #getDefaultConfiguration() {
-        // Obtener configuración base de TVAddonConfig
+        // 1) Intentar cargar por defecto la configuración externa desde tv/data/tv-config.js
+        //    Esto permite que toda la librería use la misma configuración definida por el usuario.
+        const candidatePaths = [
+            // Si el proceso se ejecuta desde el directorio tv/
+            path.resolve(process.cwd(), 'data', 'tv-config.js'),
+            // Si el proceso se ejecuta desde la raíz del repositorio
+            path.resolve(process.cwd(), 'tv', 'data', 'tv-config.js')
+        ];
+
+        for (const cfgPath of candidatePaths) {
+            try {
+                const fileContent = require(cfgPath);
+                const config = fileContent.default || fileContent;
+                // Anotar metadatos y devolver configuración externa
+                const baseDir = path.dirname(cfgPath);
+                const rootDir = path.resolve(baseDir, '..');
+                return {
+                    ...config,
+                    __source: cfgPath,
+                    __baseDir: baseDir,
+                    __rootDir: rootDir
+                };
+            } catch (error) {
+                // Continuar con el siguiente path si no se puede cargar
+                if (error?.code !== 'MODULE_NOT_FOUND' && error?.code !== 'ENOENT') {
+                    // Para otros errores, registrar y continuar con fallback
+                    console.warn(`No se pudo cargar configuración desde ${cfgPath}: ${error.message}`);
+                }
+            }
+        }
+
+        // 2) Fallback: usar la configuración por defecto previa (internamente definida)
+        // Obtener configuración base de TVAddonConfig para mantener compatibilidad
         const addonConfig = TVAddonConfig.getInstance().getAll();
-        
-        return {
+
+        const fallbackConfig = {
             // Configuración del servidor
             server: {
                 port: 3000,
@@ -217,6 +259,13 @@ export class ConfigurationManager {
                 batchSize: 100,
                 enableProgressReporting: true
             }
+        };
+
+        return {
+            ...fallbackConfig,
+            __source: 'internal-default',
+            __baseDir: process.cwd(),
+            __rootDir: path.resolve(process.cwd(), 'tv')
         };
     }
 
