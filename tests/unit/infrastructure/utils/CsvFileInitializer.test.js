@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { CsvFileInitializer } from '@/infrastructure/utils/CsvFileInitializer.js';
+import { CsvFileInitializer } from '../../../../src/infrastructure/utils/CsvFileInitializer.js';
 import { existsSync, writeFileSync, mkdirSync, readFileSync, rmSync } from 'fs';
 import { dirname } from 'path';
 import { tmpdir } from 'os';

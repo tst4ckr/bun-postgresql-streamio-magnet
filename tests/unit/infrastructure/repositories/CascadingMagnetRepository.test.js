@@ -4,8 +4,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { CascadingMagnetRepository } from '@/infrastructure/repositories/CascadingMagnetRepository.js';
-import { MagnetNotFoundError, RepositoryError } from '@/domain/repositories/MagnetRepository.js';
+import { CascadingMagnetRepository } from '../../../../src/infrastructure/repositories/CascadingMagnetRepository.js';
+import { MagnetNotFoundError, RepositoryError } from '../../../../src/domain/repositories/MagnetRepository.js';
 
 // Mock dependencies
 vi.mock('@/infrastructure/repositories/CSVMagnetRepository.js');

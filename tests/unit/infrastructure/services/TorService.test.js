@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import net from 'net';
 import { SocksProxyAgent } from 'socks-proxy-agent';
-import { TorService } from '@/infrastructure/services/TorService.js';
+import { TorService } from '../../../../src/infrastructure/services/TorService.js';
 
 // Mock dependencies
 vi.mock('net');

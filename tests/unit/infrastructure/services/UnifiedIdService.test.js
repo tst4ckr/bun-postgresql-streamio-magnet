@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { UnifiedIdService } from '@/infrastructure/services/UnifiedIdService.js';
+import { UnifiedIdService } from '../../../../src/infrastructure/services/UnifiedIdService.js';
 
 describe('UnifiedIdService', () => {
   let unifiedIdService;

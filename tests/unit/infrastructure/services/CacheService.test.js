@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { CacheService } from '@/infrastructure/services/CacheService.js';
+import { CacheService } from '../../../../src/infrastructure/services/CacheService.js';
 
 describe('CacheService', () => {
   let cacheService;

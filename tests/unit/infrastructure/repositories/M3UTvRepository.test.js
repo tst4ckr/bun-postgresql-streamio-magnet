@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { M3UTvRepository } from '@/infrastructure/repositories/M3UTvRepository.js';
+import { M3UTvRepository } from '../../../../src/infrastructure/repositories/M3UTvRepository.js';
 
 // Mock dependencies
 vi.mock('@/infrastructure/utils/M3UParser.js', () => ({

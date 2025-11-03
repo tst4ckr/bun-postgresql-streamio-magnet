@@ -3,8 +3,8 @@
  * Valida detección de patrones de ID, validación y tipos soportados
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
-import { IdDetectorService, idDetectorService } from '@/infrastructure/services/IdDetectorService.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { IdDetectorService, idDetectorService } from '../../../../src/infrastructure/services/IdDetectorService.js';
 
 describe('IdDetectorService', () => {
   let service;

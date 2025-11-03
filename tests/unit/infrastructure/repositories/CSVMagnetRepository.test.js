@@ -4,11 +4,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createReadStream } from 'fs';
-import csv from 'csv-parser';
-import { CSVMagnetRepository } from '@/infrastructure/repositories/CSVMagnetRepository.js';
-import { MagnetNotFoundError, RepositoryError } from '@/domain/repositories/MagnetRepository.js';
-import { Magnet } from '@/domain/entities/Magnet.js';
+import { promises as fs } from 'fs';
+import { join, dirname } from 'path';
+import { CSVMagnetRepository } from '../../../../src/infrastructure/repositories/CSVMagnetRepository.js';
+import { MagnetNotFoundError, RepositoryError } from '../../../../src/domain/repositories/MagnetRepository.js';
+import { Magnet } from '../../../../src/domain/entities/Magnet.js';
 
 // Mock dependencies
 vi.mock('fs');

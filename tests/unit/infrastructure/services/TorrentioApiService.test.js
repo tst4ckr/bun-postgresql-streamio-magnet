@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { writeFileSync, appendFileSync, existsSync, mkdirSync, readFileSync } from 'fs';
 import { dirname } from 'path';
-import { TorrentioApiService } from '@/infrastructure/services/TorrentioApiService.js';
+import { TorrentioApiService } from '../../../../src/infrastructure/services/TorrentioApiService.js';
 
 // Mock dependencies
 vi.mock('fs');

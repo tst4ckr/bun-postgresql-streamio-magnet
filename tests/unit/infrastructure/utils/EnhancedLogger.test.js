@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EnhancedLogger } from '@/infrastructure/utils/EnhancedLogger.js';
+import { EnhancedLogger } from '../../../../src/infrastructure/utils/EnhancedLogger.js';
 
 describe('EnhancedLogger', () => {
   let logger;
