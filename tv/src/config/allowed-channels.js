@@ -8,8 +8,10 @@ import { EnvLoader } from '../infrastructure/config/EnvLoader.js';
 
 // Función para cargar canales permitidos desde variables de entorno
 function loadAllowedChannelsFromEnv() {
-  // Solo cargar variables de entorno si no están ya disponibles
-  if (typeof process.env.ALLOWED_CHANNELS === 'undefined') {
+  // Solo cargar variables de entorno si no están ya disponibles y si no hay configuración personalizada
+  if (typeof process.env.ALLOWED_CHANNELS === 'undefined' && 
+      typeof process.env.CHANNELS_SOURCE === 'undefined' && 
+      typeof process.env.M3U_URL === 'undefined') {
     try {
       EnvLoader.getInstance();
     } catch (error) {
@@ -42,7 +44,19 @@ function getDefaultAllowedChannels() {
 }
 
 // Cargar canales permitidos desde variables de entorno o usar valores por defecto
-const ALLOWED_CHANNELS = loadAllowedChannelsFromEnv();
+// Carga perezosa para evitar la ejecución automática al importar el módulo
+let ALLOWED_CHANNELS = null;
+
+/**
+ * Función de carga perezosa para ALLOWED_CHANNELS
+ * @returns {Array} Lista de canales permitidos
+ */
+function getAllowedChannelsLazy() {
+  if (ALLOWED_CHANNELS === null) {
+    ALLOWED_CHANNELS = loadAllowedChannelsFromEnv();
+  }
+  return ALLOWED_CHANNELS;
+}
 
 /**
  * Normaliza el nombre de un canal para comparación
@@ -336,12 +350,12 @@ function isChannelAllowedWithThreshold(channelName, threshold = 0.9) {
 function addAllowedChannel(channelName) {
   if (channelName && typeof channelName === 'string') {
     const normalizedNew = normalizeChannelName(channelName);
-    const exists = ALLOWED_CHANNELS.some(allowed => 
+    const exists = getAllowedChannelsLazy().some(allowed => 
       normalizeChannelName(allowed) === normalizedNew
     );
     
     if (!exists) {
-      ALLOWED_CHANNELS.push(channelName.trim());
+      getAllowedChannelsLazy().push(channelName.trim());
     }
   }
 }
@@ -353,12 +367,12 @@ function addAllowedChannel(channelName) {
 function removeAllowedChannel(channelName) {
   if (channelName && typeof channelName === 'string') {
     const normalizedToRemove = normalizeChannelName(channelName);
-    const index = ALLOWED_CHANNELS.findIndex(allowed => 
+    const index = getAllowedChannelsLazy().findIndex(allowed => 
       normalizeChannelName(allowed) === normalizedToRemove
     );
     
     if (index > -1) {
-      ALLOWED_CHANNELS.splice(index, 1);
+      getAllowedChannelsLazy().splice(index, 1);
     }
   }
 }
@@ -366,7 +380,7 @@ function removeAllowedChannel(channelName) {
 // Mantener compatibilidad hacia atrás - función ya declarada arriba
 
 export {
-  ALLOWED_CHANNELS,
+  getAllowedChannelsLazy as ALLOWED_CHANNELS,
   isChannelAllowed,
   isChannelAllowedWithThreshold,
   filterAllowedChannels,

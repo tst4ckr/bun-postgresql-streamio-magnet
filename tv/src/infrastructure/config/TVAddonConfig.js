@@ -24,8 +24,10 @@ export class TVAddonConfig {
    * @private
    */
   constructor() {
-    // Cargar variables de entorno antes de acceder a process.env
-    EnvLoader.getInstance();
+    // Cargar variables de entorno solo si no están ya definidas (evita carga automática)
+    if (!process.env.CHANNELS_SOURCE && !process.env.M3U_URL) {
+      EnvLoader.getInstance();
+    }
     
     this.#config = this.#loadConfiguration();
     this.#validateConfiguration();

@@ -8,6 +8,22 @@
  * Esta configuración refleja exactamente los valores activos del archivo .env
  */
 export const customTVConfig = {
+  // Configuración del addon
+  addon: {
+    id: 'org.stremio.custom-tv-addon',
+    name: 'Custom TV Addon',
+    description: 'Addon personalizado de TV con configuración custom',
+    version: '2.0.0',
+    contactEmail: 'custom@example.com',
+    enableUserConfig: false,
+    enableDeepLinks: false
+  },
+
+  // Variables específicas para compatibilidad con el script de prueba
+  CHANNELS_SOURCE: 'hybrid',
+  AUTO_M3U_URL: 'https://iptv-org.github.io/iptv/languages/spa.m3u',
+  CHANNELS_FILE: 'data/tv.csv',
+  ENABLE_STREAM_VALIDATION: true,
   // ===================================
   // CONFIGURACIÓN DE FUENTE DE DATOS
   // ===================================

@@ -25,7 +25,12 @@ async function main() {
 
         // FASE 1: CONFIGURACIÓN - Carga variables de entorno y configuración centralizada
         console.log('📋 Paso 1: Cargando configuración...');
-        EnvLoader.getInstance(); // Singleton para cargar .env una sola vez
+        
+        // Cargar variables de entorno solo si no están ya definidas (evita carga automática)
+        if (!process.env.CHANNELS_SOURCE && !process.env.M3U_URL) {
+            EnvLoader.getInstance(); // Singleton para cargar .env una sola vez
+        }
+        
         const config = TVAddonConfig.getInstance(); // Configuración centralizada del addon
         const logger = createLogger(); // Logger personalizado para trazabilidad
         

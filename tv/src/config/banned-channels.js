@@ -22,8 +22,10 @@ import { BannedChannelsFilterService, BannedChannelsFilterConfig } from '../doma
  * @returns {Array<string>} Lista de canales prohibidos
  */
 function loadBannedChannelsFromEnv() {
-  // Solo cargar variables de entorno si no están ya disponibles
-  if (typeof process.env.BANNED_CHANNELS === 'undefined') {
+  // Solo cargar variables de entorno si no están ya disponibles y si no hay configuración personalizada
+  if (typeof process.env.BANNED_CHANNELS === 'undefined' && 
+      typeof process.env.CHANNELS_SOURCE === 'undefined' && 
+      typeof process.env.M3U_URL === 'undefined') {
     try {
       EnvLoader.getInstance();
     } catch (error) {
@@ -57,8 +59,15 @@ function getDefaultBannedChannels() {
   return [];
 }
 
-// Lista de canales prohibidos cargada desde variables de entorno
-const BANNED_CHANNELS = loadBannedChannelsFromEnv();
+// Lista de canales prohibidos cargada desde variables de entorno (lazy loading)
+let BANNED_CHANNELS = null;
+
+function getBannedChannelsLazy() {
+  if (BANNED_CHANNELS === null) {
+    BANNED_CHANNELS = loadBannedChannelsFromEnv();
+  }
+  return BANNED_CHANNELS;
+}
 
 // Función para parsear variables de entorno separadas por comas
 function parseEnvArray(envVar, defaultValue = []) {
@@ -104,11 +113,25 @@ function getBannedIPRangesLazy() {
   return BANNED_IP_RANGES;
 }
 
-// Lista de URLs específicas prohibidas (configurable desde .env)
-const BANNED_URLS = parseEnvArray('BANNED_URLS', []);
+// Lista de URLs específicas prohibidas (configurable desde .env) - lazy loading
+let BANNED_URLS = null;
 
-// Lista de dominios prohibidos (configurable desde .env)
-const BANNED_DOMAINS = parseEnvArray('BANNED_DOMAINS', []);
+function getBannedURLsLazy() {
+  if (BANNED_URLS === null) {
+    BANNED_URLS = parseEnvArray('BANNED_URLS', []);
+  }
+  return BANNED_URLS;
+}
+
+// Lista de dominios prohibidos (configurable desde .env) - lazy loading
+let BANNED_DOMAINS = null;
+
+function getBannedDomainsLazy() {
+  if (BANNED_DOMAINS === null) {
+    BANNED_DOMAINS = parseEnvArray('BANNED_DOMAINS', []);
+  }
+  return BANNED_DOMAINS;
+}
 
 // Variables de entorno para listas de ignore específicas (lazy loading)
 let IGNORE_IPS_FOR_FILTERING = null;
@@ -148,18 +171,32 @@ function getIgnoreChannelNamesForFilteringLazy() {
   return IGNORE_CHANNEL_NAMES_FOR_FILTERING;
 }
 
-// Términos adicionales prohibidos (configurable desde .env)
-const CUSTOM_BANNED_TERMS = parseEnvArray('CUSTOM_BANNED_TERMS', []);
+// Términos adicionales prohibidos (configurable desde .env) - lazy loading
+let CUSTOM_BANNED_TERMS = null;
 
-// Patrones regex prohibidos (configurable desde .env)
-const BANNED_PATTERNS = parseEnvArray('BANNED_PATTERNS', []).map(pattern => {
-  try {
-    return new RegExp(pattern, 'i');
-  } catch (error) {
-    console.warn(`Patrón regex inválido ignorado: ${pattern}`);
-    return null;
+function getCustomBannedTermsLazy() {
+  if (CUSTOM_BANNED_TERMS === null) {
+    CUSTOM_BANNED_TERMS = parseEnvArray('CUSTOM_BANNED_TERMS', []);
   }
-}).filter(pattern => pattern !== null);
+  return CUSTOM_BANNED_TERMS;
+}
+
+// Patrones regex prohibidos (configurable desde .env) - lazy loading
+let BANNED_PATTERNS = null;
+
+function getBannedPatternsLazy() {
+  if (BANNED_PATTERNS === null) {
+    BANNED_PATTERNS = parseEnvArray('BANNED_PATTERNS', []).map(pattern => {
+      try {
+        return new RegExp(pattern, 'i');
+      } catch (error) {
+        console.warn(`Patrón regex inválido ignorado: ${pattern}`);
+        return null;
+      }
+    }).filter(pattern => pattern !== null);
+  }
+  return BANNED_PATTERNS;
+}
 
 // Instancia del servicio de filtrado de canales prohibidos
 let bannedChannelsFilterService = null;
@@ -285,7 +322,7 @@ function isChannelBanned(channelName, threshold = 0.9, channel = null) {
    }
   
   // Primero verificar coincidencia exacta
-  const exactMatch = BANNED_CHANNELS.some(bannedTerm => {
+  const exactMatch = getBannedChannelsLazy().some(bannedTerm => {
     const normalizedBanned = normalizeChannelName(bannedTerm);
     return normalizedInput === normalizedBanned;
   });
@@ -295,7 +332,7 @@ function isChannelBanned(channelName, threshold = 0.9, channel = null) {
   }
   
   // Luego verificar similitud y contención
-  return BANNED_CHANNELS.some(bannedTerm => {
+  return getBannedChannelsLazy().some(bannedTerm => {
     const normalizedBanned = normalizeChannelName(bannedTerm);
     const similarity = calculateStringSimilarity(normalizedInput, normalizedBanned);
     
@@ -329,7 +366,7 @@ function isChannelBannedWithThreshold(channelName, threshold = 0.9) {
   const normalizedInput = normalizeChannelName(channelName);
   
   // Primero verificar coincidencia exacta
-  const exactMatch = BANNED_CHANNELS.some(bannedTerm => {
+  const exactMatch = getBannedChannelsLazy().some(bannedTerm => {
     const normalizedBanned = normalizeChannelName(bannedTerm);
     return normalizedInput === normalizedBanned;
   });
@@ -339,7 +376,7 @@ function isChannelBannedWithThreshold(channelName, threshold = 0.9) {
   }
   
   // Luego verificar similitud con umbral personalizado
-  return BANNED_CHANNELS.some(bannedTerm => {
+  return getBannedChannelsLazy().some(bannedTerm => {
     const normalizedBanned = normalizeChannelName(bannedTerm);
     const similarity = calculateStringSimilarity(normalizedInput, normalizedBanned);
     
@@ -538,12 +575,12 @@ function isDomainBanned(domain) {
   const normalizedDomain = domain.toLowerCase();
   
   // Verificar dominios exactos
-  if (BANNED_DOMAINS.includes(normalizedDomain)) {
+  if (getBannedDomainsLazy().includes(normalizedDomain)) {
     return true;
   }
   
   // Verificar subdominios
-  return BANNED_DOMAINS.some(bannedDomain => {
+  return getBannedDomainsLazy().some(bannedDomain => {
     return normalizedDomain.endsWith('.' + bannedDomain) || normalizedDomain === bannedDomain;
   });
 }
@@ -573,7 +610,7 @@ function isURLBanned(url, channel = null) {
    }
   
   // Verificar URLs exactas
-  return BANNED_URLS.some(bannedURL => {
+  return getBannedURLsLazy().some(bannedURL => {
     return normalizedURL.includes(bannedURL.toLowerCase());
   });
 }
@@ -584,9 +621,9 @@ function isURLBanned(url, channel = null) {
  * @returns {boolean} - true si coincide con algún patrón prohibido
  */
 function isChannelNameMatchingPatterns(channelName) {
-  if (!channelName || BANNED_PATTERNS.length === 0) return false;
+  if (!channelName || getBannedPatternsLazy().length === 0) return false;
   
-  return BANNED_PATTERNS.some(pattern => pattern.test(channelName));
+  return getBannedPatternsLazy().some(pattern => pattern.test(channelName));
 }
 
 /**
@@ -595,11 +632,11 @@ function isChannelNameMatchingPatterns(channelName) {
  * @returns {boolean} - true si contiene términos prohibidos
  */
 function isChannelNameContainingCustomTerms(channelName) {
-  if (!channelName || CUSTOM_BANNED_TERMS.length === 0) return false;
+  if (!channelName || getCustomBannedTermsLazy().length === 0) return false;
   
   const normalizedName = normalizeChannelName(channelName);
   
-  return CUSTOM_BANNED_TERMS.some(term => {
+  return getCustomBannedTermsLazy().some(term => {
     const normalizedTerm = normalizeChannelName(term);
     return normalizedName.includes(normalizedTerm);
   });
@@ -752,7 +789,7 @@ async function filterBannedChannels(channels) {
  * @returns {Array<string>} Lista de canales prohibidos
  */
 function getBannedTerms() {
-  return [...BANNED_CHANNELS];
+  return [...getBannedChannelsLazy()];
 }
 
 /**
@@ -760,7 +797,7 @@ function getBannedTerms() {
  * @returns {Array<string>} Lista de canales prohibidos
  */
 function getBannedChannels() {
-  return [...BANNED_CHANNELS];
+  return [...getBannedChannelsLazy()];
 }
 
 /**
@@ -796,8 +833,8 @@ function getBannedIPRanges() {
 function addBannedTerm(term) {
   if (typeof term === 'string' && term.trim()) {
     const normalizedTerm = normalizeChannelName(term);
-    if (!BANNED_CHANNELS.some(banned => normalizeChannelName(banned) === normalizedTerm)) {
-      BANNED_CHANNELS.push(term.trim().toUpperCase());
+    if (!getBannedChannelsLazy().some(banned => normalizeChannelName(banned) === normalizedTerm)) {
+      getBannedChannelsLazy().push(term.trim().toUpperCase());
     }
   }
 }
@@ -858,9 +895,9 @@ function addBannedIPRange(cidr) {
 function removeBannedTerm(term) {
   if (typeof term === 'string' && term.trim()) {
     const normalizedTerm = normalizeChannelName(term);
-    const index = BANNED_CHANNELS.findIndex(banned => normalizeChannelName(banned) === normalizedTerm);
+    const index = getBannedChannelsLazy().findIndex(banned => normalizeChannelName(banned) === normalizedTerm);
     if (index > -1) {
-      BANNED_CHANNELS.splice(index, 1);
+      getBannedChannelsLazy().splice(index, 1);
     }
   }
 }
@@ -910,7 +947,7 @@ function removeBannedIPRange(cidr) {
  * @returns {Array} - Array de URLs prohibidas
  */
 function getBannedURLs() {
-  return [...BANNED_URLS];
+  return [...getBannedURLsLazy()];
 }
 
 /**
@@ -924,8 +961,8 @@ function addBannedURL(url) {
   }
 
   const normalizedURL = url.trim();
-  if (normalizedURL && !BANNED_URLS.includes(normalizedURL)) {
-    BANNED_URLS.push(normalizedURL);
+  if (normalizedURL && !getBannedURLsLazy().includes(normalizedURL)) {
+    getBannedURLsLazy().push(normalizedURL);
     return true;
   }
   return false;
@@ -941,9 +978,9 @@ function removeBannedURL(url) {
     return false;
   }
 
-  const index = BANNED_URLS.indexOf(url.trim());
+  const index = getBannedURLsLazy().indexOf(url.trim());
   if (index > -1) {
-    BANNED_URLS.splice(index, 1);
+    getBannedURLsLazy().splice(index, 1);
     return true;
   }
   return false;
@@ -958,7 +995,7 @@ function removeBannedURL(url) {
  * @returns {Array} - Array de dominios prohibidos
  */
 function getBannedDomains() {
-  return [...BANNED_DOMAINS];
+  return [...getBannedDomainsLazy()];
 }
 
 /**
@@ -972,8 +1009,8 @@ function addBannedDomain(domain) {
   }
 
   const normalizedDomain = domain.trim().toLowerCase();
-  if (normalizedDomain && !BANNED_DOMAINS.includes(normalizedDomain)) {
-    BANNED_DOMAINS.push(normalizedDomain);
+  if (normalizedDomain && !getBannedDomainsLazy().includes(normalizedDomain)) {
+    getBannedDomainsLazy().push(normalizedDomain);
     return true;
   }
   return false;
@@ -990,9 +1027,9 @@ function removeBannedDomain(domain) {
   }
 
   const normalizedDomain = domain.trim().toLowerCase();
-  const index = BANNED_DOMAINS.indexOf(normalizedDomain);
+  const index = getBannedDomainsLazy().indexOf(normalizedDomain);
   if (index > -1) {
-    BANNED_DOMAINS.splice(index, 1);
+    getBannedDomainsLazy().splice(index, 1);
     return true;
   }
   return false;
@@ -1007,7 +1044,7 @@ function removeBannedDomain(domain) {
  * @returns {Array} - Array de términos prohibidos
  */
 function getCustomBannedTerms() {
-  return [...CUSTOM_BANNED_TERMS];
+  return [...getCustomBannedTermsLazy()];
 }
 
 /**
@@ -1021,8 +1058,8 @@ function addCustomBannedTerm(term) {
   }
 
   const normalizedTerm = term.trim();
-  if (normalizedTerm && !CUSTOM_BANNED_TERMS.includes(normalizedTerm)) {
-    CUSTOM_BANNED_TERMS.push(normalizedTerm);
+  if (normalizedTerm && !getCustomBannedTermsLazy().includes(normalizedTerm)) {
+    getCustomBannedTermsLazy().push(normalizedTerm);
     return true;
   }
   return false;
@@ -1038,9 +1075,9 @@ function removeCustomBannedTerm(term) {
     return false;
   }
 
-  const index = CUSTOM_BANNED_TERMS.indexOf(term.trim());
+  const index = getCustomBannedTermsLazy().indexOf(term.trim());
   if (index > -1) {
-    CUSTOM_BANNED_TERMS.splice(index, 1);
+    getCustomBannedTermsLazy().splice(index, 1);
     return true;
   }
   return false;
@@ -1055,7 +1092,7 @@ function removeCustomBannedTerm(term) {
  * @returns {Array} - Array de patrones regex como strings
  */
 function getBannedPatterns() {
-  return BANNED_PATTERNS.map(pattern => pattern.source);
+  return getBannedPatternsLazy().map(pattern => pattern.source);
 }
 
 /**
@@ -1070,12 +1107,12 @@ function addBannedPattern(pattern) {
 
   try {
     const regex = new RegExp(pattern, 'i');
-    const patternExists = BANNED_PATTERNS.some(existingPattern => 
+    const patternExists = getBannedPatternsLazy().some(existingPattern => 
       existingPattern.source === regex.source
     );
     
     if (!patternExists) {
-      BANNED_PATTERNS.push(regex);
+      getBannedPatternsLazy().push(regex);
       return true;
     }
     return false;
@@ -1095,9 +1132,9 @@ function removeBannedPattern(pattern) {
     return false;
   }
 
-  const index = BANNED_PATTERNS.findIndex(regex => regex.source === pattern);
+  const index = getBannedPatternsLazy().findIndex(regex => regex.source === pattern);
   if (index > -1) {
-    BANNED_PATTERNS.splice(index, 1);
+    getBannedPatternsLazy().splice(index, 1);
     return true;
   }
   return false;
