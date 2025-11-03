@@ -87,21 +87,30 @@ export function shouldLog(messageLevel, currentLevel) {
 
 /**
  * FUNCIÓN PURA: Genera una clave única para throttling
- * @param {number} level - Nivel del log
- * @param {string} message - Mensaje del log
+ * @param {any} message - Mensaje del log (puede ser cualquier tipo)
+ * @param {Array} args - Argumentos adicionales del log
  * @returns {string} Clave de throttling
  */
-export function getThrottleKey(level, message) {
-  const messageHash = simpleHash(message);
-  return `${level}:${messageHash}`;
+export function getThrottleKey(message, args = []) {
+  // Convertir message a string de forma segura
+  const messageStr = typeof message === 'string' ? message : String(message);
+  
+  // Crear una representación del mensaje completo
+  const fullMessage = args.length > 0 ? `${messageStr} ${args.join(' ')}` : messageStr;
+  
+  const messageHash = simpleHash(fullMessage);
+  return `throttle:${messageHash}`;
 }
 
 /**
  * FUNCIÓN PURA: Hash simple para agrupar mensajes similares
- * @param {string} str - String a hashear
+ * @param {any} input - Valor a hashear (se convertirá a string)
  * @returns {string} Hash en base 36
  */
-export function simpleHash(str) {
+export function simpleHash(input) {
+  // Convertir input a string de forma segura
+  const str = input == null ? '' : String(input);
+  
   let hash = 0;
   for (let i = 0; i < Math.min(str.length, 50); i++) {
     const char = str.charCodeAt(i);
@@ -121,6 +130,39 @@ export function simpleHash(str) {
 export function shouldThrottle(timestamps, windowStart, maxLogsPerWindow) {
   const recentLogs = timestamps.filter(t => t > windowStart);
   return recentLogs.length >= maxLogsPerWindow;
+}
+
+/**
+ * FUNCIÓN PURA: Verifica si un log debe ser throttled usando el mapa de throttle
+ * @param {Map} throttleMap - Mapa de throttling
+ * @param {string} throttleKey - Clave de throttling
+ * @param {number} throttleWindow - Ventana de tiempo en ms
+ * @param {number} maxLogsPerWindow - Máximo de logs por ventana
+ * @returns {boolean} True si debe ser throttled
+ */
+export function shouldThrottleWithMap(throttleMap, throttleKey, throttleWindow = 1000, maxLogsPerWindow = 50) {
+  const now = Date.now();
+  const windowStart = now - throttleWindow;
+  
+  // Obtener o crear array de timestamps para esta clave
+  if (!throttleMap.has(throttleKey)) {
+    throttleMap.set(throttleKey, []);
+  }
+  
+  const timestamps = throttleMap.get(throttleKey);
+  
+  // Filtrar timestamps válidos (dentro de la ventana)
+  const validTimestamps = filterValidTimestamps(timestamps, windowStart);
+  throttleMap.set(throttleKey, validTimestamps);
+  
+  // Verificar si debe ser throttled
+  if (shouldThrottle(validTimestamps, windowStart, maxLogsPerWindow)) {
+    return true;
+  }
+  
+  // Agregar timestamp actual
+  validTimestamps.push(now);
+  return false;
 }
 
 /**

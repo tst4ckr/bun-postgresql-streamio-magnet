@@ -23,6 +23,7 @@ import {
   getThrottleKey,
   simpleHash,
   shouldThrottle,
+  shouldThrottleWithMap,
   filterValidTimestamps,
   formatLogMessage,
   formatArgs,
@@ -144,7 +145,7 @@ export class OptimizedLoggerService {
 
         // Verificar throttling usando herramientas auxiliares
         const throttleKey = getThrottleKey(message, args);
-        if (shouldThrottle(this.#throttleMap, throttleKey, this.#config.throttleMs)) {
+        if (shouldThrottleWithMap(this.#throttleMap, throttleKey, this.#config.throttleWindow, this.#config.maxLogsPerWindow)) {
             this.#metrics.throttledLogs++;
             return;
         }
