@@ -75,7 +75,7 @@ export class TVAddonConfig {
       dataSources: {
         channelsSource: finalSource,
         channelsFile: process.env.CHANNELS_FILE || 'data/channels.csv',
-        m3uUrl: process.env.M3U_URL || null,
+        m3uUrl0: process.env.M3U_URL0 || null,
         backupM3uUrl: process.env.BACKUP_M3U_URL || null,
         // URLs M3U adicionales para múltiples fuentes
         m3uUrl1: process.env.M3U_URL1 || '',
@@ -229,7 +229,11 @@ export class TVAddonConfig {
         enableFailover: process.env.ENABLE_FAILOVER === 'true',
         maxRetryAttempts: parseInt(process.env.MAX_RETRY_ATTEMPTS) || 3,
         retryDelayMs: parseInt(process.env.RETRY_DELAY_MS) || 1000
-      }
+      },
+
+      // Configuración de directorios para resolución de rutas
+      __baseDir: process.cwd(),
+      __rootDir: process.cwd()
     };
   }
 
@@ -355,6 +359,8 @@ export class TVAddonConfig {
 
   get logging() { return { ...this.#config.logging }; }
   get advanced() { return { ...this.#config.advanced }; }
+  get __baseDir() { return this.#config.__baseDir; }
+  get __rootDir() { return this.#config.__rootDir; }
 
   /**
    * Obtiene toda la configuración
