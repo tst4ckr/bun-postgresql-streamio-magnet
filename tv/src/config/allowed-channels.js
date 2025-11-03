@@ -6,10 +6,17 @@
 
 import { EnvLoader } from '../infrastructure/config/EnvLoader.js';
 
-// Las variables de entorno ya están cargadas desde index.js
-
 // Función para cargar canales permitidos desde variables de entorno
 function loadAllowedChannelsFromEnv() {
+  // Solo cargar variables de entorno si no están ya disponibles
+  if (typeof process.env.ALLOWED_CHANNELS === 'undefined') {
+    try {
+      EnvLoader.getInstance();
+    } catch (error) {
+      console.warn('[ALLOWED_CHANNELS] No se pudieron cargar variables de entorno:', error.message);
+    }
+  }
+  
   const envChannels = process.env.ALLOWED_CHANNELS;
   
   if (envChannels) {

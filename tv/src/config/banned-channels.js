@@ -17,14 +17,20 @@ import { URL } from 'url';
 import { EnvLoader } from '../infrastructure/config/EnvLoader.js';
 import { BannedChannelsFilterService, BannedChannelsFilterConfig } from '../domain/services/BannedChannelsFilterService.js';
 
-// Asegurar que las variables de entorno estén cargadas
-EnvLoader.getInstance();
-
 /**
  * Carga la lista de canales prohibidos desde variables de entorno
  * @returns {Array<string>} Lista de canales prohibidos
  */
 function loadBannedChannelsFromEnv() {
+  // Solo cargar variables de entorno si no están ya disponibles
+  if (typeof process.env.BANNED_CHANNELS === 'undefined') {
+    try {
+      EnvLoader.getInstance();
+    } catch (error) {
+      console.warn('[BANNED_CHANNELS] No se pudieron cargar variables de entorno:', error.message);
+    }
+  }
+  
   const envValue = process.env.BANNED_CHANNELS;
   
   if (!envValue || envValue.trim() === '') {
@@ -56,6 +62,15 @@ const BANNED_CHANNELS = loadBannedChannelsFromEnv();
 
 // Función para parsear variables de entorno separadas por comas
 function parseEnvArray(envVar, defaultValue = []) {
+  // Solo cargar variables de entorno si no están ya disponibles
+  if (typeof process.env[envVar] === 'undefined') {
+    try {
+      EnvLoader.getInstance();
+    } catch (error) {
+      console.warn(`[BANNED_CHANNELS] No se pudieron cargar variables de entorno para ${envVar}:`, error.message);
+    }
+  }
+  
   const value = process.env[envVar];
   if (!value || value.trim() === '') {
     return defaultValue;
@@ -665,6 +680,15 @@ function isChannelBannedByAnyReason(channel) {
  * @returns {boolean} true si ENABLE_BANNED_CHANNELS=true
  */
 function isBannedChannelsFilterEnabled() {
+  // Solo cargar variables de entorno si no están ya disponibles
+  if (typeof process.env.ENABLE_BANNED_CHANNELS === 'undefined') {
+    try {
+      EnvLoader.getInstance();
+    } catch (error) {
+      console.warn('[BANNED_CHANNELS] No se pudieron cargar variables de entorno para ENABLE_BANNED_CHANNELS:', error.message);
+    }
+  }
+  
   return process.env.ENABLE_BANNED_CHANNELS === 'true';
 }
 

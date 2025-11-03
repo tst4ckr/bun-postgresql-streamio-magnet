@@ -5,7 +5,6 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import TVAddonConfig from '../infrastructure/config/TVAddonConfig.js';
 
 /**
  * Gestor de configuración centralizado
@@ -98,9 +97,6 @@ export class ConfigurationManager {
      * @returns {Object} Configuración por defecto
      */
     #getDefaultConfiguration() {
-        // Obtener configuración base de TVAddonConfig
-        const addonConfig = TVAddonConfig.getInstance().getAll();
-        
         return {
             // Configuración del servidor
             server: {
@@ -132,8 +128,8 @@ export class ConfigurationManager {
                 customFilters: []
             },
 
-            // Configuración de archivos y persistencia (desde TVAddonConfig)
-            files: addonConfig.files || { enableBackup: true },
+            // Configuración de archivos y persistencia
+            files: { enableBackup: true },
 
             // Configuración de deduplicación
             deduplication: {

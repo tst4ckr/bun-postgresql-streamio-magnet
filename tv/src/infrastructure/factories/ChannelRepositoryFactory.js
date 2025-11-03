@@ -3,7 +3,6 @@
  * Implementa el Factory Pattern para desacoplar la creación de repositorios
  */
 
-import { TVAddonConfig } from '../config/TVAddonConfig.js';
 import { M3UParserService } from '../parsers/M3UParserService.js';
 import { CSVChannelRepository } from '../repositories/CSVChannelRepository.js';
 import { RemoteM3UChannelRepository } from '../repositories/RemoteM3UChannelRepository.js';
@@ -18,7 +17,7 @@ export class ChannelRepositoryFactory {
   /**
    * Crea y retorna una instancia del repositorio de canales configurado
    * @static
-   * @param {Object} config - Configuración del procesador (ConfigurationManager o TVAddonConfig)
+   * @param {Object} config - Configuración del procesador (ConfigurationManager)
    * @param {Object} logger - Logger para trazabilidad
    * @returns {Promise<ChannelRepository>}
    * @throws {Error} si la fuente de datos no es soportada
