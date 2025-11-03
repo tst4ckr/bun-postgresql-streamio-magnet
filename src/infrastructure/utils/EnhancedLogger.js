@@ -183,7 +183,17 @@ export class EnhancedLogger {
    */
   #formatMessage(level, message, args) {
     // Lazy evaluation: solo evaluar el mensaje si es necesario
-    const actualMessage = typeof message === 'function' ? message() : message;
+    let actualMessage;
+    if (typeof message === 'function') {
+      try {
+        actualMessage = message();
+      } catch (error) {
+        // Manejar graciosamente errores en funciones de mensaje
+        actualMessage = `[Error evaluating message function: ${error.message}]`;
+      }
+    } else {
+      actualMessage = message;
+    }
     
     // En producción con salida mínima, usar formato ultra-compacto
     if (this.#isProduction && this.#minimalOutput) {
@@ -302,7 +312,12 @@ export class EnhancedLogger {
    * @param {string} level - Nuevo nivel de logging
    */
   setLogLevel(level) {
-    this.#logLevel = level;
+    // Validar que el nivel sea válido, si no, usar 'info' por defecto
+    if (this.#logLevels.hasOwnProperty(level)) {
+      this.#logLevel = level;
+    } else {
+      this.#logLevel = 'info'; // Fallback a nivel seguro
+    }
   }
 
   /**

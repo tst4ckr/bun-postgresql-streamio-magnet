@@ -89,40 +89,36 @@ describe('EnhancedLogger', () => {
     });
 
     it('should respect log level hierarchy for info level', () => {
-      logger.setLogLevel('info');
+       logger.setLogLevel('info');
 
-      logger.error('Error message');
-      logger.warn('Warning message');
-      logger.info('Info message');
-      logger.debug('Debug message');
+       logger.error('Error message');
+       logger.warn('Warning message');
+       logger.info('Info message');
+       logger.debug('Debug message');
 
-      expect(mockConsole.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error message')
-      );
-      expect(mockConsole.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Warning message')
-      );
-      expect(mockConsole.info).toHaveBeenCalledWith(
-        expect.stringContaining('Info message')
-      );
-      expect(mockConsole.debug).not.toHaveBeenCalled();
-    });
+       expect(mockConsole.error).toHaveBeenCalled();
+       expect(mockConsole.error.mock.calls[0][0]).toContain('Error message');
+       expect(mockConsole.warn).toHaveBeenCalled();
+       expect(mockConsole.warn.mock.calls[0][0]).toContain('Warning message');
+       expect(mockConsole.info).toHaveBeenCalled();
+       expect(mockConsole.info.mock.calls[0][0]).toContain('Info message');
+       expect(mockConsole.debug).not.toHaveBeenCalled();
+     });
 
     it('should respect log level hierarchy for error level', () => {
-      logger.setLogLevel('error');
+       logger.setLogLevel('error');
 
-      logger.error('Error message');
-      logger.warn('Warning message');
-      logger.info('Info message');
-      logger.debug('Debug message');
+       logger.error('Error message');
+       logger.warn('Warning message');
+       logger.info('Info message');
+       logger.debug('Debug message');
 
-      expect(mockConsole.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error message')
-      );
-      expect(mockConsole.warn).not.toHaveBeenCalled();
-      expect(mockConsole.info).not.toHaveBeenCalled();
-      expect(mockConsole.debug).not.toHaveBeenCalled();
-    });
+       expect(mockConsole.error).toHaveBeenCalled();
+       expect(mockConsole.error.mock.calls[0][0]).toContain('Error message');
+       expect(mockConsole.warn).not.toHaveBeenCalled();
+       expect(mockConsole.info).not.toHaveBeenCalled();
+       expect(mockConsole.debug).not.toHaveBeenCalled();
+     });
 
     it('should log all levels for debug level', () => {
       logger.setLogLevel('debug');
@@ -147,33 +143,29 @@ describe('EnhancedLogger', () => {
     it('should log info messages', () => {
       logger.info('Test info message');
 
-      expect(mockConsole.info).toHaveBeenCalledWith(
-        expect.stringContaining('Test info message')
-      );
+      expect(mockConsole.info).toHaveBeenCalled();
+      expect(mockConsole.info.mock.calls[0][0]).toContain('Test info message');
     });
 
     it('should log warning messages', () => {
       logger.warn('Test warning message');
 
-      expect(mockConsole.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Test warning message')
-      );
+      expect(mockConsole.warn).toHaveBeenCalled();
+      expect(mockConsole.warn.mock.calls[0][0]).toContain('Test warning message');
     });
 
     it('should log error messages', () => {
       logger.error('Test error message');
 
-      expect(mockConsole.error).toHaveBeenCalledWith(
-        expect.stringContaining('Test error message')
-      );
+      expect(mockConsole.error).toHaveBeenCalled();
+      expect(mockConsole.error.mock.calls[0][0]).toContain('Test error message');
     });
 
     it('should log debug messages', () => {
       logger.debug('Test debug message');
 
-      expect(mockConsole.debug).toHaveBeenCalledWith(
-        expect.stringContaining('Test debug message')
-      );
+      expect(mockConsole.debug).toHaveBeenCalled();
+      expect(mockConsole.debug.mock.calls[0][0]).toContain('Test debug message');
     });
 
     it('should handle function messages (lazy evaluation)', () => {
@@ -182,9 +174,8 @@ describe('EnhancedLogger', () => {
       logger.info(lazyMessage);
 
       expect(lazyMessage).toHaveBeenCalled();
-      expect(mockConsole.info).toHaveBeenCalledWith(
-        expect.stringContaining('Lazy evaluated message')
-      );
+      expect(mockConsole.info).toHaveBeenCalled();
+      expect(mockConsole.info.mock.calls[0][0]).toContain('Lazy evaluated message');
     });
 
     it('should not evaluate function messages when log level prevents logging', () => {
@@ -456,103 +447,95 @@ describe('EnhancedLogger', () => {
       logger = new EnhancedLogger('debug');
     });
 
-    it('should log operation completion', () => {
-      const metrics = { duration: 150, itemsProcessed: 10 };
+     it('should log operation completion', () => {
+       const metrics = { duration: 150, itemsProcessed: 10 };
 
-      logger.operationComplete('dataProcessing', 150, metrics);
+       logger.operationComplete('dataProcessing', 150, metrics);
 
-      expect(mockConsole.info).toHaveBeenCalledWith(
-        expect.stringContaining('dataProcessing completada')
-      );
-    });
+       expect(mockConsole.info).toHaveBeenCalled();
+       expect(mockConsole.info.mock.calls[0][0]).toContain('dataProcessing completada en 150ms');
+     });
 
-    it('should log validation failures', () => {
-      const context = { field: 'email', value: 'invalid-email' };
+     it('should log validation failures', () => {
+       const context = { field: 'email', value: 'invalid-email' };
 
-      logger.validationFailed('User', 'Invalid email format', context);
+       logger.validationFailed('User', 'Invalid email format', context);
 
-      expect(mockConsole.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Validación fallida para User')
-      );
-    });
+       expect(mockConsole.warn).toHaveBeenCalled();
+       expect(mockConsole.warn.mock.calls[0][0]).toContain('Validación falló para User: Invalid email format');
+     });
 
-    it('should log resource not found', () => {
-      const context = { searchCriteria: 'id=123' };
+     it('should log resource not found', () => {
+       const context = { searchCriteria: 'id=123' };
 
-      logger.resourceNotFound('Movie', 'tt1234567', context);
+       logger.resourceNotFound('Movie', 'tt1234567', context);
 
-      expect(mockConsole.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Movie no encontrado')
-      );
-    });
+       expect(mockConsole.warn).toHaveBeenCalled();
+       expect(mockConsole.warn.mock.calls[0][0]).toContain('No se encontró Movie: tt1234567');
+     });
 
-    it('should log configuration applied', () => {
-      logger.configurationApplied('torService', { enabled: true, port: 9050 });
+     it('should log configuration applied', () => {
+       logger.configurationApplied('torService', { enabled: true, port: 9050 });
 
-      expect(mockConsole.info).toHaveBeenCalledWith(
-        expect.stringContaining('Configuración torService aplicada')
-      );
-    });
+       expect(mockConsole.info).toHaveBeenCalled();
+       expect(mockConsole.info.mock.calls[0][0]).toContain('torService configurado a:');
+     });
 
-    it('should log search results', () => {
-      const details = { source: 'API', cached: false };
+     it('should log search results', () => {
+       const details = { source: 'API', cached: false };
 
-      logger.searchResults('magnet', 'tt1234567', 5, details);
+       logger.searchResults('magnet', 'tt1234567', 5, details);
 
-      expect(mockConsole.info).toHaveBeenCalledWith(
-        expect.stringContaining('Búsqueda magnet')
-      );
-    });
+       expect(mockConsole.info).toHaveBeenCalled();
+       expect(mockConsole.info.mock.calls[0][0]).toContain('Encontrados 5 resultados magnet para tt1234567');
+     });
 
-    it('should log resource discarded', () => {
-      const details = { quality: 'low', seeders: 0 };
+     it('should log resource discarded', () => {
+       const details = { quality: 'low', seeders: 0 };
 
-      logger.resourceDiscarded('Magnet', 'No seeders available', details);
+       logger.resourceDiscarded('Magnet', 'No seeders available', details);
 
-      expect(mockConsole.debug).toHaveBeenCalledWith(
-        expect.stringContaining('Magnet descartado')
-      );
-    });
+       expect(mockConsole.debug).toHaveBeenCalled();
+       expect(mockConsole.debug.mock.calls[0][0]).toContain('Magnet descartado: No seeders available');
+     });
 
-    it('should log processing errors', () => {
-      const error = new Error('Processing failed');
-      const context = { step: 'validation', input: 'data' };
+     it('should log processing errors', () => {
+       const error = new Error('Processing failed');
+       const context = { step: 'validation', input: 'data' };
 
-      logger.processingError('dataValidation', error, context);
+       logger.processingError('dataValidation', error, context);
 
-      expect(mockConsole.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error en operación dataValidation')
-      );
-    });
+       expect(mockConsole.error).toHaveBeenCalled();
+       expect(mockConsole.error.mock.calls[0][0]).toContain('Error en dataValidation:');
+     });
 
-    it('should log selection made', () => {
-      const criteria = { quality: '1080p', seeders: 100 };
+     it('should log selection made', () => {
+       const criteria = { quality: '1080p', seeders: 100 };
 
-      logger.selectionMade('magnet', 'Best quality option', criteria);
+       logger.selectionMade('magnet', 'Best quality option', criteria);
 
-      expect(mockConsole.info).toHaveBeenCalledWith(
-        expect.stringContaining('Selección magnet realizada')
-      );
-    });
+       expect(mockConsole.info).toHaveBeenCalled();
+       expect(mockConsole.info.mock.calls[0][0]).toContain('magnet seleccionado: Best quality option');
+     });
 
-    it('should log non-optimal conditions', () => {
-      const details = { currentValue: 5, optimalValue: 50 };
+     it('should log non-optimal conditions', () => {
+       const details = { currentValue: 5, optimalValue: 50 };
 
-      logger.nonOptimalCondition('Low seeders', 'Slower download', details);
+       logger.nonOptimalCondition('Low seeders', 'Slower download', details);
 
-      expect(mockConsole.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Condición no óptima detectada')
-      );
-    });
+       expect(mockConsole.warn).toHaveBeenCalled();
+       expect(mockConsole.warn.mock.calls[0][0]).toContain('Condición no óptima - Low seeders: Slower download');
+     });
 
     it('should log resource changes', () => {
-      const details = { from: 'inactive', to: 'active' };
+      const details = { previousStatus: 'inactive', newStatus: 'active' };
 
       logger.resourceChanged('TorService', 'status_change', details);
 
-      expect(mockConsole.info).toHaveBeenCalledWith(
-        expect.stringContaining('Cambio en recurso TorService')
-      );
+      // Verificar que el primer argumento (mensaje formateado) contenga el texto esperado
+      expect(mockConsole.info).toHaveBeenCalled();
+      const firstCall = mockConsole.info.mock.calls[0];
+      expect(firstCall[0]).toContain('TorService status_change');
     });
 
     it('should log configuration status', () => {
@@ -560,9 +543,10 @@ describe('EnhancedLogger', () => {
 
       logger.configurationStatus('apiConfig', false, details);
 
-      expect(mockConsole.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Estado de configuración apiConfig')
-      );
+      // Verificar que el primer argumento (mensaje formateado) contenga el texto esperado
+      expect(mockConsole.warn).toHaveBeenCalled();
+      const firstCall = mockConsole.warn.mock.calls[0];
+      expect(firstCall[0]).toContain('apiConfig inválida');
     });
   });
 
