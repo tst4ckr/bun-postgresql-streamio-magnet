@@ -14,8 +14,7 @@ import {
   hasActiveFilters,
   createFilterConfiguration
 } from './ContentFilterService_tools.js';
-import { isChannelBannedByAnyReason } from '../../config/banned-channels.js';
-import { isChannelAllowed, getAllowedChannels } from '../../config/allowed-channels.js';
+// Removed dependency on banned-channels.js to use only tv-config.js configuration
 
 /**
  * @fileoverview Servicio para filtrar contenido de canales de TV
@@ -157,18 +156,19 @@ class ContentFilterService {
 
     try {
       // Verificar filtro de canales permitidos solo si está habilitado
-      const enableAllowedChannels = process.env.ENABLE_ALLOWED_CHANNELS === 'true';
-      if (enableAllowedChannels) {
-        const allowedChannels = getAllowedChannels();
-        if (allowedChannels.length > 0 && !isChannelAllowed(channel.name)) {
+      if (this.#filterConfig.enableAllowedChannels) {
+        const allowedChannels = this.#filterConfig.allowedChannels || [];
+        if (allowedChannels.length > 0 && !this.#isChannelInList(channel.name, allowedChannels)) {
           return false; // No está en la lista de permitidos
         }
       }
 
       // Verificar filtro de canales prohibidos solo si está habilitado
-      const enableBannedChannels = process.env.ENABLE_BANNED_CHANNELS === 'true';
-      if (enableBannedChannels && isChannelBannedByAnyReason(channel)) {
-        return false;
+      if (this.#filterConfig.enableBannedChannels) {
+        const bannedChannels = this.#filterConfig.bannedChannels || [];
+        if (this.#isChannelInList(channel.name, bannedChannels)) {
+          return false;
+        }
       }
 
       // Obtener texto combinado del canal para análisis
@@ -263,6 +263,43 @@ class ContentFilterService {
    */
   hasActiveFilters() {
     return hasActiveFilters(this.#filterConfig);
+  }
+
+  /**
+   * Verifica si un canal está en una lista de canales
+   * Utiliza normalización de nombres para comparación flexible
+   * @private
+   * @param {string} channelName - Nombre del canal a verificar
+   * @param {string[]} channelList - Lista de canales para comparar
+   * @returns {boolean} true si el canal está en la lista
+   */
+  #isChannelInList(channelName, channelList) {
+    if (!channelName || !Array.isArray(channelList) || channelList.length === 0) {
+      return false;
+    }
+
+    const normalizedChannelName = channelName.toLowerCase().trim();
+    
+    return channelList.some(bannedChannel => {
+      const normalizedBannedChannel = bannedChannel.toLowerCase().trim();
+      
+      // Verificar coincidencia exacta
+      if (normalizedChannelName === normalizedBannedChannel) {
+        return true;
+      }
+      
+      // Verificar si el canal contiene el término prohibido
+      if (normalizedChannelName.includes(normalizedBannedChannel)) {
+        return true;
+      }
+      
+      // Verificar si el término prohibido contiene el nombre del canal
+      if (normalizedBannedChannel.includes(normalizedChannelName)) {
+        return true;
+      }
+      
+      return false;
+    });
   }
 
   /**
