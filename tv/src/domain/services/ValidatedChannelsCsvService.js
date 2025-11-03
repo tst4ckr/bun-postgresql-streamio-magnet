@@ -6,6 +6,11 @@
 
 import { ChannelPersistenceService } from './ChannelPersistenceService.js';
 import { RepositoryError } from '../repositories/ChannelRepository.js';
+import { 
+  getPriorityChannelsFromEnv, 
+  getCategoryOrderFromEnv, 
+  getValidatedChannelsCsvPath 
+} from './ValidatedChannelsCsvService_tools.js';
 
 /**
  * Servicio para generar y mantener el archivo tv.csv con canales validados
@@ -78,18 +83,10 @@ export class ValidatedChannelsCsvService {
    */
   #sortChannelsByCategory(channels) {
     // Obtener canales prioritarios desde .env
-    const priorityChannelsEnv = process.env.PRIORITY_CHANNELS || '';
-    const priorityChannelNames = priorityChannelsEnv
-      .split(',')
-      .map(name => name.trim().toUpperCase())
-      .filter(name => name.length > 0);
+    const priorityChannelNames = getPriorityChannelsFromEnv();
     
     // Obtener orden de categorías desde .env
-    const categoryOrderEnv = process.env.CATEGORY_ORDER || '';
-    const priorityCategories = categoryOrderEnv
-      .split(',')
-      .map(category => category.trim())
-      .filter(category => category.length > 0);
+    const priorityCategories = getCategoryOrderFromEnv();
     
     // Si no hay configuración en .env, usar orden por defecto
     if (priorityCategories.length === 0) {
@@ -198,10 +195,7 @@ export class ValidatedChannelsCsvService {
    * @returns {string} - Ruta del archivo tv.csv
    */
   #getValidatedChannelsCsvPath() {
-    const defaultPath = 'data/tv.csv';
-    return this.#config?.csv?.validatedChannelsCsv || 
-           process.env.VALIDATED_CHANNELS_CSV || 
-           defaultPath;
+    return getValidatedChannelsCsvPath(this.#config);
   }
 
   /**

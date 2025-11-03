@@ -2,10 +2,55 @@
  * @fileoverview Herramientas auxiliares para ChannelDeduplicationService
  * Contiene funciones puras y utilidades reutilizables que implementan
  * normalización, detección de patrones de calidad y cálculos de similitud.
+ * También centraliza el acceso a variables de entorno.
  * 
  * @author Sistema de Deduplicación de Canales
  * @version 1.0.0
  */
+
+import { EnvLoader } from '../../infrastructure/config/EnvLoader.js';
+
+let envLoaded = false;
+
+/**
+ * Asegura que las variables de entorno estén cargadas una sola vez
+ */
+function ensureEnvLoaded() {
+  if (!envLoaded) {
+    EnvLoader.getInstance();
+    envLoaded = true;
+  }
+}
+
+/**
+ * Obtiene archivos a ignorar para deduplicación desde variables de entorno
+ * @returns {string[]} Array de archivos a ignorar
+ */
+export function getDeduplicationIgnoreFilesFromEnv() {
+  ensureEnvLoaded();
+  return process.env.DEDUPLICATION_IGNORE_FILES 
+    ? process.env.DEDUPLICATION_IGNORE_FILES.split(',').map(file => file.trim()).filter(file => file.length > 0)
+    : [];
+}
+
+/**
+ * Obtiene configuración de deduplicación desde variables de entorno
+ * @returns {Object} Configuración de deduplicación
+ */
+export function getDeduplicationConfigFromEnv() {
+  ensureEnvLoaded();
+  const ignoreFiles = getDeduplicationIgnoreFilesFromEnv();
+  
+  return {
+    enableIntelligentDeduplication: process.env.ENABLE_INTELLIGENT_DEDUPLICATION !== 'false',
+    enableHdUpgrade: process.env.ENABLE_HD_UPGRADE !== 'false',
+    nameSimilarityThreshold: parseFloat(process.env.NAME_SIMILARITY_THRESHOLD || '0.85'),
+    urlSimilarityThreshold: parseFloat(process.env.URL_SIMILARITY_THRESHOLD || '0.90'),
+    ignoreFiles: ignoreFiles,
+    strategy: process.env.DEDUPLICATION_STRATEGY || 'prioritize_source',
+    preserveSourcePriority: process.env.PRESERVE_SOURCE_PRIORITY !== 'false'
+  };
+}
 
 /**
  * Normaliza el nombre de un canal para comparación eliminando caracteres especiales,

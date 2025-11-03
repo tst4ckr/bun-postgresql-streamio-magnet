@@ -14,50 +14,13 @@
 
 import { isIP, isIPv4, isIPv6 } from 'net';
 import { URL } from 'url';
-import { EnvLoader } from '../infrastructure/config/EnvLoader.js';
 import { BannedChannelsFilterService, BannedChannelsFilterConfig } from '../domain/services/BannedChannelsFilterService.js';
-
-/**
- * Carga la lista de canales prohibidos desde variables de entorno
- * @returns {Array<string>} Lista de canales prohibidos
- */
-function loadBannedChannelsFromEnv() {
-  // Solo cargar variables de entorno si no están ya disponibles y si no hay configuración personalizada
-  if (typeof process.env.BANNED_CHANNELS === 'undefined' && 
-      typeof process.env.CHANNELS_SOURCE === 'undefined' && 
-      typeof process.env.M3U_URL === 'undefined') {
-    try {
-      EnvLoader.getInstance();
-    } catch (error) {
-      console.warn('[BANNED_CHANNELS] No se pudieron cargar variables de entorno:', error.message);
-    }
-  }
-  
-  const envValue = process.env.BANNED_CHANNELS;
-  
-  if (!envValue || envValue.trim() === '') {
-    console.log('[BANNED_CHANNELS] Variable de entorno no encontrada, usando lista por defecto');
-    return getDefaultBannedChannels();
-  }
-  
-  try {
-    const channels = envValue.split(',').map(channel => channel.trim()).filter(channel => channel.length > 0);
-    console.log(`[BANNED_CHANNELS] Cargados ${channels.length} canales desde variable de entorno`);
-    return channels;
-  } catch (error) {
-    console.error('[BANNED_CHANNELS] Error al parsear variable de entorno:', error.message);
-    console.log('[BANNED_CHANNELS] Usando lista por defecto como fallback');
-    return getDefaultBannedChannels();
-  }
-}
-
-/**
- * Obtiene la lista por defecto de canales prohibidos
- * @returns {Array<string>} Lista por defecto de canales prohibidos
- */
-function getDefaultBannedChannels() {
-  return [];
-}
+import { 
+  parseEnvArray, 
+  loadBannedChannelsFromEnv, 
+  getDefaultBannedChannels,
+  isBannedChannelsFilterEnabled as isBannedChannelsFilterEnabledTool
+} from './banned-channels_tools.js';
 
 // Lista de canales prohibidos cargada desde variables de entorno (lazy loading)
 let BANNED_CHANNELS = null;
@@ -70,22 +33,7 @@ function getBannedChannelsLazy() {
 }
 
 // Función para parsear variables de entorno separadas por comas
-function parseEnvArray(envVar, defaultValue = []) {
-  // Solo cargar variables de entorno si no están ya disponibles
-  if (typeof process.env[envVar] === 'undefined') {
-    try {
-      EnvLoader.getInstance();
-    } catch (error) {
-      console.warn(`[BANNED_CHANNELS] No se pudieron cargar variables de entorno para ${envVar}:`, error.message);
-    }
-  }
-  
-  const value = process.env[envVar];
-  if (!value || value.trim() === '') {
-    return defaultValue;
-  }
-  return value.split(',').map(item => item.trim()).filter(item => item.length > 0);
-}
+// Ahora usa la función centralizada de banned-channels_tools.js
 
 // Variables para carga lazy de IPs baneadas
 let BANNED_IPS = null;
@@ -717,16 +665,7 @@ function isChannelBannedByAnyReason(channel) {
  * @returns {boolean} true si ENABLE_BANNED_CHANNELS=true
  */
 function isBannedChannelsFilterEnabled() {
-  // Solo cargar variables de entorno si no están ya disponibles
-  if (typeof process.env.ENABLE_BANNED_CHANNELS === 'undefined') {
-    try {
-      EnvLoader.getInstance();
-    } catch (error) {
-      console.warn('[BANNED_CHANNELS] No se pudieron cargar variables de entorno para ENABLE_BANNED_CHANNELS:', error.message);
-    }
-  }
-  
-  return process.env.ENABLE_BANNED_CHANNELS === 'true';
+  return isBannedChannelsFilterEnabledTool();
 }
 
 /**

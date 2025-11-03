@@ -4,44 +4,10 @@
  * Si incluyes "HBO", permitirá todo lo que contenga HBO con 90% de similitud
  */
 
-import { EnvLoader } from '../infrastructure/config/EnvLoader.js';
-
-// Función para cargar canales permitidos desde variables de entorno
-function loadAllowedChannelsFromEnv() {
-  // Solo cargar variables de entorno si no están ya disponibles y si no hay configuración personalizada
-  if (typeof process.env.ALLOWED_CHANNELS === 'undefined' && 
-      typeof process.env.CHANNELS_SOURCE === 'undefined' && 
-      typeof process.env.M3U_URL === 'undefined') {
-    try {
-      EnvLoader.getInstance();
-    } catch (error) {
-      console.warn('[ALLOWED_CHANNELS] No se pudieron cargar variables de entorno:', error.message);
-    }
-  }
-  
-  const envChannels = process.env.ALLOWED_CHANNELS;
-  
-  if (envChannels) {
-    try {
-      // Parsear la lista de canales desde la variable de entorno
-      // Formato esperado: "HBO,HBO Plus,ESPN,Discovery Channel"
-      return envChannels
-        .split(',')
-        .map(channel => channel.trim())
-        .filter(channel => channel.length > 0);
-    } catch (error) {
-      console.warn('[ALLOWED_CHANNELS] Error parseando ALLOWED_CHANNELS desde .env:', error.message);
-      return getDefaultAllowedChannels();
-    }
-  }
-  
-  return getDefaultAllowedChannels();
-}
-
-// Lista por defecto de canales permitidos (fallback)
-function getDefaultAllowedChannels() {
-  return [];
-}
+import { 
+  loadAllowedChannelsFromEnv, 
+  getDefaultAllowedChannels 
+} from './allowed-channels_tools.js';
 
 // Cargar canales permitidos desde variables de entorno o usar valores por defecto
 // Carga perezosa para evitar la ejecución automática al importar el módulo
