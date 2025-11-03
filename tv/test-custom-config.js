@@ -1,4 +1,4 @@
-/**
+bun /**
  * Script de prueba para verificar que la librería funciona con la configuración personalizada
  */
 
@@ -12,10 +12,10 @@ async function testCustomConfig() {
         console.log('📋 Prueba 1: Verificando configuración personalizada...');
         const config = getCustomTVConfig();
         console.log('✅ Configuración cargada:');
-        console.log(`   - Fuente de canales: ${config.channelsSource}`);
-        console.log(`   - URL M3U automática: ${config.autoM3uUrl}`);
-        console.log(`   - Archivo de salida: ${config.validatedChannelsCsv}`);
-        console.log(`   - Validación habilitada: ${config.validateStreamsOnStartup}`);
+        console.log(`   - Fuente de canales: ${config.CHANNELS_SOURCE}`);
+        console.log(`   - URL M3U automática: ${config.AUTO_M3U_URL}`);
+        console.log(`   - Archivo de salida: ${config.VALIDATED_CHANNELS_CSV}`);
+        console.log(`   - Validación habilitada: ${config.VALIDATE_STREAMS_ON_STARTUP}`);
         console.log('');
         
         // Prueba 2: Crear procesador con configuración personalizada
@@ -27,15 +27,15 @@ async function testCustomConfig() {
         // Prueba 3: Verificar que se puede procesar con overrides
         console.log('⚙️  Prueba 3: Probando con configuración override...');
         const overrideConfig = {
-            logLevel: 'info',
-            validateStreamsOnStartup: false, // Deshabilitar validación para prueba rápida
-            enableRequestLogging: false
+            LOG_LEVEL: 'info',
+            VALIDATE_STREAMS_ON_STARTUP: false, // Deshabilitar validación para prueba rápida
+            ENABLE_REQUEST_LOGGING: false
         };
         
         console.log('📊 Configuración de override aplicada:');
-        console.log(`   - Log level: ${overrideConfig.logLevel}`);
-        console.log(`   - Validación deshabilitada: ${!overrideConfig.validateStreamsOnStartup}`);
-        console.log(`   - Request logging: ${overrideConfig.enableRequestLogging}`);
+        console.log(`   - Log level: ${overrideConfig.LOG_LEVEL}`);
+        console.log(`   - Validación deshabilitada: ${!overrideConfig.VALIDATE_STREAMS_ON_STARTUP}`);
+        console.log(`   - Request logging: ${overrideConfig.ENABLE_REQUEST_LOGGING}`);
         console.log('');
         
         // Nota: No ejecutamos el procesamiento completo para evitar descargas largas
