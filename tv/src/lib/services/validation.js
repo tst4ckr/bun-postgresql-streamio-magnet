@@ -523,6 +523,23 @@ class ValidationService {
             options: this.options
         };
     }
+
+    /**
+     * Cleanup method for resource management
+     */
+    cleanup() {
+        // Clear validators and schemas
+        this.validators.clear();
+        this.schemas.clear();
+        
+        // Reset options to defaults
+        this.options = {
+            strictMode: false,
+            allowEmptyValues: false,
+            customValidators: {},
+            enableLogging: false
+        };
+    }
 }
 
 /**
