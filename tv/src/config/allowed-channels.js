@@ -6,7 +6,8 @@
 
 import { 
   loadAllowedChannelsFromEnv, 
-  getDefaultAllowedChannels 
+  getDefaultAllowedChannels,
+  getAllowedChannelsConfigFromEnv
 } from './allowed-channels_tools.js';
 
 // Cargar canales permitidos desde variables de entorno o usar valores por defecto
@@ -106,7 +107,8 @@ function isChannelAllowed(channelName) {
   }
   
   // Si el filtro de canales permitidos está deshabilitado, permitir todos los canales
-  if (process.env.ENABLE_ALLOWED_CHANNELS !== 'true') {
+  const config = getAllowedChannelsConfigFromEnv();
+  if (!config.enableAllowedChannels) {
     return true;
   }
   
@@ -216,7 +218,8 @@ function filterAllowedChannels(channels, threshold = 0.9) {
   }
   
   // Si el filtro de canales permitidos está deshabilitado, retornar todos los canales
-  if (process.env.ENABLE_ALLOWED_CHANNELS !== 'true') {
+  const config = getAllowedChannelsConfigFromEnv();
+  if (!config.enableAllowedChannels) {
     return channels;
   }
   

@@ -2,10 +2,40 @@
  * @fileoverview Herramientas auxiliares para ChannelNameCleaningService
  * Contiene funciones puras y utilidades reutilizables para la limpieza de nombres de canales.
  * Elimina información redundante como "FREE", "EVER", "CESAR", etc.
+ * También centraliza el acceso a variables de entorno.
  * 
  * @author Sistema de Limpieza de Nombres de Canales
  * @version 1.0.0
  */
+
+import { EnvLoader } from '../../infrastructure/config/EnvLoader.js';
+
+let envLoaded = false;
+
+/**
+ * Asegura que las variables de entorno estén cargadas una sola vez
+ */
+function ensureEnvLoaded() {
+  if (!envLoaded) {
+    EnvLoader.getInstance();
+    envLoaded = true;
+  }
+}
+
+/**
+ * Obtiene configuración de limpieza de nombres desde variables de entorno
+ * @returns {Object} Configuración de limpieza de nombres
+ */
+export function getChannelNameCleaningConfigFromEnv() {
+  ensureEnvLoaded();
+  
+  return {
+    enableCleaning: process.env.ENABLE_CHANNEL_NAME_CLEANING !== 'false',
+    preserveOriginalOnFailure: process.env.PRESERVE_ORIGINAL_ON_CLEANING_FAILURE !== 'false',
+    logCleaningStats: process.env.LOG_CHANNEL_CLEANING_STATS === 'true',
+    batchSize: parseInt(process.env.CHANNEL_CLEANING_BATCH_SIZE) || 1000
+  };
+}
 
 /**
  * Patrones redundantes comunes encontrados en nombres de canales

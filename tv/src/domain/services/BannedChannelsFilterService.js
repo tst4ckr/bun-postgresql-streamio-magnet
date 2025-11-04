@@ -4,6 +4,8 @@
  * siguiendo principios SOLID y Domain-Driven Design
  */
 
+import { getBannedChannelsFilterConfigFromEnv } from './BannedChannelsFilterService_tools.js';
+
 // Logger simple para el servicio
 const createLogger = () => ({
   info: (msg, ...args) => console.log(`[INFO] ${new Date().toISOString()} - ${msg}`, ...args),
@@ -39,27 +41,14 @@ class BannedChannelsFilterConfig {
    * @returns {BannedChannelsFilterConfig}
    */
   static fromEnvironment() {
-    // Función helper para parsear archivos de ignore
-    const parseIgnoreFiles = (envVar) => {
-      return process.env[envVar] 
-        ? process.env[envVar].split(',').map(file => file.trim()).filter(file => file.length > 0)
-        : [];
-    };
-
-    // Configuración legacy (mantener compatibilidad)
-    const ignoreFiles = parseIgnoreFiles('BANNED_CHANNELS_IGNORE_FILES');
-    
-    // Configuraciones específicas por tipo
-    const ignoreFilesForIPs = parseIgnoreFiles('BANNED_IPS_CHANNELS_IGNORE_FILES');
-    const ignoreFilesForURLs = parseIgnoreFiles('BANNED_URLS_CHANNELS_IGNORE_FILES');
-    const ignoreFilesForChannels = parseIgnoreFiles('BANNED_CHANNELS_CHANNELS_IGNORE_FILES');
+    const config = getBannedChannelsFilterConfigFromEnv();
     
     return new BannedChannelsFilterConfig({
-      enableBannedChannels: process.env.ENABLE_BANNED_CHANNELS === 'true',
-      ignoreFiles: ignoreFiles,
-      ignoreFilesForIPs: ignoreFilesForIPs,
-      ignoreFilesForURLs: ignoreFilesForURLs,
-      ignoreFilesForChannels: ignoreFilesForChannels
+      enableBannedChannels: config.enableBannedChannels,
+      ignoreFiles: config.ignoreFiles,
+      ignoreFilesForIPs: config.ignoreFilesForIPs,
+      ignoreFilesForURLs: config.ignoreFilesForURLs,
+      ignoreFilesForChannels: config.ignoreFilesForChannels
     });
   }
 

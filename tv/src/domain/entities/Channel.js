@@ -4,6 +4,7 @@
  */
 
 import { StreamQuality } from '../value-objects/StreamQuality.js';
+import { getFallbackLogoFromEnv, getAllowedCountriesFromEnv } from './Channel_tools.js';
 
 export class Channel {
   static TYPES = {
@@ -319,7 +320,7 @@ export class Channel {
       id: this.#id,
       type: this.#type,
       name: this.#name,
-      poster: this.#logo || process.env.FALLBACK_LOGO,
+      poster: this.#logo || getFallbackLogoFromEnv(),
       posterShape: 'square',
       genres: [this.#genre],
       description: `Canal ${this.#name} - ${this.#country}`,
@@ -343,7 +344,7 @@ export class Channel {
       id: this.#id,
       type: this.#type,
       name: this.#name,
-      poster: this.#logo || process.env.FALLBACK_LOGO,
+      poster: this.#logo || getFallbackLogoFromEnv(),
       posterShape: 'square',
       background: this.#logo,
       genres: [this.#genre],
@@ -392,9 +393,9 @@ export class Channel {
     }
 
     // Restricciones geográficas básicas
-    const allowedCountries = process.env.ALLOWED_COUNTRIES?.split(',').map(c => c.trim().toLowerCase());
+    const allowedCountries = getAllowedCountriesFromEnv();
     if (allowedCountries?.length > 0) {
-      behaviorHints.countryWhitelist = allowedCountries;
+      behaviorHints.countryWhitelist = allowedCountries.map(c => c.toLowerCase());
     }
 
     // Agregar behaviorHints si hay configuraciones

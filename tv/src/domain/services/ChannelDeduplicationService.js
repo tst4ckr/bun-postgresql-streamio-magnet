@@ -22,7 +22,8 @@ import {
   extractNumberFromSDPattern,
   extractSDVariant,
   QUALITY_PATTERN_PRIORITY,
-  SD_VARIANT_PRIORITY
+  SD_VARIANT_PRIORITY,
+  getDeduplicationConfigFromEnv
 } from './ChannelDeduplicationService_tools.js';
 // Logger simple para el servicio
 const createLogger = () => ({
@@ -88,18 +89,16 @@ class DeduplicationConfig {
    * @returns {DeduplicationConfig}
    */
   static fromEnvironment() {
-    const ignoreFiles = process.env.DEDUPLICATION_IGNORE_FILES 
-      ? process.env.DEDUPLICATION_IGNORE_FILES.split(',').map(file => file.trim()).filter(file => file.length > 0)
-      : [];
+    const config = getDeduplicationConfigFromEnv();
     
     return new DeduplicationConfig({
-      enableIntelligentDeduplication: process.env.ENABLE_INTELLIGENT_DEDUPLICATION !== 'false',
-      enableHdUpgrade: process.env.ENABLE_HD_UPGRADE !== 'false',
-      nameSimilarityThreshold: parseFloat(process.env.NAME_SIMILARITY_THRESHOLD || '0.85'),
-      urlSimilarityThreshold: parseFloat(process.env.URL_SIMILARITY_THRESHOLD || '0.90'),
-      ignoreFiles: ignoreFiles,
-      strategy: process.env.DEDUPLICATION_STRATEGY || ConflictResolutionStrategy.PRIORITIZE_SOURCE,
-      preserveSourcePriority: process.env.PRESERVE_SOURCE_PRIORITY !== 'false'
+      enableIntelligentDeduplication: config.enableIntelligentDeduplication,
+      enableHdUpgrade: config.enableHdUpgrade,
+      nameSimilarityThreshold: config.nameSimilarityThreshold,
+      urlSimilarityThreshold: config.urlSimilarityThreshold,
+      ignoreFiles: config.ignoreFiles,
+      strategy: config.strategy,
+      preserveSourcePriority: config.preserveSourcePriority
     });
   }
 }

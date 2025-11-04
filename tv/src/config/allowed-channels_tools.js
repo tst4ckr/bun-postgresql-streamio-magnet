@@ -50,8 +50,20 @@ function loadAllowedChannelsFromEnv() {
 }
 
 /**
- * Obtiene la lista por defecto de canales permitidos (fallback)
- * @returns {Array<string>} Lista por defecto de canales permitidos
+ * Obtiene la configuración de canales permitidos desde variables de entorno
+ * @returns {Object} Configuración de canales permitidos
+ */
+function getAllowedChannelsConfigFromEnv() {
+  ensureEnvLoaded();
+  
+  return {
+    enableAllowedChannels: process.env.ENABLE_ALLOWED_CHANNELS === 'true'
+  };
+}
+
+/**
+ * Obtiene la lista de canales permitidos por defecto
+ * @returns {Array<string>} Lista vacía por defecto
  */
 function getDefaultAllowedChannels() {
   return [];
@@ -60,5 +72,6 @@ function getDefaultAllowedChannels() {
 export {
   ensureEnvLoaded,
   loadAllowedChannelsFromEnv,
-  getDefaultAllowedChannels
+  getDefaultAllowedChannels,
+  getAllowedChannelsConfigFromEnv
 };

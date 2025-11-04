@@ -34,7 +34,8 @@ import {
   normalizeRejectionReason,
   validateHandlerArgs,
   calculateDuration,
-  fallbackErrorLogging
+  fallbackErrorLogging,
+  getErrorHandlerConfigFromEnv
 } from './ErrorHandler_tools.js';
 
 // Re-exportar las clases de error para mantener compatibilidad
@@ -344,10 +345,11 @@ export class ErrorHandler {
    */
   handleAddonError(error, handlerType, args, startTime) {
     const duration = Date.now() - startTime;
+    const config = getErrorHandlerConfigFromEnv();
     
     this.#logger.error(`Fallo en ${handlerType} (${duration}ms):`, {
       error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      stack: config.isDevelopment ? error.stack : undefined,
       args: args
     });
     

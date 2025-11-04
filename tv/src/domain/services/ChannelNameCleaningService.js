@@ -13,7 +13,8 @@ import {
   hasRedundantPatterns,
   getCleaningStats,
   safeCleanChannelName,
-  isValidCleanedName
+  isValidCleanedName,
+  getChannelNameCleaningConfigFromEnv
 } from './ChannelNameCleaningService_tools.js';
 
 /**
@@ -32,11 +33,13 @@ export class ChannelNameCleaningConfig {
    * @returns {ChannelNameCleaningConfig}
    */
   static fromEnvironment() {
+    const config = getChannelNameCleaningConfigFromEnv();
+    
     return new ChannelNameCleaningConfig({
-      enableCleaning: process.env.ENABLE_CHANNEL_NAME_CLEANING !== 'false',
-      preserveOriginalOnFailure: process.env.PRESERVE_ORIGINAL_ON_CLEANING_FAILURE !== 'false',
-      logCleaningStats: process.env.LOG_CHANNEL_CLEANING_STATS === 'true',
-      batchSize: parseInt(process.env.CHANNEL_CLEANING_BATCH_SIZE) || 1000
+      enableCleaning: config.enableCleaning,
+      preserveOriginalOnFailure: config.preserveOriginalOnFailure,
+      logCleaningStats: config.logCleaningStats,
+      batchSize: config.batchSize
     });
   }
 }

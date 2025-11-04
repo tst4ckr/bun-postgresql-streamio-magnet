@@ -3,6 +3,38 @@
  * Contiene funciones puras, validadores y formateadores
  */
 
+import { EnvLoader } from '../config/EnvLoader.js';
+
+// Variable global para controlar si ya se cargaron las variables de entorno
+let envLoaded = false;
+
+/**
+ * Carga las variables de entorno una sola vez para todo el módulo
+ * @returns {void}
+ */
+function ensureEnvLoaded() {
+  if (!envLoaded && !EnvLoader.isLoaded()) {
+    try {
+      EnvLoader.getInstance();
+      envLoaded = true;
+    } catch (error) {
+      console.warn('[ERROR_HANDLER_TOOLS] No se pudieron cargar variables de entorno:', error.message);
+    }
+  }
+}
+
+/**
+ * Obtiene la configuración de ErrorHandler desde variables de entorno
+ * @returns {Object} Configuración de ErrorHandler
+ */
+export function getErrorHandlerConfigFromEnv() {
+  ensureEnvLoaded();
+  
+  return {
+    isDevelopment: process.env.NODE_ENV === 'development'
+  };
+}
+
 /**
  * Tipos de errores personalizados
  */
