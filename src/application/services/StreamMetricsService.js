@@ -315,59 +315,6 @@ Generated: ${metrics.timestamp}
   }
 
   /**
-   * Registra la detección de tipo de ID de contenido.
-   * @param {string} contentId - ID del contenido
-   * @param {Object} idDetection - Información de detección del ID
-   */
-  logIdDetection(contentId, idDetection) {
-    const { type, confidence, source } = idDetection || {};
-    
-    this.#logger.info(
-      `[StreamHandler] ID detectado: ${contentId} -> Tipo: ${type || 'unknown'} ` +
-      `(Confianza: ${confidence || 'N/A'}, Fuente: ${source || 'N/A'})`
-    );
-    
-    // Actualizar métricas de detección de ID
-    if (type) {
-      this.#metrics.requestsByIdType[type] = (this.#metrics.requestsByIdType[type] || 0) + 1;
-    }
-    
-    // Log detallado en desarrollo
-    if (process.env.NODE_ENV === 'development') {
-      this.#logger.debug(`[StreamHandler] Detalles de detección ID:`, {
-        contentId,
-        detectedType: type,
-        confidence,
-        source,
-        timestamp: new Date().toISOString()
-      });
-    }
-  }
-
-  /**
-   * Registra errores de validación.
-   * @param {Error} validationError - Error de validación
-   */
-  logValidationError(validationError) {
-    const errorType = 'VALIDATION_ERROR';
-    this.#metrics.errorsByType[errorType] = (this.#metrics.errorsByType[errorType] || 0) + 1;
-    
-    this.#logger.error(
-      `[StreamHandler] Error de validación: ${validationError.message}`
-    );
-    
-    // Log detallado en desarrollo
-    if (process.env.NODE_ENV === 'development') {
-      this.#logger.debug(`[StreamHandler] Detalles del error de validación:`, {
-        errorMessage: validationError.message,
-        errorType,
-        stack: validationError.stack,
-        timestamp: new Date().toISOString()
-      });
-    }
-  }
-
-  /**
    * Registra información de debugging específica.
    * @param {string} operation - Operación siendo debuggeada
    * @param {Object} data - Datos de debug

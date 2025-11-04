@@ -11,7 +11,6 @@ export class CacheService {
   constructor() {
     this.logger = new EnhancedLogger('CacheService');
     this.cache = new Map();
-    this.accessHistory = new Map(); // Inicializar accessHistory
     this.stats = { hits: 0, misses: 0, sets: 0, deletes: 0, clears: 0 };
     
     this.config = {
@@ -356,6 +355,10 @@ export class CacheService {
    * @private
    */
   #recordAccess(key, contentType) {
+    if (!this.accessHistory) {
+      this.accessHistory = new Map();
+    }
+    
     const currentCount = this.accessHistory.get(key) || 0;
     this.accessHistory.set(key, currentCount + 1);
     

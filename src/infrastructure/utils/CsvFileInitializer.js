@@ -4,7 +4,7 @@
  */
 
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
-import { existsSync, writeFileSync, mkdirSync, readFileSync } from 'fs';
+import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 
 export class CsvFileInitializer {
@@ -76,7 +76,8 @@ export class CsvFileInitializer {
         }
 
         try {
-            const firstLine = readFileSync(filePath, 'utf8').split('\n')[0].trim();
+            const fs = require('fs');
+            const firstLine = fs.readFileSync(filePath, 'utf8').split('\n')[0].trim();
             return firstLine === CsvFileInitializer.CSV_HEADER;
         } catch (error) {
             CsvFileInitializer.#logger.error(`[CsvFileInitializer] Error validando formato de ${filePath}:`, error.message);
@@ -91,19 +92,14 @@ export class CsvFileInitializer {
      */
     static repairCsvFormat(filePath, filename) {
         try {
-            const content = readFileSync(filePath, 'utf8');
-            
-            // Encontrar la primera línea y preservar el resto del contenido exactamente como está
-            const firstLineMatch = content.match(/^[^\r\n]*/);
-            if (!firstLineMatch) return;
-            
-            const firstLine = firstLineMatch[0];
-            const restOfContent = content.substring(firstLine.length);
+            const fs = require('fs');
+            const content = fs.readFileSync(filePath, 'utf8');
+            const lines = content.split('\n');
             
             // Si la primera línea no es la cabecera correcta, reemplazarla
-            if (firstLine.trim() !== CsvFileInitializer.CSV_HEADER) {
-                const repairedContent = CsvFileInitializer.CSV_HEADER + restOfContent;
-                writeFileSync(filePath, repairedContent, 'utf8');
+            if (lines[0].trim() !== CsvFileInitializer.CSV_HEADER) {
+                lines[0] = CsvFileInitializer.CSV_HEADER;
+                fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
                 CsvFileInitializer.#logger.info(`[CsvFileInitializer] Formato reparado: ${filename}`);
             }
         } catch (error) {

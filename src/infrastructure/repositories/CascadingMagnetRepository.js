@@ -346,7 +346,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       
       if (finalResults.length > 0) {
         // Cachear resultados exitosos
-        const cacheTTL = this.#getCacheTTL(type, finalResults.length, false, contentId);
+        const cacheTTL = this.#getCacheTTL(type, finalResults.length);
         cacheService.set(cacheKey, finalResults, cacheTTL, {
           contentType: type,
           metadata: { 
@@ -373,7 +373,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
           const enrichedSpanishResults = this.#enrichMagnetsWithMetadata(spanishApiResults, metadata);
           
           // Cachear resultados de API con TTL más corto
-          const apiCacheTTL = this.#getCacheTTL(type, enrichedSpanishResults.length, true, contentId);
+          const apiCacheTTL = this.#getCacheTTL(type, enrichedSpanishResults.length, true);
           cacheService.set(cacheKey, enrichedSpanishResults, apiCacheTTL, {
             contentType: type,
             metadata: { 
@@ -414,7 +414,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
           
           if (finalEnglishResults.length > 0) {
             // Cachear resultados de english.csv
-            const cacheTTL = this.#getCacheTTL(type, finalEnglishResults.length, false, contentId);
+            const cacheTTL = this.#getCacheTTL(type, finalEnglishResults.length);
             cacheService.set(cacheKey, finalEnglishResults, cacheTTL, {
               contentType: type,
               metadata: { 
@@ -449,7 +449,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
           const enrichedEnglishApiResults = this.#enrichMagnetsWithMetadata(englishApiResults, metadata);
           
           // Cachear resultados de API con TTL más corto
-          const apiCacheTTL = this.#getCacheTTL(type, enrichedEnglishApiResults.length, true, contentId);
+          const apiCacheTTL = this.#getCacheTTL(type, enrichedEnglishApiResults.length, true);
           cacheService.set(cacheKey, enrichedEnglishApiResults, apiCacheTTL, {
             contentType: type,
             metadata: { 
@@ -479,7 +479,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       this.#logger.warn(`No se encontraron magnets para ${contentId} en ninguna fuente (${duration}ms)`, { component: 'CascadingMagnetRepository' });
       
       // Cachear resultado vacío con TTL corto para evitar búsquedas repetidas
-      const emptyTTL = this.#getCacheTTL(type, 0, false, contentId);
+      const emptyTTL = this.#getCacheTTL(type, 0);
       cacheService.set(cacheKey, [], emptyTTL, {
         contentType: type,
         metadata: { 
@@ -1015,11 +1015,6 @@ export class CascadingMagnetRepository extends MagnetRepository {
   async #fallbackSearch(contentId, type) {
     this.#logger.info(`Ejecutando búsqueda de fallback para ${contentId}`);
     
-    // Verificar inicialización antes de usar repositorios
-    if (!this.#isInitialized) {
-      await this.initialize();
-    }
-    
     try {
       // Detectar tipo de ID y aplicar estrategia específica
       const idType = this.#detectIdType(contentId);
@@ -1098,12 +1093,14 @@ export class CascadingMagnetRepository extends MagnetRepository {
    * @param {string} type - Tipo de contenido
    * @param {number} resultCount - Número de resultados encontrados
    * @param {boolean} isApiResult - Si los resultados vienen de API
-   * @param {string} contentId - ID del contenido para historial de acceso
    * @returns {number} TTL en milisegundos
    */
-  #getCacheTTL(type, resultCount, isApiResult = false, contentId = null) {
+  #getCacheTTL(type, resultCount, isApiResult = false) {
     // Usar el optimizador de caché para TTL adaptativo
-    const adaptiveTTL = this.#cacheService.calculateAdaptiveTTL(type, resultCount, contentId);
+    const adaptiveTTL = this.#cacheService.calculateAdaptiveTTL(type, resultCount, {
+      source: isApiResult ? 'api' : 'repository',
+      timestamp: Date.now()
+    });
     
     this.#logger.info(`TTL adaptativo calculado para ${type} con ${resultCount} resultados (API: ${isApiResult}): ${adaptiveTTL}ms`, { component: 'CascadingMagnetRepository' });
     return adaptiveTTL;

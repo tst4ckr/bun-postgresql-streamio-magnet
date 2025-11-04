@@ -12,14 +12,7 @@
     "validate-channels": "bun run scripts/validate-channels.js",
     "update-logos": "bun run scripts/update-logos.js",
     "deploy": "./scripts/deploy.sh",
-    "test": "vitest",
-    "test:unit": "vitest run --reporter=verbose",
-    "test:watch": "vitest --watch",
-    "test:coverage": "vitest run --coverage",
-    "test:ui": "vitest --ui",
-    "test:domain": "vitest run tests/unit/domain",
-    "test:application": "vitest run tests/unit/application",
-    "test:infrastructure": "vitest run tests/unit/infrastructure",
+    "test": "bun test",
     "lint": "eslint src/ --ext .js",
     "publish-addon": "bun run scripts/publish-addon.js",
     "build": "bun install",
@@ -52,12 +45,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.0.6",
-    "@vitest/ui": "^4.0.6",
-    "eslint": "^8.57.0",
-    "happy-dom": "^20.0.10",
-    "jsdom": "^27.1.0",
-    "vitest": "^4.0.6"
+    "eslint": "^8.57.0"
   },
   "engines": {
     "bun": ">=1.0.0"

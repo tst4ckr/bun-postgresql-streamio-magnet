@@ -174,7 +174,7 @@ export class StreamProcessingService {
    * @param {Object|null} metadata - Metadatos del contenido (opcional)
    * @returns {Object[]} Lista de streams formateados
    */
-  createStreamsFromMagnets(magnets, type, metadata = null, idDetection = null) {
+  createStreamsFromMagnets(magnets, type, metadata = null) {
     if (!magnets || magnets.length === 0) {
       return [];
     }
@@ -197,8 +197,8 @@ export class StreamProcessingService {
           return null;
         }
 
-        const streamTitle = this.formatStreamTitle(magnet, type, metadata, idDetection);
-        const streamDescription = this.formatStreamDescription(magnet, type, metadata, idDetection);
+        const streamTitle = this.formatStreamTitle(magnet, type, metadata);
+        const streamDescription = this.formatStreamDescription(magnet, type, metadata);
 
         const stream = {
           name: streamTitle,

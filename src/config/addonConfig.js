@@ -119,7 +119,7 @@ const config = {
     torrentioApiUrl: process.env.TORRENTIO_API_URL || 'https://torrentio.strem.fun/',
     timeout: parseInt(process.env.CSV_TIMEOUT) || CONSTANTS.TIME.DEFAULT_TIMEOUT,
     // Configuración específica para TV M3U
-    m3uUrl: process.env.M3U_URL ? resolvePath(process.env.M3U_URL) : null,
+    m3uUrl: process.env.M3U_URL || null,
     m3uCacheTimeout: parseInt(process.env.M3U_CACHE_TIMEOUT) || CONSTANTS.CACHE.TV_M3U_CACHE_TIMEOUT,
     maxTvChannels: parseInt(process.env.MAX_TV_CHANNELS) || CONSTANTS.LIMIT.MAX_TV_CHANNELS
   },
