@@ -7,6 +7,8 @@
  * Entidad Tv que representa un canal de televisión.
  * Inmutable siguiendo principios de DDD.
  */
+import { CONSTANTS } from '../../config/constants.js';
+
 export class Tv {
   #id;
   #name;
@@ -92,13 +94,15 @@ export class Tv {
    * @returns {Object} Metadatos en formato Stremio
    */
   toStremioMeta(typeOverride = 'tv') {
+    const fallbackLogo = CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO;
+    const poster = this.#logo || fallbackLogo;
     return {
       id: this.#id,
       type: typeOverride || 'tv',
       name: this.#name,
-      poster: this.#logo,
+      poster,
       posterShape: 'landscape',
-      background: this.#logo,
+      background: poster,
       description: `Canal: ${this.#name}${this.#group ? ` (${this.#group})` : ''}`,
       genre: [this.#group],
       runtime: 'Live TV',

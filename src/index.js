@@ -176,6 +176,12 @@ class MagnetAddon {
    */
   #setupCatalogHandler() {
     this.#addonBuilder.defineCatalogHandler(async (args) => {
+      this.#logger.info(`[DEBUG] Main Catalog Handler - Incoming request:`, {
+        type: args.type,
+        id: args.id,
+        extra: args.extra,
+        timestamp: new Date().toISOString()
+      });
       try {
         // Solo TvHandler maneja catálogos para TV/CHANNEL
         if ((args.type === 'tv' || args.type === 'channel') && this.#tvHandler) {
