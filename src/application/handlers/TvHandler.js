@@ -167,6 +167,7 @@ export class TvHandler {
 
         // Cabeceras adicionales para mejorar compatibilidad con ciertos proveedores
         const proxyHeaders = { request: {} };
+        // Cabeceras opcionales vía entorno
         if (process.env.TV_STREAM_USER_AGENT && typeof process.env.TV_STREAM_USER_AGENT === 'string') {
           proxyHeaders.request['User-Agent'] = process.env.TV_STREAM_USER_AGENT;
         }
@@ -175,6 +176,19 @@ export class TvHandler {
         }
         if (process.env.TV_STREAM_ORIGIN && typeof process.env.TV_STREAM_ORIGIN === 'string') {
           proxyHeaders.request['Origin'] = process.env.TV_STREAM_ORIGIN;
+        }
+
+        // Fallback dinámico: si no se especificó Referer/Origin, derivar del origen de la URL M3U
+        if (!proxyHeaders.request['Referer'] || !proxyHeaders.request['Origin']) {
+          try {
+            const repoConfig = this.#tvRepository?.getConfig?.();
+            const m3uUrl = repoConfig?.m3uUrl;
+            if (m3uUrl) {
+              const origin = new URL(m3uUrl).origin;
+              if (!proxyHeaders.request['Referer']) proxyHeaders.request['Referer'] = origin;
+              if (!proxyHeaders.request['Origin']) proxyHeaders.request['Origin'] = origin;
+            }
+          } catch {}
         }
 
         // Log de configuración aplicada (solo si hay cabeceras custom)

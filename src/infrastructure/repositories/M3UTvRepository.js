@@ -155,9 +155,14 @@ export class M3UTvRepository {
       'User-Agent': process.env.M3U_REQUEST_USER_AGENT || 'Stremio-Addon/1.0',
       'Accept': process.env.M3U_REQUEST_ACCEPT || 'application/x-mpegURL, text/plain, */*'
     };
-    if (process.env.M3U_REQUEST_REFERER) {
-      headers['Referer'] = process.env.M3U_REQUEST_REFERER;
-    }
+    // Referer dinámico: si no está en entorno, usar el origen de la propia URL M3U
+    try {
+      if (process.env.M3U_REQUEST_REFERER) {
+        headers['Referer'] = process.env.M3U_REQUEST_REFERER;
+      } else if (this.#m3uUrl) {
+        headers['Referer'] = new URL(this.#m3uUrl).origin;
+      }
+    } catch {}
 
     const timeout = parseInt(process.env.M3U_REQUEST_TIMEOUT) || 10000;
 
