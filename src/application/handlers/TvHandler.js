@@ -101,7 +101,7 @@ export class TvHandler {
     const { items: pagedTvs, hasMore } = this.#paginateTvs(filteredTvs, skip, pageSize);
 
     const metas = pagedTvs.map(tv => {
-      const meta = tv.toStremioMeta(args.type);
+      const meta = tv.toStremioMeta('tv');
       meta.type = 'tv'; // Forzar siempre el tipo 'tv'
       return meta;
     });
