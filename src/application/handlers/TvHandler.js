@@ -3,7 +3,7 @@
  * Gestiona las solicitudes de catálogo, metadatos y streams para canales de TV.
  */
 
-import { ErrorHandler } from '../../infrastructure/errors/ErrorHandler.js';
+import { ErrorHandler, safeExecute, createError, ERROR_TYPES } from '../../infrastructure/errors/ErrorHandler.js';
 
 /**
  * Manejador para la lógica de canales de TV en Stremio.
@@ -40,15 +40,15 @@ export class TvHandler {
    * Obtiene un canal de TV por ID con manejo de errores unificado
    * @private
    * @param {string} channelId - ID del canal
-   * @returns {Promise<Tv|null>} Instancia de Tv o null si no existe
+   * @returns {Promise<Tv>} Instancia de Tv
+   * @throws {Error} Si el canal no se encuentra
    */
   async #getTvById(channelId) {
-    try {
-      return await this.#tvRepository.getTvById(channelId);
-    } catch (error) {
-      this.#logger.warn(`Error fetching TV channel ${channelId}:`, { error: error.message });
-      return null;
+    const tv = await this.#tvRepository.getTvById(channelId);
+    if (!tv) {
+      throw createError(`No se encontró el canal de TV con ID: ${channelId}`, ERROR_TYPES.NOT_FOUND);
     }
+    return tv;
   }
 
   /**
@@ -57,56 +57,56 @@ export class TvHandler {
    * @returns {Function} Handler para el catálogo de Stremio
    */
   createCatalogHandler() {
-    return async (args) => {
-      this.#logger.info(`TV catalog request: id=${args.id}`, { extra: args.extra });
-
-      try {
-        const { type, id, extra = {} } = args;
-
-        // Validar tipo de contenido (Stremio puede enviar 'channel' para catálogos de TV)
-        if (type !== 'tv' && type !== 'channel') {
-          return { metas: [] };
-        }
-
-        // Obtener todos los canales desde repositorio M3U
-        const tvs = await this.#tvRepository.getAllTvs();
-        if (!tvs || tvs.length === 0) {
-          this.#logger.warn('No hay canales de TV disponibles');
-          return { metas: [] };
-        }
-
-        // Filtrar según el catálogo solicitado (similar a CatalogHandler)
-        let filteredTvs = this.#filterTvsByCatalog(tvs, id, extra);
-
-        // Aplicar búsqueda si se proporciona (por nombre o grupo)
-        if (extra.search) {
-          filteredTvs = this.#searchTvs(filteredTvs, extra.search);
-        }
-
-        // Orden opcional
-        const sortBy = extra.sort || 'name';
-        if (sortBy === 'name') {
-          filteredTvs = filteredTvs.sort((a, b) => a.name.localeCompare(b.name));
-        }
-
-        // Paginación estilo Stremio (pageSize 100 y flag hasMore)
-        const skip = parseInt(extra.skip) || 0;
-        const pageSize = 100;
-        const { items: pagedTvs, hasMore } = this.#paginateTvs(filteredTvs, skip, pageSize);
-
-        const metas = pagedTvs.map(tv => tv.toStremioMeta(args.type));
-
-        this.#logger.info(`Catálogo '${id}': ${metas.length} de ${filteredTvs.length}`);
-
-        return {
-          metas,
-          ...(hasMore && { hasMore: true }),
-          cacheMaxAge: this.#config.cache.tvCatalogMaxAge
-        };
-      } catch (error) {
-        this.#logger.error('Error fetching TV catalog', { error: error.message });
-        return { metas: [] };
+    return (args) => safeExecute(
+      () => this.#handleCatalogRequest(args),
+      {
+        operation: 'createCatalogHandler',
+        handler: 'TvHandler',
+        fallbackResponse: { metas: [] }
       }
+    );
+  }
+
+  /**
+   * Lógica de negocio para el catálogo de TV
+   * @private
+   */
+  async #handleCatalogRequest(args) {
+    this.#logger.info(`TV catalog request: id=${args.id}`, { extra: args.extra });
+    const { type, id, extra = {} } = args;
+
+    if (type !== 'tv') {
+      return { metas: [] };
+    }
+
+    const tvs = await this.#tvRepository.getAllTvs();
+    if (!tvs || tvs.length === 0) {
+      this.#logger.warn('No hay canales de TV disponibles');
+      return { metas: [] };
+    }
+
+    let filteredTvs = this.#filterTvsByCatalog(tvs, id, extra);
+
+    if (extra.search) {
+      filteredTvs = this.#searchTvs(filteredTvs, extra.search);
+    }
+
+    const sortBy = extra.sort || 'name';
+    if (sortBy === 'name') {
+      filteredTvs.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    const skip = parseInt(extra.skip) || 0;
+    const pageSize = 100;
+    const { items: pagedTvs, hasMore } = this.#paginateTvs(filteredTvs, skip, pageSize);
+
+    const metas = pagedTvs.map(tv => tv.toStremioMeta(args.type));
+    this.#logger.info(`Catálogo '${id}': ${metas.length} de ${filteredTvs.length}`);
+
+    return {
+      metas,
+      ...(hasMore && { hasMore: true }),
+      cacheMaxAge: this.#config.cache.tvCatalogMaxAge
     };
   }
 
@@ -115,24 +115,21 @@ export class TvHandler {
    * @returns {Function} Handler para metadatos de Stremio
    */
   createMetaHandler() {
-    return async (args) => {
-      try {
+    return (args) => safeExecute(
+      async () => {
         const channelId = this.#extractChannelId(args.id);
         const tv = await this.#getTvById(channelId);
-        
-        if (!tv) {
-          return Promise.reject(new Error(`TV channel not found: ${args.id}`));
-        }
-
         return {
           meta: tv.toStremioMeta(args.type),
           cacheMaxAge: this.#config.cache.metadataCacheMaxAge
         };
-      } catch (error) {
-        this.#logger.error('Error fetching TV meta', { error: error.message });
-        return Promise.reject(error);
+      },
+      {
+        operation: 'createMetaHandler',
+        handler: 'TvHandler',
+        fallbackResponse: { meta: {} }
       }
-    };
+    );
   }
 
   /**
@@ -140,24 +137,21 @@ export class TvHandler {
    * @returns {Function} Handler para streams de Stremio
    */
   createStreamHandler() {
-    return async (args) => {
-      try {
+    return (args) => safeExecute(
+      async () => {
         const channelId = this.#extractChannelId(args.id);
         const tv = await this.#getTvById(channelId);
-        
-        if (!tv) {
-          return Promise.reject(new Error(`TV channel not found: ${args.id}`));
-        }
-
         return {
           streams: [tv.toStremioStream()],
           cacheMaxAge: this.#config.cache.streamCacheMaxAge
         };
-      } catch (error) {
-        this.#logger.error('Error fetching TV stream', { error: error.message });
-        return Promise.reject(error);
+      },
+      {
+        operation: 'createStreamHandler',
+        handler: 'TvHandler',
+        fallbackResponse: { streams: [] }
       }
-    };
+    );
   }
 
   /**

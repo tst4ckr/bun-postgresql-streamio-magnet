@@ -291,11 +291,11 @@ export class StreamHandler {
       );
     }
 
-    if (!['movie', 'series', 'anime', 'tv'].includes(args.type)) {
+    if (!['movie', 'series', 'tv'].includes(args.type)) {
       throw createError(
-        'Tipo de contenido debe ser movie, series, anime o tv',
+        'Tipo de contenido debe ser movie, series o tv',
         ERROR_TYPES.VALIDATION,
-        { type: args.type, supportedTypes: ['movie', 'series', 'anime', 'tv'] }
+        { type: args.type, supportedTypes: ['movie', 'series', 'tv'] }
       );
     }
     

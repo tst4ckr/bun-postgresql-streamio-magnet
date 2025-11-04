@@ -102,8 +102,8 @@ class MagnetAddon {
       });
 
       try {
-        // Delegar a StreamHandler para todo tipo excepto TV/Channel
-        if (args.type !== 'tv' && args.type !== 'channel') {
+        // Delegar a StreamHandler para todo tipo excepto TV
+        if (args.type !== 'tv') {
           this.#logger.debug(`[DEBUG] Delegating to StreamHandler for type: ${args.type}`);
           const result = await this.#streamHandler.createAddonHandler()(args);
           this.#logger.debug(`[DEBUG] StreamHandler result:`, {
@@ -113,8 +113,8 @@ class MagnetAddon {
           return result;
         }
         
-        // Para TV/Channel, usar TvHandler si está disponible
-        this.#logger.debug(`[DEBUG] Processing TV/Channel request - TvHandler available: ${!!this.#tvHandler}`);
+        // Para TV, usar TvHandler si está disponible
+        this.#logger.debug(`[DEBUG] Processing TV request - TvHandler available: ${!!this.#tvHandler}`);
         if (this.#tvHandler) {
           this.#logger.debug(`[DEBUG] Delegating to TvHandler for type: ${args.type}`);
           const result = await this.#tvHandler.createStreamHandler()(args);
@@ -183,8 +183,8 @@ class MagnetAddon {
         timestamp: new Date().toISOString()
       });
       try {
-        // Solo TvHandler maneja catálogos para TV/Channel
-        if ((args.type === 'tv' || args.type === 'channel') && this.#tvHandler) {
+        // Solo TvHandler maneja catálogos para TV
+        if (args.type === 'tv' && this.#tvHandler) {
           return await this.#tvHandler.createCatalogHandler()(args);
         }
         
@@ -215,8 +215,8 @@ class MagnetAddon {
       });
 
       try {
-        // Delegar a TvHandler para TV/Channel
-        if ((args.type === 'tv' || args.type === 'channel') && this.#tvHandler) {
+        // Delegar a TvHandler para TV
+        if (args.type === 'tv' && this.#tvHandler) {
           this.#logger.debug(`[DEBUG] Delegating to TvHandler for ${args.type} meta request`);
           const result = await this.#tvHandler.createMetaHandler()(args);
           this.#logger.debug(`[DEBUG] TvHandler meta result:`, {
@@ -229,7 +229,7 @@ class MagnetAddon {
           return result;
         }
         
-        this.#logger.debug(`[DEBUG] Non-TV/Channel meta request or no TvHandler - returning empty meta`);
+        this.#logger.debug(`[DEBUG] Non-TV meta request or no TvHandler - returning empty meta`);
         // Respuesta por defecto para otros tipos
         return { meta: {} };
       } catch (error) {
