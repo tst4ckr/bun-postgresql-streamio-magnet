@@ -74,13 +74,19 @@ const config = {
       {
         type: 'tv',
         id: 'tv_catalog',
-        name: 'TV Channels'
+        name: 'TV Channels',
+        extra: [
+          { name: 'genre', isRequired: false, options: ['news', 'sports', 'entertainment', 'documentary', 'kids', 'music'] }
+        ]
       }
       ,
       {
         type: 'channel',
         id: 'channel_catalog',
-        name: 'TV Channels'
+        name: 'TV Channels',
+        extra: [
+          { name: 'genre', isRequired: false, options: ['news', 'sports', 'entertainment', 'documentary', 'kids', 'music'] }
+        ]
       }
     ],
     idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv:', 'tv_']

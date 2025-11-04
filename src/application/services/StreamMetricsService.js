@@ -204,6 +204,60 @@ export class StreamMetricsService {
   }
 
   /**
+   * Registra la detección del tipo de ID del contenido.
+   * @param {string} contentId - ID del contenido recibido en la petición
+   * @param {{ type?: string, confidence?: number, source?: string }|null} idDetection - Resultado de la detección
+   */
+  logIdDetection(contentId, idDetection) {
+    try {
+      const detectedType = idDetection?.type || 'unknown';
+      const confidence = typeof idDetection?.confidence === 'number' ? idDetection.confidence : 'N/A';
+      const source = idDetection?.source || 'N/A';
+
+      this.#logger.info(
+        `[StreamHandler] ID detectado: ${contentId} -> Tipo: ${detectedType} (Confianza: ${confidence}, Fuente: ${source})`
+      );
+
+      if (process.env.NODE_ENV === 'development') {
+        this.#logger.debug('[StreamHandler] Detalles de detección ID:', {
+          contentId,
+          detectedType,
+          confidence,
+          source,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (e) {
+      // No romper flujo por logging
+      this.#logger.warn('[StreamHandler] Fallo registrando detección de ID', { error: e?.message });
+    }
+  }
+
+  /**
+   * Registra un error de validación en la petición.
+   * @param {Error} error - Error de validación capturado
+   */
+  logValidationError(error) {
+    try {
+      const message = error?.message || 'Unknown validation error';
+      this.#metrics.errorsByType.VALIDATION_ERROR = (this.#metrics.errorsByType.VALIDATION_ERROR || 0) + 1;
+      this.#logger.error(`[StreamHandler] Error de validación: ${message}`);
+
+      if (process.env.NODE_ENV === 'development') {
+        this.#logger.debug('[StreamHandler] Detalles del error de validación:', {
+          errorMessage: message,
+          errorType: 'VALIDATION_ERROR',
+          stack: error?.stack,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (e) {
+      // Evitar que errores de logging afecten al flujo
+      this.#logger.warn('[StreamHandler] Fallo registrando error de validación', { error: e?.message });
+    }
+  }
+
+  /**
    * Registra operaciones de cache.
    * @param {Object} cacheInfo - Información de cache
    * @param {string} cacheInfo.operation - Tipo de operación (hit/miss/set)

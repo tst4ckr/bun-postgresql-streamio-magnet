@@ -79,15 +79,16 @@ export class StreamHandler {
    */
   async #handleStreamRequest(args) {
     const startTime = Date.now();
+    let metricsContext = null;
     
     try {
-      // 1. Iniciar métricas
-      await this.#streamMetricsService.logStreamRequestStart(args);
+      // 1. Iniciar métricas y obtener contexto
+      metricsContext = this.#streamMetricsService.logStreamRequestStart(args);
       
       // 2. Validar petición
       const validation = await this.#streamValidationService.validateStreamRequest(args);
       if (!validation.isValid) {
-        await this.#streamMetricsService.logValidationError(validation.error);
+        this.#streamMetricsService.logValidationError(validation.error);
         throw createError(validation.error, ERROR_TYPES.VALIDATION);
       }
 
@@ -95,22 +96,29 @@ export class StreamHandler {
       
       // 3. Detectar tipo de ID
       const idDetection = await this.#streamValidationService.detectContentIdType(contentId);
-      await this.#streamMetricsService.logIdDetection(contentId, idDetection);
+      this.#streamMetricsService.logIdDetection(contentId, idDetection);
       
       // 4. Obtener magnets
-      const magnets = await this.#streamProcessingService.getMagnets(contentId, type);
-      await this.#streamMetricsService.logMagnetSearch(contentId, magnets.length);
+      const searchStart = Date.now();
+      const magnets = await this.#streamProcessingService.getMagnets(contentId, type, idDetection);
+      const searchTime = Date.now() - searchStart;
+      this.#streamMetricsService.logMagnetSearch({
+        id: contentId,
+        idType: idDetection?.type,
+        resultCount: Array.isArray(magnets) ? magnets.length : 0,
+        searchTime
+      });
       
       if (!magnets || magnets.length === 0) {
-        await this.#streamMetricsService.logStreamRequestSuccess(args, 0, Date.now() - startTime);
+        this.#streamMetricsService.logStreamRequestSuccess(metricsContext, { streams: [], metadata: null });
         return this.#streamCacheService.createEmptyResponse(type);
       }
 
       // 5. Crear streams desde magnets
-      const streams = await this.#streamProcessingService.createStreamsFromMagnets(magnets, type);
+      const streams = await this.#streamProcessingService.createStreamsFromMagnets(magnets, type, null, idDetection);
       
       if (streams.length === 0) {
-        await this.#streamMetricsService.logStreamRequestSuccess(args, 0, Date.now() - startTime);
+        this.#streamMetricsService.logStreamRequestSuccess(metricsContext, { streams: [], metadata: null });
         return this.#streamCacheService.createEmptyResponse(type);
       }
 
@@ -119,7 +127,7 @@ export class StreamHandler {
       
       // 7. Log de éxito
       const duration = Date.now() - startTime;
-      await this.#streamMetricsService.logStreamRequestSuccess(args, streams.length, duration);
+      this.#streamMetricsService.logStreamRequestSuccess(metricsContext, { streams, metadata: null });
       
       this.#logger.info(`Encontrados ${streams.length} streams para ${type}/${contentId} en ${duration}ms`);
       
@@ -127,7 +135,7 @@ export class StreamHandler {
       
     } catch (error) {
       const duration = Date.now() - startTime;
-      await this.#streamMetricsService.logStreamRequestError(args, error, duration);
+      this.#streamMetricsService.logStreamRequestError(metricsContext || args, error);
       
       this.#logger.error(`Error procesando stream request para ${args?.type}/${args?.id}: ${error.message}`);
       return this.#streamCacheService.createErrorResponse(error, args?.type);
