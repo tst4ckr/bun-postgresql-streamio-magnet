@@ -7,6 +7,8 @@
  * Entidad Tv que representa un canal de televisión.
  * Inmutable siguiendo principios de DDD.
  */
+import CONSTANTS from '../../config/constants.js';
+
 export class Tv {
   #id;
   #name;
@@ -96,11 +98,12 @@ export class Tv {
       id: this.#id,
       type: 'tv',
       name: this.#name,
-      poster: this.#logo,
+      // Stremio requiere poster en Meta Preview; usar logo por defecto si no hay
+      poster: this.#logo || CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO,
       posterShape: 'landscape',
-      background: this.#logo,
+      background: this.#logo || CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO,
       description: `Canal: ${this.#name}${this.#group ? ` (${this.#group})` : ''}`,
-      genre: [this.#group],
+      genres: [this.#group],
       runtime: 'Live TV',
       released: new Date().getFullYear().toString(),
       imdbRating: null,
