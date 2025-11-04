@@ -29,7 +29,7 @@ async function main() {
         setupEventHandlers(library);
 
         // Ejecutar el procesamiento completo
-        console.log('🚀 Iniciando procesamiento de canales IPTV...\n');
+        console.log('� Iniciando procesamiento de canales IPTV...\n');
         
         const result = await library.processComplete();
 
