@@ -6,16 +6,12 @@
  * caching inteligente y manejo de errores robusto.
  */
 
-import { EventEmitter } from '../core/event-emitter.js';
-
 /**
  * Clase base para carga de datos con batching y caching
  * Inspirada en el patrón DataLoader de Facebook
  */
-export class DataLoader extends EventEmitter {
+export class DataLoader {
     constructor(batchLoadFn, options = {}) {
-        super();
-        
         this.batchLoadFn = batchLoadFn;
         this.options = {
             batch: true,
@@ -50,7 +46,7 @@ export class DataLoader extends EventEmitter {
         if (this._promiseCache) {
             const cachedPromise = this._promiseCache.get(cacheKey);
             if (cachedPromise) {
-                this.emit('cache_hit', { key, cacheKey });
+                // Cache hit - returning cached promise
                 return cachedPromise;
             }
         }
@@ -89,7 +85,6 @@ export class DataLoader extends EventEmitter {
             this._promiseCache.set(cacheKey, promise);
         }
 
-        this.emit('load_requested', { key, cacheKey });
         return promise;
     }
 
@@ -129,7 +124,6 @@ export class DataLoader extends EventEmitter {
             : Promise.resolve(value);
 
         this._promiseCache.set(cacheKey, promise);
-        this.emit('cache_primed', { key, cacheKey, value });
         
         return this;
     }
@@ -146,7 +140,6 @@ export class DataLoader extends EventEmitter {
 
         const cacheKey = this.options.cacheKeyFn(key);
         this._promiseCache.delete(cacheKey);
-        this.emit('cache_cleared', { key, cacheKey });
         
         return this;
     }
@@ -161,7 +154,6 @@ export class DataLoader extends EventEmitter {
         }
 
         this._promiseCache.clear();
-        this.emit('cache_cleared_all');
         
         return this;
     }
@@ -178,11 +170,6 @@ export class DataLoader extends EventEmitter {
         if (!batch || batch.keys.length === 0) {
             return;
         }
-
-        this.emit('batch_dispatched', { 
-            keys: batch.keys, 
-            size: batch.keys.length 
-        });
 
         try {
             const values = await this.batchLoadFn(batch.keys);
@@ -215,12 +202,6 @@ export class DataLoader extends EventEmitter {
                 }
             }
 
-            this.emit('batch_completed', { 
-                keys: batch.keys, 
-                values,
-                size: batch.keys.length 
-            });
-
         } catch (error) {
             // Rechazar todas las promesas del batch
             for (const callback of batch.callbacks) {
@@ -233,12 +214,6 @@ export class DataLoader extends EventEmitter {
                     this._promiseCache.delete(cacheKey);
                 }
             }
-
-            this.emit('batch_failed', { 
-                keys: batch.keys, 
-                error,
-                size: batch.keys.length 
-            });
         }
     }
 
