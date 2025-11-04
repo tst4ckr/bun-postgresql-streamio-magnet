@@ -548,7 +548,6 @@ export class IPTVDataLoader {
     destroy() {
         for (const loader of this.loaders.values()) {
             loader.clearAll();
-            loader.removeAllListeners();
         }
         this.loaders.clear();
     }
