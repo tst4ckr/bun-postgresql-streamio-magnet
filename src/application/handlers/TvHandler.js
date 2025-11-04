@@ -119,8 +119,13 @@ export class TvHandler {
       async () => {
         const channelId = this.#extractChannelId(args.id);
         const tv = await this.#getTvById(channelId);
+        const meta = tv.toStremioMeta(args.type);
+
+        // Forzar siempre el tipo 'tv' en la respuesta para consistencia
+        meta.type = 'tv';
+
         return {
-          meta: tv.toStremioMeta(args.type),
+          meta,
           cacheMaxAge: this.#config.cache.metadataCacheMaxAge
         };
       },
