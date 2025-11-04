@@ -4,7 +4,7 @@
  * Sigue principios de arquitectura limpia y responsabilidad única
  */
 
-import { EnhancedLogger } from '../utils/EnhancedLogger.js';
+import { UnifiedLogger } from './UnifiedLogger.js';
 import { errorHandler, withErrorHandling, createError, ERROR_TYPES, safeExecute } from '../errors/ErrorHandler.js';
 import { cacheService } from './CacheService.js';
 import { addonConfig } from '../../config/addonConfig.js';
@@ -19,7 +19,7 @@ export class MetadataService {
    * @param {Object} dependencies.config - Configuración del addon
    */
   constructor({ logger, cacheService, errorHandler, config }) {
-    this.logger = logger || new EnhancedLogger('MetadataService');
+    this.logger = logger || new UnifiedLogger({ context: 'MetadataService' });
     this.cacheService = cacheService;
     this.errorHandler = errorHandler;
     this.config = config;
@@ -510,7 +510,7 @@ export class MetadataService {
 
 // Instancia singleton del servicio con dependencias
 export const metadataService = new MetadataService({
-  logger: new EnhancedLogger('MetadataService'),
+  logger: new UnifiedLogger({ context: 'MetadataService' }),
   cacheService,
   errorHandler,
   config: addonConfig

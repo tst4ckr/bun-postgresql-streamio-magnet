@@ -4,7 +4,7 @@
  * Sigue principios de arquitectura limpia y responsabilidad única
  */
 
-import { EnhancedLogger } from '../utils/EnhancedLogger.js';
+import { UnifiedLogger } from './UnifiedLogger.js';
 import { idDetectorService } from './IdDetectorService.js';
 import { cacheService } from './CacheService.js';
 import { addonConfig } from '../../config/addonConfig.js';
@@ -14,7 +14,7 @@ export class UnifiedIdService {
   
   constructor({ idDetectorService, logger, cacheService, config } = {}) {
     this.idDetectorService = idDetectorService;
-    this.logger = logger || new EnhancedLogger('UnifiedIdService');
+    this.logger = logger || new UnifiedLogger({ context: 'UnifiedIdService' });
     this.cacheService = cacheService;
     this.config = config;
     

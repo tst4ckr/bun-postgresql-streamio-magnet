@@ -3,7 +3,7 @@
  * Implementa estrategias de recuperación, logging estructurado y respuestas consistentes
  */
 
-import { EnhancedLogger } from '../utils/EnhancedLogger.js';
+import { UnifiedLogger } from '../services/UnifiedLogger.js';
 
 /**
  * Tipos de errores clasificados por severidad y estrategia de recuperación
@@ -114,7 +114,7 @@ export class ErrorHandler {
   #circuitBreaker;
 
   constructor(logger = null, retryConfig = {}) {
-    this.#logger = logger || new EnhancedLogger('error', true);
+    this.#logger = logger || new UnifiedLogger({ context: 'ErrorHandler' });
     this.#retryConfig = {
       maxRetries: retryConfig.maxRetries || 3,
       baseDelay: retryConfig.baseDelay || 1000,

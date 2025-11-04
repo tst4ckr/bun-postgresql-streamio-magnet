@@ -26,8 +26,7 @@ import { StreamValidationService } from '../services/StreamValidationService.js'
 import { BitelUidService } from '../services/BitelUidService.js';
 import { IpExtractionService } from '../services/IpExtractionService.js';
 import { IpLatencyValidationService } from '../services/IpLatencyValidationService.js';
-import { EnhancedLoggerService } from '../services/EnhancedLoggerService.js';
-import { OptimizedLoggerService } from '../services/OptimizedLoggerService.js';
+import { UnifiedLoggerService } from '../services/UnifiedLoggerService.js';
 import { MemoryOptimizationService } from '../services/MemoryOptimizationService.js';
 import ProcessFlowControlService from '../services/ProcessFlowControlService.js';
 import { M3UParserService } from '../parsers/M3UParserService.js';
@@ -50,42 +49,32 @@ export function registerServices(container, config) {
   // SERVICIOS BASE (sin dependencias externas)
   // ============================================================================
 
-  // Logger optimizado - servicio base para logging con throttling y batching
-  container.register('optimizedLogger', (deps, serviceConfig, logger) => {
-    return new OptimizedLoggerService(serviceConfig);
+  // Logger unificado - servicio consolidado con todas las características
+  container.register('unifiedLogger', (deps, serviceConfig, logger) => {
+    return new UnifiedLoggerService(serviceConfig);
   }, {
     dependencies: [],
     singleton: true,
     config: {
       level: config.logging?.level || 'info',
-      enableConsole: config.logging?.enableConsole !== false,
-      enableFile: config.logging?.enableFile || false,
-      logFile: config.logging?.logFile || './logs/app.log',
-      throttleMs: config.logging?.throttleMs || 100,
+      enableBatching: config.logging?.enableBatching !== false,
       batchSize: config.logging?.batchSize || 50,
+      batchTimeout: config.logging?.batchTimeout || 100,
+      enableThrottling: config.logging?.enableThrottling !== false,
+      throttleWindow: config.logging?.throttleWindow || 1000,
+      maxLogsPerWindow: config.logging?.maxLogsPerWindow || 10,
+      enableSourceTracking: config.logging?.enableSourceTracking !== false,
+      enableRequestLogging: config.logging?.enableRequestLogging || false,
+      enablePerformanceMetrics: config.logging?.enablePerformanceMetrics !== false,
       maxMemoryMB: config.logging?.maxMemoryMB || 10
-    }
-  });
-
-  // Logger mejorado - servicio base para logging (legacy)
-  container.register('enhancedLogger', (deps, serviceConfig, logger) => {
-    return new EnhancedLoggerService(serviceConfig, null);
-  }, {
-    dependencies: [],
-    singleton: true,
-    config: {
-      logLevel: config.logLevel || 'info',
-      enableRequestLogging: config.enableRequestLogging || false,
-      enablePerformanceMetrics: config.enablePerformanceMetrics || true,
-      logFilePath: config.logFilePath || null
     }
   });
 
   // Servicio de optimización de memoria - reduce duplicación de datos
   container.register('memoryOptimizationService', (deps, serviceConfig, logger) => {
-    return new MemoryOptimizationService(serviceConfig, deps.optimizedLogger);
+    return new MemoryOptimizationService(serviceConfig, deps.unifiedLogger);
   }, {
-    dependencies: ['optimizedLogger'],
+    dependencies: ['unifiedLogger'],
     singleton: true,
     config: {
       enableStringPooling: config.memory?.enableStringPooling !== false,
@@ -99,9 +88,9 @@ export function registerServices(container, config) {
 
   // Servicio de UID para canales Bitel
   container.register('bitelUidService', (deps, serviceConfig, logger) => {
-    return new BitelUidService(serviceConfig, deps.optimizedLogger);
+    return new BitelUidService(serviceConfig, deps.unifiedLogger);
   }, {
-    dependencies: ['optimizedLogger'],
+    dependencies: ['unifiedLogger'],
     singleton: true,
     config: {
       enableBitelUid: config.enableBitelUid || false,
@@ -139,11 +128,11 @@ export function registerServices(container, config) {
 
   // Servicio de salud de streams - base para validaciones
   container.register('streamHealthService', (deps, serviceConfig, logger) => {
-    return new StreamHealthService(serviceConfig, deps.optimizedLogger, {
+    return new StreamHealthService(serviceConfig, deps.unifiedLogger, {
       bitelUidService: deps.bitelUidService
     });
   }, {
-    dependencies: ['optimizedLogger'],
+    dependencies: ['unifiedLogger'],
     singleton: true,
     config: {
       validation: config.validation || {},
@@ -157,16 +146,16 @@ export function registerServices(container, config) {
     return new HttpsToHttpConversionService(
       serviceConfig,
       deps.streamHealthService,
-      deps.optimizedLogger,
+      deps.unifiedLogger,
       {
-        flowControlService: new ProcessFlowControlService(deps.optimizedLogger, {
+        flowControlService: new ProcessFlowControlService(deps.unifiedLogger, {
           maxConcurrent: serviceConfig.httpsToHttp?.maxConcurrentConversions || 5,
           timeout: serviceConfig.httpsToHttp?.conversionTimeout || 15000
         })
       }
     );
   }, {
-    dependencies: ['streamHealthService', 'optimizedLogger'],
+    dependencies: ['streamHealthService', 'unifiedLogger'],
     singleton: true,
     config: {
       enableHttpsToHttpConversion: config.enableHttpsToHttpConversion || false,
@@ -178,10 +167,10 @@ export function registerServices(container, config) {
 
   // Servicio de validación de streams
   container.register('streamValidationService', (deps, serviceConfig, logger) => {
-    return new StreamValidationService(serviceConfig, deps.optimizedLogger, {
+    return new StreamValidationService(serviceConfig, deps.unifiedLogger, {
       streamHealthService: deps.streamHealthService,
       httpsToHttpService: deps.httpsToHttpService,
-      flowControlService: new ProcessFlowControlService(deps.optimizedLogger, {
+      flowControlService: new ProcessFlowControlService(deps.unifiedLogger, {
         memoryThreshold: serviceConfig.MEMORY_USAGE_THRESHOLD || 70,
         cpuThreshold: 80,
         checkInterval: 2000,
@@ -190,7 +179,7 @@ export function registerServices(container, config) {
       })
     });
   }, {
-    dependencies: ['optimizedLogger', 'streamHealthService', 'httpsToHttpService'],
+    dependencies: ['unifiedLogger', 'streamHealthService', 'httpsToHttpService'],
     singleton: true,
     config: {
       validation: config.validation || {},
@@ -207,9 +196,9 @@ export function registerServices(container, config) {
 
   // Servicio de extracción de IPs
   container.register('ipExtractionService', (deps, serviceConfig, logger) => {
-    return new IpExtractionService(serviceConfig, deps.optimizedLogger);
+    return new IpExtractionService(serviceConfig, deps.unifiedLogger);
   }, {
-    dependencies: ['optimizedLogger'],
+    dependencies: ['unifiedLogger'],
     singleton: true,
     config: {
       enableIpExtraction: config.enableIpExtraction || false,
@@ -219,9 +208,9 @@ export function registerServices(container, config) {
 
   // Servicio de validación de latencia por IP
   container.register('ipLatencyValidationService', (deps, serviceConfig, logger) => {
-    return new IpLatencyValidationService(serviceConfig, deps.optimizedLogger);
+    return new IpLatencyValidationService(serviceConfig, deps.unifiedLogger);
   }, {
-    dependencies: ['optimizedLogger'],
+    dependencies: ['unifiedLogger'],
     singleton: true,
     config: {
       validation: config.validation || {},
@@ -234,9 +223,9 @@ export function registerServices(container, config) {
 
   // Servicio de deduplicación de canales
   container.register('channelDeduplicationService', (deps, serviceConfig, logger) => {
-    return new ChannelDeduplicationService(serviceConfig, deps.optimizedLogger);
+    return new ChannelDeduplicationService(serviceConfig, deps.unifiedLogger);
   }, {
-    dependencies: ['optimizedLogger'],
+    dependencies: ['unifiedLogger'],
     singleton: true,
     config: {
       enableIntelligentDeduplication: config.enableIntelligentDeduplication || true,
@@ -272,9 +261,9 @@ export function registerServices(container, config) {
 
   // Servicio de generación de CSV validado
   container.register('validatedChannelsCsvService', (deps, serviceConfig, logger) => {
-    return new ValidatedChannelsCsvService(serviceConfig, deps.optimizedLogger);
+    return new ValidatedChannelsCsvService(serviceConfig, deps.unifiedLogger);
   }, {
-    dependencies: ['optimizedLogger'],
+    dependencies: ['unifiedLogger'],
     singleton: true,
     config: {
       outputPath: config.outputPath || './tv.csv',

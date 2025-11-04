@@ -6,7 +6,7 @@
 import { writeFileSync, appendFileSync, existsSync, mkdirSync, readFileSync } from 'fs';
 import { dirname } from 'path';
 import { Magnet } from '../../domain/entities/Magnet.js';
-import { EnhancedLogger } from '../utils/EnhancedLogger.js';
+import { UnifiedLogger } from './UnifiedLogger.js';
 import { addonConfig } from '../../config/addonConfig.js';
 import { CONSTANTS } from '../../config/constants.js';
 import { ConfigurationCommandFactory } from '../patterns/ConfigurationCommand.js';
@@ -66,7 +66,7 @@ export class TorrentioApiService {
     this.#baseUrl = baseUrl;
     this.#torrentioFilePath = torrentioFilePath;
     this.#englishFilePath = englishFilePath || torrentioFilePath.replace('torrentio.csv', 'english.csv');
-    this.#logger = logger || new EnhancedLogger('TorrentioApiService');
+    this.#logger = logger || new UnifiedLogger({ context: 'TorrentioApiService' });
     this.#timeout = timeout;
     
     // Inicializar TorService con configuración completa

@@ -6,14 +6,14 @@
 
 import { idDetectorService } from './IdDetectorService.js';
 import { unifiedIdService } from './UnifiedIdService.js';
-import { EnhancedLogger } from '../utils/EnhancedLogger.js';
+import { UnifiedLogger } from './UnifiedLogger.js';
 import { CONSTANTS } from '../../config/constants.js';
 
 export class DynamicValidationService {
   constructor({ idDetectorService, unifiedIdService, logger, config }) {
     this.idDetectorService = idDetectorService;
     this.unifiedIdService = unifiedIdService;
-    this.logger = logger || new EnhancedLogger('DynamicValidationService');
+    this.logger = logger || new UnifiedLogger({ context: 'DynamicValidationService' });
     this.config = config;
     
     this.validationRules = this.#initializeValidationRules();

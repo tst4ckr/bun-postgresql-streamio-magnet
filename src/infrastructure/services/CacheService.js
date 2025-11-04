@@ -3,13 +3,13 @@
  * Implementa cache en memoria con estrategias de invalidación directas
  */
 
-import { EnhancedLogger } from '../utils/EnhancedLogger.js';
+import { UnifiedLogger } from './UnifiedLogger.js';
 import { addonConfig } from '../../config/addonConfig.js';
 import { CONSTANTS } from '../../config/constants.js';
 
 export class CacheService {
   constructor() {
-    this.logger = new EnhancedLogger('CacheService');
+    this.logger = new UnifiedLogger({ context: 'CacheService' });
     this.cache = new Map();
     this.accessHistory = new Map(); // Inicializar accessHistory
     this.stats = { hits: 0, misses: 0, sets: 0, deletes: 0, clears: 0 };
