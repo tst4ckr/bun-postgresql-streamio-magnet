@@ -4,7 +4,8 @@
  * Configura e inicia el servidor del addon de Stremio con inicialización por fases ordenada.
  */
 
-import { addonBuilder, serveHTTP } from 'stremio-addon-sdk';
+import pkg from 'stremio-addon-sdk';
+const { addonBuilder, serveHTTP } = pkg;
 import { addonConfig, manifest } from './config/addonConfig.js';
 import { CascadingMagnetRepository } from './infrastructure/repositories/CascadingMagnetRepository.js';
 import { StreamHandler } from './application/handlers/StreamHandler.js';

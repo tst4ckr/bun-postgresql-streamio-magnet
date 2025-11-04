@@ -4,6 +4,9 @@
  */
 
 import { M3UParser } from '../utils/M3UParser.js';
+import { readFile } from 'fs/promises';
+import { existsSync } from 'fs';
+import { join, resolve } from 'path';
 
 /**
  * Repositorio para canales de TV M3U que implementa cache en memoria.
@@ -151,19 +154,36 @@ export class M3UTvRepository {
   async #loadTvsFromSource() {
     this.#logger.debug(`Fetching M3U from: ${this.#m3uUrl}`);
     
-    const response = await fetch(this.#m3uUrl, {
-      headers: {
-        'User-Agent': 'Stremio-Addon/1.0',
-        'Accept': 'application/x-mpegURL, text/plain, */*'
-      },
-      timeout: 10000
-    });
+    let m3uContent;
+    
+    // Detectar si es un archivo local o una URL remota
+    if (this.#isLocalFile(this.#m3uUrl)) {
+      // Es un archivo local
+      const filePath = this.#resolveLocalPath(this.#m3uUrl);
+      
+      if (!existsSync(filePath)) {
+        throw new Error(`Local M3U file not found: ${filePath}`);
+      }
+      
+      m3uContent = await readFile(filePath, 'utf8');
+      this.#logger.debug(`Loaded M3U content from local file: ${filePath}`);
+    } else {
+      // Es una URL remota
+      const response = await fetch(this.#m3uUrl, {
+        headers: {
+          'User-Agent': 'Stremio-Addon/1.0',
+          'Accept': 'application/x-mpegURL, text/plain, */*'
+        },
+        timeout: 10000
+      });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      m3uContent = await response.text();
+      this.#logger.debug(`Loaded M3U content from remote URL`);
     }
-
-    const m3uContent = await response.text();
     
     if (!M3UParser.isValidM3U(m3uContent)) {
       throw new Error('Invalid M3U format received');
@@ -180,6 +200,31 @@ export class M3UTvRepository {
     this.#lastFetch = Date.now();
     
     this.#logger.debug(`Loaded ${tvs.length} tvs from M3U source`);
+  }
+
+  /**
+   * Verifica si la ruta es un archivo local.
+   * @private
+   * @param {string} path - Ruta a verificar
+   * @returns {boolean} True si es un archivo local
+   */
+  #isLocalFile(path) {
+    // Detectar si es una ruta de archivo local (no URL)
+    return !path.startsWith('http://') && !path.startsWith('https://');
+  }
+
+  /**
+   * Resuelve la ruta del archivo local.
+   * @private
+   * @param {string} path - Ruta del archivo
+   * @returns {string} Ruta absoluta resuelta
+   */
+  #resolveLocalPath(path) {
+    // Si la ruta es relativa, resolverla desde el directorio del proyecto
+    if (path.startsWith('.') || !path.startsWith('/')) {
+      return resolve(process.cwd(), path);
+    }
+    return path;
   }
 
   /**
