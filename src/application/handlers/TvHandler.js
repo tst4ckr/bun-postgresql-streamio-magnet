@@ -165,8 +165,25 @@ export class TvHandler {
           };
         }
 
+        // Cabeceras adicionales para mejorar compatibilidad con ciertos proveedores
+        const proxyHeaders = { request: {} };
+        if (process.env.TV_STREAM_USER_AGENT && typeof process.env.TV_STREAM_USER_AGENT === 'string') {
+          proxyHeaders.request['User-Agent'] = process.env.TV_STREAM_USER_AGENT;
+        }
+        if (process.env.TV_STREAM_REFERER && typeof process.env.TV_STREAM_REFERER === 'string') {
+          proxyHeaders.request['Referer'] = process.env.TV_STREAM_REFERER;
+        }
+        if (process.env.TV_STREAM_ORIGIN && typeof process.env.TV_STREAM_ORIGIN === 'string') {
+          proxyHeaders.request['Origin'] = process.env.TV_STREAM_ORIGIN;
+        }
+
+        // Log de configuración aplicada (solo si hay cabeceras custom)
+        if (Object.keys(proxyHeaders.request).length > 0) {
+          this.#logger.debug(`[TV] Aplicando proxyHeaders al stream:`, proxyHeaders.request);
+        }
+
         return {
-          streams: [tv.toStremioStream()],
+          streams: [tv.toStremioStream({ proxyHeaders })],
           cacheMaxAge: this.#config.cache.streamCacheMaxAge
         };
       } catch (error) {

@@ -122,7 +122,15 @@ export class Tv {
    * Convierte el canal a formato de stream de Stremio.
    * @returns {Object} Stream en formato Stremio
    */
-  toStremioStream() {
+  toStremioStream(options = {}) {
+    const defaultHeaders = {
+      'User-Agent': 'Stremio/4.4.142 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    };
+
+    // Merge de headers proporcionados por opciones (por ejemplo, Referer/Origin)
+    const extraRequestHeaders = options?.proxyHeaders?.request || {};
+    const mergedRequestHeaders = { ...defaultHeaders, ...extraRequestHeaders };
+
     return {
       name: this.#name,
       description: `Canal: ${this.#name}${this.#group ? ` (${this.#group})` : ''}`,
@@ -131,9 +139,7 @@ export class Tv {
         notWebReady: true,
         bingeGroup: `tv-${this.#group}`,
         proxyHeaders: {
-          request: {
-            'User-Agent': 'Stremio/4.4.142 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
+          request: mergedRequestHeaders
         }
       }
     };

@@ -159,12 +159,16 @@ export class M3UParser {
    * @returns {boolean} True si es M3U válido
    */
   static isValidM3U(content) {
-    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+    if (!content || (typeof content !== 'string' && !(content instanceof String))) {
       return false;
     }
 
+    // Normalizar a string y limpiar posibles BOM al inicio
+    const raw = String(content);
+    const cleaned = raw.replace(/^\uFEFF/, '').trim();
+
     // Verificar rápidamente las primeras líneas sin split completo
-    const firstLine = content.substring(0, 100).split('\n')[0].trim();
+    const firstLine = cleaned.substring(0, 100).split('\n')[0].trim().replace(/^\uFEFF/, '');
     
     // Debe empezar con #EXTM3U
     if (!firstLine.startsWith('#EXTM3U')) {
@@ -172,7 +176,8 @@ export class M3UParser {
     }
 
     // Verificar rápidamente si hay al menos una línea EXTINF
-    return content.includes('#EXTINF:');
+    // Usar el contenido limpiado para la verificación de EXTINF
+    return cleaned.includes('#EXTINF:');
   }
 
   

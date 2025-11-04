@@ -151,12 +151,19 @@ export class M3UTvRepository {
   async #loadTvsFromSource() {
     this.#logger.debug(`Fetching M3U from: ${this.#m3uUrl}`);
     
+    const headers = {
+      'User-Agent': process.env.M3U_REQUEST_USER_AGENT || 'Stremio-Addon/1.0',
+      'Accept': process.env.M3U_REQUEST_ACCEPT || 'application/x-mpegURL, text/plain, */*'
+    };
+    if (process.env.M3U_REQUEST_REFERER) {
+      headers['Referer'] = process.env.M3U_REQUEST_REFERER;
+    }
+
+    const timeout = parseInt(process.env.M3U_REQUEST_TIMEOUT) || 10000;
+
     const response = await fetch(this.#m3uUrl, {
-      headers: {
-        'User-Agent': 'Stremio-Addon/1.0',
-        'Accept': 'application/x-mpegURL, text/plain, */*'
-      },
-      timeout: 10000
+      headers,
+      timeout
     });
 
     if (!response.ok) {
@@ -166,6 +173,9 @@ export class M3UTvRepository {
     const m3uContent = await response.text();
     
     if (!M3UParser.isValidM3U(m3uContent)) {
+      // Log de diagnóstico para saber por qué no es válido
+      const preview = m3uContent.substring(0, 200).replace(/\n/g, '\\n');
+      this.#logger.warn('Invalid M3U format received. First bytes preview:', preview);
       throw new Error('Invalid M3U format received');
     }
 
