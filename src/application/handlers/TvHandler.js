@@ -54,10 +54,11 @@ export class TvHandler {
    */
   createCatalogHandler() {
     return async (args) => {
-      this.#logger.info(`TV catalog request: id=${args.id}`);
+      this.#logger.info(`TV catalog request: id=${args.id}, type=${args.type || 'tv'}`);
 
       try {
         const tvs = await this.#tvRepository.getAllTvs();
+        this.#logger.debug(`TV catalog loaded: total=${tvs?.length || 0}`);
         if (!tvs || tvs.length === 0) {
           this.#logger.warn('No TV channels found for catalog');
           return { metas: [] };
@@ -65,6 +66,7 @@ export class TvHandler {
 
         const genre = args.extra?.genre;
         const filteredTvs = genre ? tvs.filter(tv => tv.group === genre) : tvs;
+        this.#logger.debug(`TV catalog filter: genre=${genre || 'none'}, result=${filteredTvs.length}`);
         
         if (genre && filteredTvs.length === 0) {
           this.#logger.warn(`No TV channels found for genre: "${genre}"`);

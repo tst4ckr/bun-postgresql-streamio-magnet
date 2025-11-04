@@ -326,15 +326,15 @@ function generateManifest() {
       ? ['drama', 'comedy', 'action', 'crime', 'sci-fi', 'fantasy', 'thriller', 'documentary']
       : catalog.type === 'anime'
       ? ['action', 'adventure', 'comedy', 'drama', 'fantasy', 'romance', 'sci-fi', 'slice-of-life']
-      : catalog.type === 'tv'
+      : (catalog.type === 'tv' || catalog.type === 'channel')
       ? ['news', 'sports', 'entertainment', 'documentary', 'kids', 'music']
       : undefined,
     // Agregar filtros de idioma para contenido internacional
-    ...(catalog.type !== 'tv' && {
+    ...(catalog.type !== 'tv' && catalog.type !== 'channel' && {
       languages: ['spanish', 'english', 'japanese', 'korean', 'portuguese', 'french']
     }),
     // Filtros de calidad para mejor experiencia
-    ...(catalog.type !== 'tv' && {
+    ...(catalog.type !== 'tv' && catalog.type !== 'channel' && {
       qualities: ['4K', '1080p', '720p', '480p']
     })
   }));
