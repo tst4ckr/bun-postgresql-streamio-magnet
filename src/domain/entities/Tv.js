@@ -100,22 +100,7 @@ export class Tv {
       id: this.#id,
       type: typeOverride || 'tv',
       name: this.#name,
-      poster,
-      posterShape: 'landscape',
-      background: poster,
-      description: `Canal: ${this.#name}${this.#group ? ` (${this.#group})` : ''}`,
-      genre: [this.#group],
-      runtime: 'Live TV',
-      released: new Date().getFullYear().toString(),
-      imdbRating: null,
-      cast: [],
-      director: [],
-      writer: [],
-      country: 'ES',
-      language: 'es',
-      awards: null,
-      website: null
-
+      poster: poster
     };
   }
 
