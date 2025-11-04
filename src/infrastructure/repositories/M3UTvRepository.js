@@ -5,8 +5,7 @@
 
 import { M3UParser } from '../utils/M3UParser.js';
 import { readFile } from 'fs/promises';
-import { existsSync } from 'fs';
-import { join, resolve } from 'path';
+import { isLocalFile, resolveLocalPath, validateLocalFile, buildFileNotFoundError } from './M3UTvRepository_tools.js';
 
 /**
  * Repositorio para canales de TV M3U que implementa cache en memoria.
@@ -157,12 +156,12 @@ export class M3UTvRepository {
     let m3uContent;
     
     // Detectar si es un archivo local o una URL remota
-    if (this.#isLocalFile(this.#m3uUrl)) {
+    if (isLocalFile(this.#m3uUrl)) {
       // Es un archivo local
-      const filePath = this.#resolveLocalPath(this.#m3uUrl);
+      const filePath = resolveLocalPath(this.#m3uUrl);
       
-      if (!existsSync(filePath)) {
-        throw new Error(`Local M3U file not found: ${filePath}`);
+      if (!validateLocalFile(this.#m3uUrl)) {
+        throw new Error(buildFileNotFoundError(filePath));
       }
       
       m3uContent = await readFile(filePath, 'utf8');
@@ -202,30 +201,7 @@ export class M3UTvRepository {
     this.#logger.debug(`Loaded ${tvs.length} tvs from M3U source`);
   }
 
-  /**
-   * Verifica si la ruta es un archivo local.
-   * @private
-   * @param {string} path - Ruta a verificar
-   * @returns {boolean} True si es un archivo local
-   */
-  #isLocalFile(path) {
-    // Detectar si es una ruta de archivo local (no URL)
-    return !path.startsWith('http://') && !path.startsWith('https://');
-  }
 
-  /**
-   * Resuelve la ruta del archivo local.
-   * @private
-   * @param {string} path - Ruta del archivo
-   * @returns {string} Ruta absoluta resuelta
-   */
-  #resolveLocalPath(path) {
-    // Si la ruta es relativa, resolverla desde el directorio del proyecto
-    if (path.startsWith('.') || !path.startsWith('/')) {
-      return resolve(process.cwd(), path);
-    }
-    return path;
-  }
 
   /**
    * Obtiene información de configuración del repositorio.
