@@ -39,21 +39,21 @@ const config = {
     resources: [
       {
         name: 'catalog',
-        types: ['movie', 'series', 'tv', 'channel'],
+        types: ['movie', 'series', 'tv'],
         idPrefixes: ['tt', 'tv_']
       },
       {
         name: 'meta',
-        types: ['movie', 'series', 'tv', 'channel'],
+        types: ['movie', 'series', 'tv'],
         idPrefixes: ['tt', 'tv_']
       },
       {
         name: 'stream',
-        types: ['movie', 'series', 'tv', 'channel'],
+        types: ['movie', 'series', 'tv'],
         idPrefixes: ['tt', 'tv_']
       }
     ],
-    types: ['movie', 'series', 'tv', 'channel'],
+    types: ['movie', 'series', 'tv'],
     catalogs: [
       {
         type: 'movie',
