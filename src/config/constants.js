@@ -173,13 +173,12 @@ export const LANGUAGE_CONSTANTS = {
  */
 export const CONTENT_TYPE_CONSTANTS = {
   // Tipos de contenido soportados
-  SUPPORTED_TYPES: ['movie', 'series', 'anime', 'tv'],
+  SUPPORTED_TYPES: ['movie', 'series', 'tv'],
 
   // Mapeo de tipos de contenido
   TYPE_MAPPING: {
     movie: 'movie',
     series: 'series',
-    anime: 'anime',
     tv: 'tv',
   },
 
@@ -261,9 +260,9 @@ export const LOGGING_CONSTANTS = {
 export const CASCADE_CONSTANTS = {
   // Prioridades por tipo
   SEARCH_PRIORITIES: {
-    movie: ['torrentio', 'primary', 'anime'],
-    series: ['torrentio', 'primary', 'anime'],
-    anime: ['anime', 'torrentio', 'primary'],
+    movie: ['torrentio', 'primary'],
+    series: ['torrentio', 'primary'],
+    tv: ['primary'],
   },
   
   // Configuración por defecto

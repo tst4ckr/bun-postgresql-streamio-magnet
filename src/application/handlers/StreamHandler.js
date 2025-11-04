@@ -368,7 +368,8 @@ export class StreamHandler {
    * @returns {boolean}
    */
   #isSupportedType(type) {
-    return ['movie', 'series', 'anime', 'tv'].includes(type);
+    // Solo soportamos movies, series y tv. Anime se ha deshabilitado explícitamente.
+    return ['movie', 'series', 'tv'].includes(type);
   }
 
   /**
