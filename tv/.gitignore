@@ -158,10 +158,10 @@ Thumbs.db
 *.m3u8
 
 # Output directory
-output/
-src/output/
-data/
-src/data/
+#output/
+#src/output/
+#data/
+#src/data/
 
 # Data files (uncomment if you don't want to track data files)
 # data/

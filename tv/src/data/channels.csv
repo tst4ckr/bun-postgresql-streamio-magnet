@@ -1,0 +1,4 @@
+name,url,logo,group,language,country
+Canal Test 1,http://example.com/stream1.m3u8,http://example.com/logo1.png,Entretenimiento,es,ES
+Canal Test 2,http://example.com/stream2.m3u8,http://example.com/logo2.png,Deportes,es,ES
+Canal Test 3,http://example.com/stream3.m3u8,http://example.com/logo3.png,Noticias,es,ES
