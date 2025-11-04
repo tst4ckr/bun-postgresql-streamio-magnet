@@ -3,6 +3,8 @@
  * Gestiona las solicitudes de catálogo, metadatos y streams para canales de TV.
  */
 
+import { ErrorHandler } from '../../infrastructure/errors/ErrorHandler.js';
+
 /**
  * Manejador para la lógica de canales de TV en Stremio.
  */
@@ -10,6 +12,7 @@ export class TvHandler {
   #tvRepository;
   #config;
   #logger;
+  #errorHandler;
 
   /**
    * @param {M3UTvRepository} tvRepository - Repositorio de canales de TV
@@ -20,6 +23,7 @@ export class TvHandler {
     this.#tvRepository = tvRepository;
     this.#config = config;
     this.#logger = logger;
+    this.#errorHandler = new ErrorHandler(logger, config?.cascadeSearch || {});
   }
 
   /**
@@ -57,22 +61,26 @@ export class TvHandler {
       this.#logger.info(`TV catalog request: id=${args.id}`, { extra: args.extra });
 
       try {
-        const tvs = await this.#tvRepository.getAllTvs();
-        if (!tvs || tvs.length === 0) {
-          this.#logger.warn('No TV channels found for catalog');
+        const { type, id, extra = {} } = args;
+
+        // Validar tipo de contenido
+        if (type !== 'tv') {
           return { metas: [] };
         }
-        const extra = args.extra || {};
 
-        // Filtro por género (grupo M3U)
-        const genre = extra.genre?.trim();
-        let filteredTvs = genre ? tvs.filter(tv => tv.group === genre) : tvs;
-        
-        // Filtro por búsqueda (por nombre del canal)
-        const search = extra.search?.trim();
-        if (search) {
-          const q = search.toLowerCase();
-          filteredTvs = filteredTvs.filter(tv => tv.name.toLowerCase().includes(q));
+        // Obtener todos los canales desde repositorio M3U
+        const tvs = await this.#tvRepository.getAllTvs();
+        if (!tvs || tvs.length === 0) {
+          this.#logger.warn('No hay canales de TV disponibles');
+          return { metas: [] };
+        }
+
+        // Filtrar según el catálogo solicitado (similar a CatalogHandler)
+        let filteredTvs = this.#filterTvsByCatalog(tvs, id, extra);
+
+        // Aplicar búsqueda si se proporciona (por nombre o grupo)
+        if (extra.search) {
+          filteredTvs = this.#searchTvs(filteredTvs, extra.search);
         }
 
         // Orden opcional
@@ -81,17 +89,18 @@ export class TvHandler {
           filteredTvs = filteredTvs.sort((a, b) => a.name.localeCompare(b.name));
         }
 
-        // Paginación (skip/limit) compatible con Stremio
-        const skip = Number(extra.skip ?? 0);
-        const limit = Number(extra.limit ?? 50);
-        const pagedTvs = filteredTvs.slice(skip, skip + limit);
-        
-        if (genre && filteredTvs.length === 0) {
-          this.#logger.warn(`No TV channels found for genre: "${genre}"`);
-        }
+        // Paginación estilo Stremio (pageSize 100 y flag hasMore)
+        const skip = parseInt(extra.skip) || 0;
+        const pageSize = 100;
+        const { items: pagedTvs, hasMore } = this.#paginateTvs(filteredTvs, skip, pageSize);
+
+        const metas = pagedTvs.map(tv => tv.toStremioMeta(args.type));
+
+        this.#logger.info(`Catálogo '${id}': ${metas.length} de ${filteredTvs.length}`);
 
         return {
-          metas: pagedTvs.map(tv => tv.toStremioMeta(args.type)),
+          metas,
+          ...(hasMore && { hasMore: true }),
           cacheMaxAge: this.#config.cache.tvCatalogMaxAge
         };
       } catch (error) {
@@ -149,5 +158,116 @@ export class TvHandler {
         return Promise.reject(error);
       }
     };
+  }
+
+  /**
+   * Filtra canales de TV según el catálogo solicitado
+   * @private
+   * @param {Array} tvs - Lista de canales TV
+   * @param {string} catalogId - ID del catálogo
+   * @param {Object} extra - Parámetros adicionales
+   * @returns {Array} Canales filtrados
+   */
+  #filterTvsByCatalog(tvs, catalogId, extra = {}) {
+    const byGroup = (groupTerm) => tvs.filter(tv => (tv.group || '').toLowerCase().includes(groupTerm));
+    const byNameIncludes = (term) => tvs.filter(tv => tv.name.toLowerCase().includes(term));
+
+    switch (catalogId) {
+      case 'tv_all':
+      case 'tv_catalog':
+        return tvs;
+
+      case 'tv_peru':
+        // Muchos M3U usan grupos por país
+        return byGroup('peru');
+
+      case 'tv_hd':
+        // No hay campo de calidad, usar heurística por nombre/grupo
+        return tvs.filter(tv =>
+          tv.name.toLowerCase().includes('hd') || (tv.group || '').toLowerCase().includes('hd')
+        );
+
+      case 'tv_news': {
+        const keywords = ['news', 'noticias', 'informativo', 'cnn', 'bbc', 'rpp'];
+        return tvs.filter(tv => {
+          const name = tv.name.toLowerCase();
+          const group = (tv.group || '').toLowerCase();
+          return keywords.some(k => name.includes(k) || group.includes(k));
+        });
+      }
+
+      case 'tv_sports': {
+        const keywords = ['sport', 'deportes', 'espn', 'fox sports', 'gol', 'futbol', 'football'];
+        return tvs.filter(tv => {
+          const name = tv.name.toLowerCase();
+          const group = (tv.group || '').toLowerCase();
+          return keywords.some(k => name.includes(k) || group.includes(k));
+        });
+      }
+
+      case 'tv_entertainment': {
+        const entertainmentKeywords = ['entretenimiento', 'entertainment', 'variety', 'comedy', 'drama'];
+        const isNews = (tv) => {
+          const newsKeywords = ['news', 'noticias', 'informativo', 'cnn', 'bbc', 'rpp'];
+          const name = tv.name.toLowerCase();
+          const group = (tv.group || '').toLowerCase();
+          return newsKeywords.some(k => name.includes(k) || group.includes(k));
+        };
+        const isSports = (tv) => {
+          const sportsKeywords = ['sport', 'deportes', 'espn', 'fox sports', 'gol', 'futbol', 'football'];
+          const name = tv.name.toLowerCase();
+          const group = (tv.group || '').toLowerCase();
+          return sportsKeywords.some(k => name.includes(k) || group.includes(k));
+        };
+        return tvs.filter(tv => {
+          const name = tv.name.toLowerCase();
+          const group = (tv.group || '').toLowerCase();
+          const matchesEntertainment = entertainmentKeywords.some(k => name.includes(k) || group.includes(k));
+          return matchesEntertainment && !isNews(tv) && !isSports(tv);
+        });
+      }
+
+      case 'tv_by_genre':
+        if (extra.genre) {
+          const genreTerm = extra.genre.toLowerCase();
+          return byGroup(genreTerm);
+        }
+        return tvs;
+
+      default:
+        // Si llega un catálogo desconocido, devolver todo y permitir búsqueda/orden/paginación
+        return tvs;
+    }
+  }
+
+  /**
+   * Busca canales por nombre o grupo
+   * @private
+   * @param {Array} tvs - Lista de canales
+   * @param {string} searchTerm - Término de búsqueda
+   * @returns {Array} Canales que coinciden con la búsqueda
+   */
+  #searchTvs(tvs, searchTerm) {
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) return tvs;
+    return tvs.filter(tv =>
+      tv.name.toLowerCase().includes(term) || (tv.group || '').toLowerCase().includes(term)
+    );
+  }
+
+  /**
+   * Aplica paginación a los canales
+   * @private
+   * @param {Array} tvs - Lista de canales
+   * @param {number} skip - Número de elementos a omitir
+   * @param {number} pageSize - Tamaño de página
+   * @returns {Object} Objeto con items paginados y flag hasMore
+   */
+  #paginateTvs(tvs, skip = 0, pageSize = 100) {
+    const startIndex = Math.max(0, skip);
+    const endIndex = startIndex + pageSize;
+    const items = tvs.slice(startIndex, endIndex);
+    const hasMore = endIndex < tvs.length;
+    return { items, hasMore };
   }
 }
