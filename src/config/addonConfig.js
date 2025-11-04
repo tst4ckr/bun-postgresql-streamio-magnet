@@ -33,27 +33,27 @@ const config = {
     id: process.env.ADDON_ID || 'org.stremio.torrent.search',
     version: process.env.ADDON_VERSION || '1.3.0',
     name: process.env.ADDON_NAME || 'Torrent Search Pro',
-    description: process.env.ADDON_DESCRIPTION || 'Advanced torrent search addon with cascading search system for movies, series and anime. Features unified metadata management, detailed logging, and specialized anime support with multiple ID formats.',
+    description: process.env.ADDON_DESCRIPTION || 'Advanced torrent search addon for movies, series and live TV channels (M3U). Features unified metadata management and detailed logging.',
     logo: process.env.ADDON_LOGO || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiBmaWxsPSIjMWExYTFhIi8+Cjx0ZXh0IHg9IjEyOCIgeT0iMTQwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iNzIiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjZmZmZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5UUzwvdGV4dD4KPC9zdmc+',
     background: process.env.ADDON_BACKGROUND || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyMCIgaGVpZ2h0PSIxMDgwIiB2aWV3Qm94PSIwIDAgMTkyMCAxMDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTkyMCIgaGVpZ2h0PSIxMDgwIiBmaWxsPSIjMWExYTFhIi8+Cjx0ZXh0IHg9Ijk2MCIgeT0iNTgwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iODAiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjZmZmZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5Ub3JyZW50IFNlYXJjaDwvdGV4dD4KPC9zdmc+',
     resources: [
       {
         name: 'catalog',
-        types: ['movie', 'series', 'anime', 'tv', 'channel'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv_']
+        types: ['movie', 'series', 'tv'],
+        idPrefixes: ['tt', 'tv_']
       },
       {
         name: 'meta',
-        types: ['movie', 'series', 'anime', 'tv', 'channel'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv_']
+        types: ['movie', 'series', 'tv'],
+        idPrefixes: ['tt', 'tv_']
       },
       {
         name: 'stream',
-        types: ['movie', 'series', 'anime', 'tv', 'channel'],
-        idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv_']
+        types: ['movie', 'series', 'tv'],
+        idPrefixes: ['tt', 'tv_']
       }
     ],
-    types: ['movie', 'series', 'anime', 'tv', 'channel'],
+    types: ['movie', 'series', 'tv'],
     catalogs: [
       {
         type: 'movie',
@@ -66,11 +66,6 @@ const config = {
         name: 'Series'
       },
       {
-        type: 'anime',
-        id: 'anime_catalog',
-        name: 'Anime'
-      },
-      {
         type: 'tv',
         id: 'tv_catalog',
         name: 'TV Channels',
@@ -81,20 +76,8 @@ const config = {
           { name: 'limit', isRequired: false }
         ]
       }
-      ,
-      {
-        type: 'channel',
-        id: 'tv_catalog',
-        name: 'TV Channels',
-        extra: [
-          { name: 'search', isRequired: false },
-          { name: 'genre', isRequired: false },
-          { name: 'skip', isRequired: false },
-          { name: 'limit', isRequired: false }
-        ]
-      }
     ],
-    idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv:', 'tv_']
+    idPrefixes: ['tt', 'tv_']
   },
   server: {
     port: process.env.PORT || CONSTANTS.NETWORK.DEFAULT_SERVER_PORT,
