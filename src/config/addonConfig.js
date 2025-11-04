@@ -79,7 +79,7 @@ const config = {
       ,
       {
         type: 'channel',
-        id: 'tv_catalog',
+        id: 'channel_catalog',
         name: 'TV Channels'
       }
     ],
