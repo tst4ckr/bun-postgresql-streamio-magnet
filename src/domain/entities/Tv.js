@@ -111,9 +111,17 @@ export class Tv {
       language: 'es',
       awards: null,
       website: null,
+      videos: [{
+        id: this.#id,
+        title: this.#name,
+        released: new Date().toISOString(),
+        thumbnail: this.#logo,
+        available: true,
+        streams: [this.toStremioStream()]
+      }],
       behaviorHints: {
         defaultVideoId: this.#id,
-        hasScheduledVideos: false
+        hasScheduledVideos: true
       }
     };
   }
@@ -135,7 +143,8 @@ export class Tv {
             'User-Agent': 'Stremio/4.4.142 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
           }
         }
-      }
+      },
+      isLive: true
     };
   }
 
