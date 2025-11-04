@@ -6,7 +6,7 @@
 import net from 'net';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { CONSTANTS } from '../../config/constants.js';
-import { UnifiedLogger } from './UnifiedLogger.js';
+import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 
 /**
  * Servicio para gestión completa de Tor.
@@ -46,7 +46,7 @@ export class TorService {
     this.#maxRetries = config.maxRetries ?? CONSTANTS.NETWORK.MAX_RETRIES;
     this.#retryDelay = config.retryDelay ?? CONSTANTS.TIME.TOR_RETRY_DELAY;
     this.#timeout = config.timeout ?? CONSTANTS.TIME.DEFAULT_TIMEOUT;
-    this.#logger = logger || new UnifiedLogger({ context: 'TorService' });
+    this.#logger = logger || new EnhancedLogger('TorService');
     this.#rotationInterval = null;
     this.#agent = null;
 

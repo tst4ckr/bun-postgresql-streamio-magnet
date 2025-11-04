@@ -11,7 +11,7 @@ import { CascadingMagnetRepository } from './infrastructure/repositories/Cascadi
 import { StreamHandler } from './application/handlers/StreamHandler.js';
 import { TvHandler } from './application/handlers/TvHandler.js';
 import { M3UTvRepository } from './infrastructure/repositories/M3UTvRepository.js';
-import { UnifiedLogger } from './infrastructure/services/UnifiedLogger.js';
+import { EnhancedLogger } from './infrastructure/utils/EnhancedLogger.js';
 import { TorService } from './infrastructure/services/TorService.js';
 
 /**
@@ -867,19 +867,16 @@ class MagnetAddon {
   /**
    * Crea logger optimizado según el entorno.
    * @private
-   * @returns {UnifiedLogger}
+   * @returns {EnhancedLogger}
    */
   #createLogger() {
     const { logLevel, enableDetailedLogging, production } = this.#config.logging;
     const isProduction = process.env.NODE_ENV === 'production';
     
-    return new UnifiedLogger({
-      level: logLevel,
-      enableSourceTracking: isProduction ? false : enableDetailedLogging,
-      enableStructuredLogging: true,
-      enableLazyEvaluation: true,
-      maxMemoryMB: production?.maxMemoryMB || 5
-    });
+    const sourceTracking = isProduction ? false : enableDetailedLogging;
+    const productionConfig = isProduction ? production : {};
+    
+    return new EnhancedLogger(logLevel, sourceTracking, productionConfig);
   }
 }
 
@@ -895,12 +892,9 @@ async function main() {
   try {
     // FASE PREVIA: Configuración básica y logging
     const config = addonConfig;
-    logger = new UnifiedLogger({
-      level: config.logging.logLevel,
-      enableSourceTracking: false,
-      enableStructuredLogging: true,
-      enableLazyEvaluation: true,
-      maxMemoryMB: 5
+    logger = new EnhancedLogger(config.logging.logLevel, false, {
+      errorOnly: false,
+      minimalOutput: false
     });
     
     logger.info('🎬 Iniciando Stremio Addon - VeoVeo Search Pro');
@@ -952,12 +946,9 @@ async function main() {
     
   } catch (error) {
     if (!logger) {
-      logger = new UnifiedLogger({
-        level: 'error',
-        enableSourceTracking: false,
-        enableStructuredLogging: true,
-        enableLazyEvaluation: true,
-        maxMemoryMB: 5
+      logger = new EnhancedLogger('error', false, {
+        errorOnly: true,
+        minimalOutput: true
       });
     }
     

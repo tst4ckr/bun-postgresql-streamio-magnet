@@ -3,7 +3,7 @@
  * Garantiza que todos los archivos necesarios existan antes de la inicialización del sistema
  */
 
-import { UnifiedLogger } from '../services/UnifiedLogger.js';
+import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 import { existsSync, writeFileSync, mkdirSync, readFileSync } from 'fs';
 import { dirname } from 'path';
 
@@ -16,7 +16,7 @@ export class CsvFileInitializer {
     /**
      * Logger estático para la clase
      */
-    static #logger = new UnifiedLogger();
+    static #logger = new EnhancedLogger();
 
     /**
      * Inicializa todos los archivos CSV necesarios para el sistema
