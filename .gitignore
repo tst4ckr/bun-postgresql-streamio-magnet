@@ -1,0 +1,60 @@
+# ===================================
+# Archivos de configuración locales
+# ===================================
+# Ignorar el archivo de entorno principal, pero mantener la plantilla
+config.env
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ===================================
+# Dependencias
+# ===================================
+# Ignorar el directorio de módulos de Node/Bun
+node_modules/
+bun.lockb
+
+# ===================================
+# Logs y Reportes
+# ===================================
+# Ignorar archivos de log y reportes generados
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+validation-report-*.json
+
+# ===================================
+# Archivos del sistema operativo
+# ===================================
+.DS_Store
+Thumbs.db
+
+# ===================================
+# Archivos de editores y IDEs
+# ===================================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# ===================================
+# Archivos de build y producción
+# ===================================
+dist/
+build/
+.next/
+.vercel/
+
+# ===================================
+# Archivos de testing
+# ===================================
+coverage/
+.nyc_output/
