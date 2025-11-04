@@ -5,7 +5,6 @@
 
 import crypto from 'crypto';
 import { Channel } from '../../domain/entities/Channel.js';
-import { EnvLoader } from './EnvLoader.js';
 
 /**
  * Configuración centralizada del addon de TV IPTV
@@ -24,11 +23,7 @@ export class TVAddonConfig {
    * @private
    */
   constructor() {
-    // Cargar variables de entorno solo si no están ya definidas (evita carga automática)
-    if (!process.env.CHANNELS_SOURCE && !process.env.M3U_URL) {
-      EnvLoader.getInstance();
-    }
-    
+    // No cargar automáticamente el entorno - asumir que ya está cargado
     this.#config = this.#loadConfiguration();
     this.#validateConfiguration();
     Object.freeze(this.#config);

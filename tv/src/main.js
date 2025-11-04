@@ -7,6 +7,10 @@
  * @module Main
  */
 
+// Cargar variables de entorno primero
+import { config } from 'dotenv';
+config({ path: '.env' });
+
 import { IPTVLibraryFactory } from './lib/index.js';
 
 /**
