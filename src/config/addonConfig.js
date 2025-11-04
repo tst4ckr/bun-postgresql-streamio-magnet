@@ -73,7 +73,13 @@ const config = {
       {
         type: 'tv',
         id: 'tv_catalog',
-        name: 'TV Channels'
+        name: 'TV Channels',
+        extra: [
+          { name: 'search', isRequired: false },
+          { name: 'genre', isRequired: false },
+          { name: 'skip', isRequired: false },
+          { name: 'limit', isRequired: false }
+        ]
       }
     ],
     idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv:', 'tv_']

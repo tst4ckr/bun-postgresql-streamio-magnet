@@ -54,7 +54,7 @@ export class TvHandler {
    */
   createCatalogHandler() {
     return async (args) => {
-      this.#logger.info(`TV catalog request: id=${args.id}`);
+      this.#logger.info(`TV catalog request: id=${args.id}`, { extra: args.extra });
 
       try {
         const tvs = await this.#tvRepository.getAllTvs();
@@ -62,16 +62,36 @@ export class TvHandler {
           this.#logger.warn('No TV channels found for catalog');
           return { metas: [] };
         }
+        const extra = args.extra || {};
 
-        const genre = args.extra?.genre;
-        const filteredTvs = genre ? tvs.filter(tv => tv.group === genre) : tvs;
+        // Filtro por género (grupo M3U)
+        const genre = extra.genre?.trim();
+        let filteredTvs = genre ? tvs.filter(tv => tv.group === genre) : tvs;
+        
+        // Filtro por búsqueda (por nombre del canal)
+        const search = extra.search?.trim();
+        if (search) {
+          const q = search.toLowerCase();
+          filteredTvs = filteredTvs.filter(tv => tv.name.toLowerCase().includes(q));
+        }
+
+        // Orden opcional
+        const sortBy = extra.sort || 'name';
+        if (sortBy === 'name') {
+          filteredTvs = filteredTvs.sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        // Paginación (skip/limit) compatible con Stremio
+        const skip = Number(extra.skip ?? 0);
+        const limit = Number(extra.limit ?? 50);
+        const pagedTvs = filteredTvs.slice(skip, skip + limit);
         
         if (genre && filteredTvs.length === 0) {
           this.#logger.warn(`No TV channels found for genre: "${genre}"`);
         }
 
         return {
-          metas: filteredTvs.map(tv => tv.toStremioMeta()),
+          metas: pagedTvs.map(tv => tv.toStremioMeta()),
           cacheMaxAge: this.#config.cache.tvCatalogMaxAge
         };
       } catch (error) {
