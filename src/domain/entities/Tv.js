@@ -93,10 +93,11 @@ export class Tv {
    * Convierte el canal a formato de metadatos de Stremio.
    * @returns {Object} Metadatos en formato Stremio
    */
-  toStremioMeta() {
+  toStremioMeta(options = {}) {
+    const requestedType = options?.type === 'channel' ? 'channel' : 'tv';
     return {
       id: this.#id,
-      type: 'tv',
+      type: requestedType,
       name: this.#name,
       // Stremio requiere poster en Meta Preview; usar logo por defecto si no hay
       poster: this.#logo || CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO,

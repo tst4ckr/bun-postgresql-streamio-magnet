@@ -173,7 +173,7 @@ export const LANGUAGE_CONSTANTS = {
  */
 export const CONTENT_TYPE_CONSTANTS = {
   // Tipos de contenido soportados
-  SUPPORTED_TYPES: ['movie', 'series', 'anime', 'tv'],
+  SUPPORTED_TYPES: ['movie', 'series', 'anime', 'tv', 'channel'],
 
   // Mapeo de tipos de contenido
   TYPE_MAPPING: {
@@ -181,6 +181,7 @@ export const CONTENT_TYPE_CONSTANTS = {
     series: 'series',
     anime: 'anime',
     tv: 'tv',
+    channel: 'channel',
   },
 
   // Configuración por tipo de contenido

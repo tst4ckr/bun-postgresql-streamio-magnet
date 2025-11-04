@@ -224,7 +224,7 @@ class HandlerFactory {
 
       try {
         // Delegación por tipo de contenido
-        if (args.type === 'tv' && tvHandler) {
+        if ((args.type === 'tv' || args.type === 'channel') && tvHandler) {
           this.#logger.debug(`[STREAM] Delegando a TvHandler`);
           return await tvHandler.createStreamHandler()(args);
         }
@@ -250,7 +250,7 @@ class HandlerFactory {
       });
 
       try {
-        if (args.type === 'tv' && tvHandler) {
+        if ((args.type === 'tv' || args.type === 'channel') && tvHandler) {
           return await tvHandler.createCatalogHandler()(args);
         }
         
@@ -275,7 +275,7 @@ class HandlerFactory {
       });
 
       try {
-        if (args.type === 'tv' && tvHandler) {
+        if ((args.type === 'tv' || args.type === 'channel') && tvHandler) {
           return await tvHandler.createMetaHandler()(args);
         }
         

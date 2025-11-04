@@ -71,7 +71,7 @@ export class TvHandler {
         }
 
         return {
-          metas: filteredTvs.map(tv => tv.toStremioMeta()),
+          metas: filteredTvs.map(tv => tv.toStremioMeta({ type: args.type })),
           cacheMaxAge: this.#config.cache.tvCatalogMaxAge
         };
       } catch (error) {
@@ -111,7 +111,7 @@ export class TvHandler {
         }
 
         return {
-          meta: tv.toStremioMeta(),
+          meta: tv.toStremioMeta({ type: args.type }),
           cacheMaxAge: this.#config.cache.metadataCacheMaxAge,
           // Headers de cache optimizados para metadatos de TV
           staleRevalidate: this.#config.cache.metadataCacheMaxAge * 3, // TV metadata es más estable
