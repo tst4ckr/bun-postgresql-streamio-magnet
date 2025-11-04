@@ -114,19 +114,8 @@ export class Tv {
       country: 'ES',
       language: 'es',
       awards: null,
-      website: null,
-      videos: [{
-        id: this.#id,
-        title: this.#name,
-        released: new Date().toISOString(),
-        thumbnail: this.#logo,
-        available: true,
-        streams: [this.toStremioStream()]
-      }],
-      behaviorHints: {
-        defaultVideoId: this.#id,
-        hasScheduledVideos: true
-      }
+      website: null
+
     };
   }
 
