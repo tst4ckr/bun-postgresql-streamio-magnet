@@ -287,13 +287,47 @@ export class DataLoader extends EventEmitter {
  * Maneja múltiples fuentes de datos con optimizaciones específicas
  */
 export class IPTVDataLoader {
-    constructor(container) {
-        this.container = container;
-        this.loaders = new Map();
-        this.config = container.resolve('configurationService');
-        this.logger = container.resolve('logger');
+    constructor(containerOrConfig) {
+        // Detectar si es un container o un config directo
+        if (containerOrConfig && typeof containerOrConfig.resolve === 'function') {
+            // Es un container
+            this.container = containerOrConfig;
+            this.config = containerOrConfig.resolve('configurationService');
+            this.logger = containerOrConfig.resolve('logger');
+        } else {
+            // Es un config directo
+            this.container = null;
+            this.config = containerOrConfig;
+            this.logger = console; // Fallback a console
+        }
         
+        this.loaders = new Map();
         this._initializeLoaders();
+    }
+
+    /**
+     * Obtiene la configuración de fuentes de manera compatible
+     * @private
+     * @returns {Object} Configuración de fuentes
+     */
+    _getSourcesConfig() {
+        // Si el config tiene método get (patrón container)
+        if (this.config && typeof this.config.get === 'function') {
+            return this.config.get('sources', {});
+        }
+        
+        // Si es TVAddonConfig, usar getAll() y extraer fuentes
+        if (this.config && typeof this.config.getAll === 'function') {
+            const allConfig = this.config.getAll();
+            return {
+                csv: allConfig.dataSources?.channelsSource === 'csv',
+                m3u: allConfig.dataSources?.m3uUrl || allConfig.dataSources?.autoM3uUrl,
+                api: false // Por ahora no hay fuente API configurada
+            };
+        }
+        
+        // Fallback: configuración vacía
+        return {};
     }
 
     /**
@@ -301,7 +335,8 @@ export class IPTVDataLoader {
      * @private
      */
     _initializeLoaders() {
-        const sources = this.config.get('sources', {});
+        // Obtener configuración de fuentes de manera compatible
+        const sources = this._getSourcesConfig();
         
         // Loader para datos CSV
         if (sources.csv) {
@@ -541,6 +576,14 @@ export class IPTVDataLoader {
             loader.removeAllListeners();
         }
         this.loaders.clear();
+    }
+
+    /**
+     * Método de limpieza para compatibilidad
+     * Alias para destroy()
+     */
+    cleanup() {
+        this.destroy();
     }
 }
 

@@ -16,7 +16,7 @@ import TVAddonConfig from '../infrastructure/config/TVAddonConfig.js';
 import { IPTVProcessor } from './core/iptv-processor.js';
 
 // Servicios principales
-import { DataLoader } from './services/data-loader.js';
+import { IPTVDataLoader } from './services/data-loader.js';
 import { ValidationService } from './services/validation.js';
 
 // Sistema de plugins
@@ -99,7 +99,7 @@ export class IPTVLibrary extends EventEmitter {
             });
 
             // 3. Inicializar servicios auxiliares
-            this.dataLoader = new DataLoader(this.config);
+            this.dataLoader = new IPTVDataLoader(this.config);
             this.validationService = new ValidationService(this.config);
 
             // 4. Inicializar sistema de plugins
