@@ -11,7 +11,7 @@ import { StreamHealthService } from '../services/StreamHealthService.js';
 import { StreamValidationService } from '../services/StreamValidationService.js';
 import { filterAllowedChannels } from '../../config/allowed-channels.js';
 import { filterBannedChannels } from '../../config/banned-channels.js';
-// Bun tiene fetch nativo, no necesita import
+import { shouldLogDetailed } from './AutomaticChannelRepository_tools.js';
 import { URL } from 'url';
 
 /**
@@ -414,9 +414,9 @@ export class AutomaticChannelRepository extends ChannelRepository {
    */
   async #validateChannelsBeforeFiltering(channels) {
     // Logging condicional: solo log detallado si hay pocos canales o en modo debug
-    const shouldLogDetailed = channels.length <= 100 || process.env.LOG_LEVEL === 'debug';
+    const shouldLog = shouldLogDetailed(channels.length);
     
-    if (shouldLogDetailed) {
+    if (shouldLog) {
       this.#logger.info(`Validando ${channels.length} canales pre-filtrado...`);
     } else {
       this.#logger.info(`Iniciando validación pre-filtrado de ${channels.length} canales`);
