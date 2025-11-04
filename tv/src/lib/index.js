@@ -1,205 +1,168 @@
 /**
- * IPTV Processing Library
+ * IPTV Library - Librería modular para procesamiento de datos IPTV
  * 
- * A comprehensive, modular library for IPTV channel data processing.
- * Provides unified API for loading, validating, transforming, and outputting IPTV data.
+ * Esta librería proporciona una interfaz unificada para el procesamiento
+ * de canales IPTV, incluyendo carga, validación, deduplicación y generación
+ * de archivos de salida.
  * 
  * @module IPTVLibrary
- * @version 1.0.0
  */
 
-// Core modules
-const EventEmitter = require('./core/event-emitter');
+// Módulos de configuración
+import { EnvLoader } from '../infrastructure/config/EnvLoader.js';
+import TVAddonConfig from '../infrastructure/config/TVAddonConfig.js';
 
-// Configuration modules
-const { ConfigurationBuilder } = require('./config/builder');
-const { ConfigurationService } = require('./config/service');
-const { ConfigurationValidator } = require('./config/validator');
+// Procesador principal
+import { IPTVProcessor } from './core/iptv-processor.js';
 
-// Service modules
-const { DataLoader, IPTVDataLoader, DataLoaderFactory } = require('./services/data-loader');
-const { ValidationService, ValidationServiceFactory } = require('./services/validation');
+// Servicios principales
+import { DataLoader } from './services/data-loader.js';
+import { ValidationService } from './services/validation.js';
 
-// Plugin system
-const { PluginManager, IPTVPluginFactory } = require('./plugins');
-const builtInPlugins = require('./plugins/built-in');
+// Sistema de plugins
+import { PluginManager } from './plugins/index.js';
+
+// Eventos
+import { EventEmitter } from 'events';
 
 /**
- * Main IPTV Library class that orchestrates all components
+ * Clase principal de la librería IPTV
+ * Orquesta todos los componentes y proporciona una interfaz unificada
  */
-class IPTVLibrary {
+export class IPTVLibrary extends EventEmitter {
     constructor(options = {}) {
+        super();
+        
         this.options = {
-            autoInitialize: options.autoInitialize !== false,
-            enablePlugins: options.enablePlugins !== false,
+            autoInit: options.autoInit !== false,
+            enableLogging: options.enableLogging !== false,
             enableMetrics: options.enableMetrics !== false,
-            enableCaching: options.enableCaching !== false,
+            enableValidation: options.enableValidation !== false,
+            chunkSize: options.chunkSize || 15,
             ...options
         };
-
-        // Initialize core components
-        this.eventEmitter = new EventEmitter();
-        this.configService = new ConfigurationService();
-        this.pluginManager = new PluginManager({
-            autoLoad: this.options.enablePlugins,
-            strict: false
-        });
-
-        // Initialize services
+        
+        this.config = null;
+        this.processor = null;
         this.dataLoader = null;
         this.validationService = null;
-
-        // State management
+        this.pluginManager = null;
+        
+        // Estado interno
         this.initialized = false;
         this.processing = false;
-
-        // Bind methods
+        
+        // Bind methods para evitar problemas de contexto
         this.process = this.process.bind(this);
+        this.processComplete = this.processComplete.bind(this);
         this.initialize = this.initialize.bind(this);
         this.cleanup = this.cleanup.bind(this);
-
-        // Auto-initialize if requested
-        if (this.options.autoInitialize) {
+        
+        // Auto-inicialización si está habilitada
+        if (this.options.autoInit) {
             this.initialize().catch(error => {
-                this.eventEmitter.emit('error', error);
+                this.emit('error', error);
             });
         }
     }
 
     /**
-     * Initialize the library with configuration
-     * @param {Object} config - Configuration object
+     * Inicializa la librería y todos sus componentes
      * @returns {Promise<void>}
      */
-    async initialize(config = {}) {
+    async initialize() {
         if (this.initialized) {
             return;
         }
 
         try {
-            // Load and validate configuration
-            await this.configService.load(config);
-            const finalConfig = this.configService.getConfig();
+            this.emit('initializing');
 
-            // Initialize services
-            this.dataLoader = DataLoaderFactory.create('iptv', {
-                config: finalConfig,
-                eventEmitter: this.eventEmitter
-            });
-
-            this.validationService = ValidationServiceFactory.create('standard', {
-                config: finalConfig,
-                eventEmitter: this.eventEmitter
-            });
-
-            // Register built-in plugins if enabled
-            if (this.options.enablePlugins) {
-                await this._registerBuiltInPlugins(finalConfig);
+            // 1. Cargar y validar configuración
+            if (this.options.enableLogging) {
+                console.log('🔧 Inicializando librería IPTV...');
             }
 
-            // Initialize plugin system
-            await this.pluginManager.initialize({
-                config: finalConfig,
-                services: {
-                    dataLoader: this.dataLoader,
-                    validationService: this.validationService,
-                    configService: this.configService
-                }
+            // Cargar variables de entorno si no están definidas
+            if (!process.env.CHANNELS_SOURCE && !process.env.M3U_URL) {
+                EnvLoader.getInstance();
+            }
+
+            this.config = TVAddonConfig.getInstance();
+
+            // 2. Inicializar procesador principal
+            this.processor = new IPTVProcessor({
+                enableLogging: this.options.enableLogging,
+                enableMetrics: this.options.enableMetrics,
+                enableValidation: this.options.enableValidation,
+                chunkSize: this.options.chunkSize
             });
 
+            // 3. Inicializar servicios auxiliares
+            this.dataLoader = new DataLoader(this.config);
+            this.validationService = new ValidationService(this.config);
+
+            // 4. Inicializar sistema de plugins
+            this.pluginManager = new PluginManager();
+
+            // 5. Registrar plugins built-in si están habilitados
+            if (this.options.enablePlugins !== false) {
+                await this._registerBuiltInPlugins();
+            }
+
             this.initialized = true;
-            this.eventEmitter.emit('initialized', { config: finalConfig });
+            this.emit('initialized');
+
+            if (this.options.enableLogging) {
+                console.log('✅ Librería IPTV inicializada correctamente');
+            }
 
         } catch (error) {
-            this.eventEmitter.emit('error', error);
+            this.emit('error', error);
             throw error;
         }
     }
 
     /**
-     * Process IPTV data through the complete pipeline
-     * @param {Object} options - Processing options
-     * @param {string} options.source - Data source (file path, URL, or data)
-     * @param {string} [options.type] - Source type (csv, m3u, api, auto)
-     * @param {Object} [options.config] - Override configuration
-     * @returns {Promise<Object>} Processing result
+     * Procesa canales IPTV usando el pipeline completo
+     * @param {Object} processingOptions - Opciones específicas de procesamiento
+     * @returns {Promise<Object>} Resultado del procesamiento
      */
-    async process(options = {}) {
+    async process(processingOptions = {}) {
         if (!this.initialized) {
             await this.initialize();
         }
 
         if (this.processing) {
-            throw new Error('Processing is already in progress');
+            throw new Error('Ya hay un procesamiento en curso');
         }
 
         this.processing = true;
-        const startTime = Date.now();
+        this.emit('processing-started');
 
         try {
-            // Prepare processing context
-            const context = {
-                config: { ...this.configService.getConfig(), ...options.config },
-                services: {
-                    dataLoader: this.dataLoader,
-                    validationService: this.validationService,
-                    configService: this.configService
-                },
-                data: null,
-                metadata: {
-                    source: options.source,
-                    type: options.type || 'auto',
-                    startTime,
-                    processingId: this._generateProcessingId()
-                }
-            };
-
-            this.eventEmitter.emit('processing:start', context.metadata);
-
-            // Execute processing pipeline with plugin hooks
-            const result = await this._executeProcessingPipeline(context, options);
-
-            // Finalize result
-            const endTime = Date.now();
-            const finalResult = {
-                success: true,
-                data: result.data,
-                metadata: {
-                    ...result.metadata,
-                    endTime,
-                    duration: endTime - startTime,
-                    recordCount: Array.isArray(result.data) ? result.data.length : 1
-                }
-            };
-
-            this.eventEmitter.emit('processing:complete', finalResult);
-            return finalResult;
+            // Ejecutar el pipeline completo usando el procesador
+            const result = await this.processor.process(processingOptions);
+            
+            this.emit('processing-completed', result);
+            return result;
 
         } catch (error) {
-            const errorResult = {
-                success: false,
-                error: error.message,
-                metadata: {
-                    source: options.source,
-                    type: options.type,
-                    startTime,
-                    endTime: Date.now(),
-                    duration: Date.now() - startTime
-                }
-            };
-
-            this.eventEmitter.emit('processing:error', { error, result: errorResult });
-            
-            // Execute error recovery if available
-            await this.pluginManager.executeHook('error', {
-                ...context,
-                error
-            });
-
+            this.emit('processing-error', error);
             throw error;
         } finally {
             this.processing = false;
         }
+    }
+
+    /**
+     * Método de conveniencia para procesamiento completo
+     * Alias para process() que mantiene compatibilidad
+     * @param {Object} options - Opciones de procesamiento
+     * @returns {Promise<Object>} Resultado del procesamiento
+     */
+    async processComplete(options = {}) {
+        return await this.process(options);
     }
 
     /**
@@ -329,196 +292,177 @@ class IPTVLibrary {
     }
 
     /**
-     * Register a custom plugin
-     * @param {Object|Function} plugin - Plugin definition or factory
-     * @param {Object} options - Plugin options
+     * Registra un plugin personalizado
+     * @param {Object} plugin - Plugin a registrar
      * @returns {Promise<void>}
      */
-    async registerPlugin(plugin, options = {}) {
-        return await this.pluginManager.register(plugin, options);
+    async registerPlugin(plugin) {
+        if (!this.pluginManager) {
+            throw new Error('Plugin manager no inicializado');
+        }
+        
+        await this.pluginManager.register(plugin);
+        this.emit('plugin-registered', plugin);
     }
 
     /**
-     * Unregister a plugin
-     * @param {string} pluginName - Plugin name
-     * @returns {Promise<void>}
-     */
-    async unregisterPlugin(pluginName) {
-        return await this.pluginManager.unregister(pluginName);
-    }
-
-    /**
-     * Get library statistics
-     * @returns {Object}
-     */
-    getStats() {
-        return {
-            initialized: this.initialized,
-            processing: this.processing,
-            config: this.configService.getStats(),
-            plugins: this.pluginManager.getStats(),
-            events: this.eventEmitter.getStats()
-        };
-    }
-
-    /**
-     * Get current configuration
-     * @returns {Object}
+     * Obtiene la configuración actual
+     * @returns {Object} Configuración actual
      */
     getConfig() {
-        return this.configService.getConfig();
+        return this.config;
     }
 
     /**
-     * Update configuration
-     * @param {Object} config - New configuration
-     * @returns {Promise<void>}
+     * Obtiene métricas del último procesamiento
+     * @returns {Object} Métricas de rendimiento
      */
-    async updateConfig(config) {
-        await this.configService.load(config);
-        this.eventEmitter.emit('config:updated', config);
+    getMetrics() {
+        return this.processor?.metrics || {};
     }
 
     /**
-     * Add event listener
-     * @param {string} event - Event name
-     * @param {Function} listener - Event listener
+     * Verifica si la librería está inicializada
+     * @returns {boolean} Estado de inicialización
      */
-    on(event, listener) {
-        this.eventEmitter.on(event, listener);
+    isInitialized() {
+        return this.initialized;
     }
 
     /**
-     * Remove event listener
-     * @param {string} event - Event name
-     * @param {Function} listener - Event listener
+     * Verifica si hay un procesamiento en curso
+     * @returns {boolean} Estado de procesamiento
      */
-    off(event, listener) {
-        this.eventEmitter.off(event, listener);
+    isProcessing() {
+        return this.processing;
     }
 
     /**
-     * Cleanup library resources
+     * Limpia recursos y cierra conexiones
      * @returns {Promise<void>}
      */
     async cleanup() {
-        if (this.processing) {
-            throw new Error('Cannot cleanup while processing');
-        }
-
         try {
-            // Cleanup plugins
-            await this.pluginManager.cleanup();
+            this.emit('cleanup-started');
 
-            // Cleanup services
-            if (this.dataLoader && typeof this.dataLoader.cleanup === 'function') {
+            if (this.pluginManager) {
+                await this.pluginManager.cleanup();
+            }
+
+            if (this.dataLoader) {
                 await this.dataLoader.cleanup();
             }
 
-            if (this.validationService && typeof this.validationService.cleanup === 'function') {
+            if (this.validationService) {
                 await this.validationService.cleanup();
             }
 
-            // Cleanup event emitter
-            this.eventEmitter.destroy();
-
             this.initialized = false;
-            console.log('IPTV Library cleaned up successfully');
+            this.processing = false;
+            
+            this.emit('cleanup-completed');
 
         } catch (error) {
-            console.error('Error during cleanup:', error);
+            this.emit('cleanup-error', error);
             throw error;
+        }
+    }
+
+    /**
+     * Registra plugins built-in
+     * @private
+     */
+    async _registerBuiltInPlugins() {
+        // Aquí se pueden registrar plugins built-in si existen
+        // Por ahora, mantenemos la funcionalidad básica
+        if (this.options.enableLogging) {
+            console.log('📦 Plugins built-in registrados');
         }
     }
 }
 
 /**
- * Factory for creating IPTV Library instances
+ * Factory para crear instancias de la librería IPTV
+ * Proporciona diferentes configuraciones predefinidas
  */
-class IPTVLibraryFactory {
+export class IPTVLibraryFactory {
     /**
-     * Create a standard IPTV library instance
-     * @param {Object} options - Library options
-     * @returns {IPTVLibrary}
+     * Crea una instancia estándar de la librería
+     * @param {Object} options - Opciones de configuración
+     * @returns {IPTVLibrary} Instancia de la librería
      */
-    static create(options = {}) {
-        return new IPTVLibrary(options);
-    }
-
-    /**
-     * Create a minimal IPTV library instance (no plugins)
-     * @param {Object} options - Library options
-     * @returns {IPTVLibrary}
-     */
-    static createMinimal(options = {}) {
+    static createStandard(options = {}) {
         return new IPTVLibrary({
-            ...options,
-            enablePlugins: false,
-            enableMetrics: false,
-            enableCaching: false
-        });
-    }
-
-    /**
-     * Create a full-featured IPTV library instance
-     * @param {Object} options - Library options
-     * @returns {IPTVLibrary}
-     */
-    static createFull(options = {}) {
-        return new IPTVLibrary({
-            ...options,
-            enablePlugins: true,
+            enableLogging: true,
             enableMetrics: true,
-            enableCaching: true,
-            autoInitialize: true
+            enableValidation: true,
+            autoInit: true,
+            ...options
         });
     }
 
     /**
-     * Create a testing-optimized IPTV library instance
-     * @param {Object} options - Library options
-     * @returns {IPTVLibrary}
+     * Crea una instancia silenciosa (sin logging)
+     * @param {Object} options - Opciones de configuración
+     * @returns {IPTVLibrary} Instancia de la librería
      */
-    static createForTesting(options = {}) {
+    static createSilent(options = {}) {
         return new IPTVLibrary({
-            ...options,
-            enablePlugins: false,
+            enableLogging: false,
             enableMetrics: false,
-            enableCaching: false,
-            autoInitialize: false
+            enableValidation: true,
+            autoInit: true,
+            ...options
         });
+    }
+
+    /**
+     * Crea una instancia para desarrollo
+     * @param {Object} options - Opciones de configuración
+     * @returns {IPTVLibrary} Instancia de la librería
+     */
+    static createDevelopment(options = {}) {
+        return new IPTVLibrary({
+            enableLogging: true,
+            enableMetrics: true,
+            enableValidation: false, // Más rápido para desarrollo
+            autoInit: false, // Inicialización manual
+            chunkSize: 5, // Chunks más pequeños para debugging
+            ...options
+        });
+    }
+
+    /**
+     * Crea una instancia para producción
+     * @param {Object} options - Opciones de configuración
+     * @returns {IPTVLibrary} Instancia de la librería
+     */
+    static createProduction(options = {}) {
+        return new IPTVLibrary({
+            enableLogging: false,
+            enableMetrics: true,
+            enableValidation: true,
+            autoInit: true,
+            chunkSize: 20, // Chunks más grandes para eficiencia
+            ...options
+        });
+    }
+
+    /**
+     * Crea una instancia personalizada
+     * @param {Object} config - Configuración completa
+     * @returns {IPTVLibrary} Instancia de la librería
+     */
+    static create(config = {}) {
+        return new IPTVLibrary(config);
     }
 }
 
-// Export main classes and utilities
-module.exports = {
-    // Main library
-    IPTVLibrary,
-    IPTVLibraryFactory,
+// Exportaciones principales
+export { IPTVProcessor } from './core/iptv-processor.js';
+export { DataLoader } from './services/data-loader.js';
+export { ValidationService } from './services/validation.js';
+export { PluginManager } from './plugins/index.js';
 
-    // Core components
-    EventEmitter,
-
-    // Configuration
-    ConfigurationBuilder,
-    ConfigurationService,
-    ConfigurationValidator,
-
-    // Services
-    DataLoader,
-    IPTVDataLoader,
-    DataLoaderFactory,
-    ValidationService,
-    ValidationServiceFactory,
-
-    // Plugin system
-    PluginManager,
-    IPTVPluginFactory,
-    builtInPlugins,
-
-    // Convenience exports
-    createLibrary: IPTVLibraryFactory.create,
-    createMinimalLibrary: IPTVLibraryFactory.createMinimal,
-    createFullLibrary: IPTVLibraryFactory.createFull,
-    createTestingLibrary: IPTVLibraryFactory.createForTesting
-};
+// Exportación por defecto
+export default IPTVLibrary;

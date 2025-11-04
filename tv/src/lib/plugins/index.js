@@ -616,7 +616,7 @@ class IPTVPluginFactory {
     }
 }
 
-module.exports = {
+export {
     PluginManager,
     IPTVPluginFactory
 };

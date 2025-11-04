@@ -591,7 +591,7 @@ class ValidationServiceFactory {
     }
 }
 
-module.exports = {
+export {
     ValidationService,
     ValidationServiceFactory
 };
