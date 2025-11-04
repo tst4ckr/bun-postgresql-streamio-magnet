@@ -749,9 +749,6 @@ class MagnetAddon {
   async #initializeRepositories() {
     this.#logger.info('📦 Inicializando repositorios...');
     
-    // Inicializar servicio de TV si está configurado
-    await this.#initializeTvService();
-    
     const [magnetRepository, tvRepository] = await Promise.allSettled([
       this.#repositoryFactory.createMagnetRepository(),
       this.#repositoryFactory.createTvRepository()
@@ -880,49 +877,6 @@ class MagnetAddon {
     const productionConfig = isProduction ? production : {};
     
     return new EnhancedLogger(logLevel, sourceTracking, productionConfig);
-  }
-
-  /**
-   * Inicializa el servicio de TV verificando archivos necesarios.
-   * @private
-   */
-  async #initializeTvService() {
-    const { m3uUrl } = this.#config.repository;
-    
-    if (!m3uUrl) {
-      this.#logger.info('📺 M3U URL no configurada, omitiendo inicialización de TV');
-      return;
-    }
-
-    try {
-      this.#logger.info('📺 Inicializando servicio de TV...');
-      
-      // Importar dinámicamente el servicio de inicialización de TV
-      const { TvInitializationService } = await import('./infrastructure/services/TvInitializationService.js');
-      const tvInitializationService = new TvInitializationService(this.#logger);
-      
-      // Ejecutar verificación y generación si es necesario
-      const result = await tvInitializationService.initialize();
-      
-      if (result.success) {
-        this.#logger.info('✅ Servicio de TV inicializado correctamente', {
-          filesVerified: result.filesVerified,
-          filesGenerated: result.filesGenerated,
-          generationTime: result.generationTime
-        });
-      } else {
-        this.#logger.warn('⚠️ Servicio de TV inicializado con advertencias', {
-          error: result.error,
-          attempts: result.attempts
-        });
-      }
-    } catch (error) {
-      this.#logger.error('❌ Error inicializando servicio de TV:', {
-        error: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
-      // Continuar sin funcionalidad TV si falla la inicialización
-    }
   }
 }
 
