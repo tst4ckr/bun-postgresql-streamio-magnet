@@ -195,21 +195,6 @@ class TechnicalBootstrapManager {
     this.#logger.debug('💾 Preparando capa de almacenamiento...');
     
     const { CsvFileInitializer } = await import('./infrastructure/utils/CsvFileInitializer.js');
-    const { ensureTvChannelsExist } = await import('./infrastructure/utils/TvChannelGenerator.js');
-    
-    // Verificar y generar canales de TV si es necesario
-    let tvChannelResult;
-    try {
-      tvChannelResult = await ensureTvChannelsExist(this.#config, this.#logger);
-      this.#logger.info('📺 Verificación de canales de TV completada:', {
-        generated: tvChannelResult.generated,
-        channelsM3uExists: tvChannelResult.channelsM3uExists,
-        tvCsvExists: tvChannelResult.tvCsvExists
-      });
-    } catch (error) {
-      this.#logger.error('❌ Error verificando/generando canales de TV:', error.message);
-      throw new Error(`Falló la generación de canales de TV: ${error.message}`);
-    }
     
     const csvFiles = [
       { path: this.#config.repository.primaryCsvPath, name: 'magnets.csv' },
@@ -230,15 +215,6 @@ class TechnicalBootstrapManager {
         throw error;
       }
     }
-
-    // Agregar información de canales de TV al resultado
-    initResults.tvChannels = {
-      status: 'READY',
-      channelsM3uPath: tvChannelResult.channelsM3uPath,
-      tvCsvPath: tvChannelResult.tvCsvPath,
-      generated: tvChannelResult.generated,
-      ...tvChannelResult.generationResult && { generationResult: tvChannelResult.generationResult }
-    };
 
     return initResults;
   }
