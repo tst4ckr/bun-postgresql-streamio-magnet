@@ -52,6 +52,20 @@ export function getValidatedChannelsCsvPath(config) {
   ensureEnvLoaded();
   const defaultPath = 'data/tv.csv';
   return config?.csv?.validatedChannelsCsv || 
+         process.env.OUTPUT_CSV_PATH ||
          process.env.VALIDATED_CHANNELS_CSV || 
+         defaultPath;
+}
+
+/**
+ * Obtiene la ruta del archivo M3U de salida desde variables de entorno
+ * @param {Object} config - Configuración del servicio (opcional)
+ * @returns {string} Ruta del archivo M3U de salida
+ */
+export function getM3UOutputPath(config = {}) {
+  ensureEnvLoaded();
+  const defaultPath = 'data/channels.m3u';
+  return config?.m3u?.outputPath || 
+         process.env.OUTPUT_M3U_PATH || 
          defaultPath;
 }

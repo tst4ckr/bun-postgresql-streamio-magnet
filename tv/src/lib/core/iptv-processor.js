@@ -20,6 +20,7 @@ import M3UChannelService from '../../application/M3UChannelService.js';
 import ChannelNameCleaningService from '../../domain/services/ChannelNameCleaningService.js';
 import LogoGenerationService from '../../services/LogoGenerationService.js';
 import GenreDetectionService from '../../services/GenreDetectionService.js';
+import { getM3UOutputPath } from '../../domain/services/ValidatedChannelsCsvService_tools.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -694,27 +695,38 @@ export class IPTVProcessor {
 
     async _generateM3UFiles(m3uService, validatedChannels) {
         try {
+            console.log(`[DEBUG] _generateM3UFiles iniciado con ${validatedChannels?.length || 0} canales`);
+            
             if (!validatedChannels || validatedChannels.length === 0) {
                 throw new Error('No hay canales válidos para generar M3U');
             }
 
-            const dataDir = 'data';
+            // Obtener la ruta configurada desde variables de entorno
+            const m3uFilePath = getM3UOutputPath(this.config);
+            console.log(`[DEBUG] Ruta M3U: ${m3uFilePath}`);
+            
+            const dataDir = path.dirname(m3uFilePath);
+            console.log(`[DEBUG] Directorio: ${dataDir}`);
             await this._ensureDirectoryExists(dataDir);
 
+            console.log(`[DEBUG] Generando M3U con ${validatedChannels.length} canales...`);
             const standardM3U = await m3uService.generateM3UPlaylist({
                 format: 'standard'
             }, validatedChannels);
 
-            const m3uFilePath = path.join(dataDir, 'channels.m3u');
+            console.log(`[DEBUG] M3U generado, longitud: ${standardM3U?.length || 0} caracteres`);
             await fs.writeFile(m3uFilePath, standardM3U, 'utf8');
+            console.log(`[DEBUG] Archivo M3U escrito en: ${m3uFilePath}`);
             
             if (!await this._fileExists(m3uFilePath)) {
                 throw new Error(`Error: El archivo M3U no se escribió correctamente en ${m3uFilePath}`);
             }
             
+            console.log(`[DEBUG] Archivo M3U verificado exitosamente`);
             return m3uFilePath;
 
         } catch (error) {
+            console.error(`[DEBUG] Error en _generateM3UFiles:`, error);
             if (this.options.enableLogging) {
                 console.error('   ❌ Error generando archivo M3U:', error.message);
             }
