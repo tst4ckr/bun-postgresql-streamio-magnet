@@ -5,7 +5,7 @@
 
 import { M3UParser } from '../utils/M3UParser.js';
 import { readFile } from 'fs/promises';
-import { isLocalFile, resolveLocalPath, validateLocalFile, buildFileNotFoundError } from './M3UTvRepository_tools.js';
+import { isLocalFile, resolveLocalPath, validateLocalFile, buildFileNotFoundError, processM3UContent, fetchM3UFromUrl, isCacheValid, generateTvStats, updateTvMap } from './M3UTvRepository_tools.js';
 
 /**
  * Repositorio para canales de TV M3U que implementa cache en memoria.
@@ -72,16 +72,7 @@ export class M3UTvRepository {
     
     try {
       await this.#ensureTvsLoaded();
-      const total = this.#tvs.size;
-      const groups = new Set();
-      this.#tvs.forEach(tv => groups.add(tv.group));
-      
-      const stats = {
-        total,
-        groups: groups.size,
-        groupNames: Array.from(groups).sort(),
-        lastUpdated: this.#lastFetch
-      };
+      const stats = generateTvStats(this.#tvs, this.#lastFetch);
       
       this.#logger.debug('[DEBUG] TV channels statistics:', stats);
       return stats;
@@ -112,12 +103,7 @@ export class M3UTvRepository {
    * @returns {boolean} True si el cache es válido
    */
   #isCacheValid() {
-    if (!this.#lastFetch) {
-      return false;
-    }
-    
-    const now = Date.now();
-    return (now - this.#lastFetch) < this.#cacheTimeout;
+    return isCacheValid(this.#lastFetch, this.#cacheTimeout);
   }
 
   /**
@@ -168,37 +154,15 @@ export class M3UTvRepository {
       this.#logger.debug(`Loaded M3U content from local file: ${filePath}`);
     } else {
       // Es una URL remota
-      const response = await fetch(this.#m3uUrl, {
-        headers: {
-          'User-Agent': 'Stremio-Addon/1.0',
-          'Accept': 'application/x-mpegURL, text/plain, */*'
-        },
-        timeout: 10000
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      m3uContent = await response.text();
-      this.#logger.debug(`Loaded M3U content from remote URL`);
+      m3uContent = await fetchM3UFromUrl(this.#m3uUrl, this.#logger);
     }
     
-    if (!M3UParser.isValidM3U(m3uContent)) {
-      throw new Error('Invalid M3U format received');
-    }
-
-    const tvs = M3UParser.parse(m3uContent);
+    // Procesar y validar el contenido M3U
+    const tvs = processM3UContent(m3uContent, this.#logger);
     
     // Actualizar cache
-    this.#tvs.clear();
-    tvs.forEach(tv => {
-      this.#tvs.set(tv.id, tv);
-    });
-    
+    updateTvMap(this.#tvs, tvs);
     this.#lastFetch = Date.now();
-    
-    this.#logger.debug(`Loaded ${tvs.length} tvs from M3U source`);
   }
 
 
