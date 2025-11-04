@@ -102,8 +102,8 @@ class MagnetAddon {
       });
 
       try {
-        // Delegar a StreamHandler para todo tipo excepto TV
-        if (args.type !== 'tv') {
+        // Delegar a StreamHandler para todo tipo excepto TV/CHANNEL
+        if (args.type !== 'tv' && args.type !== 'channel') {
           this.#logger.debug(`[DEBUG] Delegating to StreamHandler for type: ${args.type}`);
           const result = await this.#streamHandler.createAddonHandler()(args);
           this.#logger.debug(`[DEBUG] StreamHandler result:`, {
@@ -113,10 +113,10 @@ class MagnetAddon {
           return result;
         }
         
-        // Para TV, usar TvHandler si está disponible
-        this.#logger.debug(`[DEBUG] Processing TV request - TvHandler available: ${!!this.#tvHandler}`);
+        // Para TV/CHANNEL, usar TvHandler si está disponible
+        this.#logger.debug(`[DEBUG] Processing TV/CHANNEL request - TvHandler available: ${!!this.#tvHandler}`);
         if (this.#tvHandler) {
-          this.#logger.debug(`[DEBUG] Delegating to TvHandler for TV type`);
+          this.#logger.debug(`[DEBUG] Delegating to TvHandler for ${args.type} type`);
           const result = await this.#tvHandler.createStreamHandler()(args);
           this.#logger.debug(`[DEBUG] TvHandler result:`, {
             streamsCount: result?.streams?.length || 0,
@@ -126,7 +126,7 @@ class MagnetAddon {
           return result;
         }
         
-        this.#logger.warn(`[DEBUG] No TvHandler available for TV request - returning empty streams`);
+        this.#logger.warn(`[DEBUG] No TvHandler available for ${args.type} request - returning empty streams`);
         return { streams: [] };
       } catch (error) {
         this.#logger.error('[DEBUG] Error in main stream handler', { 
@@ -177,8 +177,8 @@ class MagnetAddon {
   #setupCatalogHandler() {
     this.#addonBuilder.defineCatalogHandler(async (args) => {
       try {
-        // Solo TvHandler maneja catálogos
-        if (args.type === 'tv' && this.#tvHandler) {
+        // Solo TvHandler maneja catálogos para TV/CHANNEL
+        if ((args.type === 'tv' || args.type === 'channel') && this.#tvHandler) {
           return await this.#tvHandler.createCatalogHandler()(args);
         }
         
@@ -209,9 +209,9 @@ class MagnetAddon {
       });
 
       try {
-        // Delegar a TvHandler para TV
-        if (args.type === 'tv' && this.#tvHandler) {
-          this.#logger.debug(`[DEBUG] Delegating to TvHandler for TV meta request`);
+        // Delegar a TvHandler para TV/CHANNEL
+        if ((args.type === 'tv' || args.type === 'channel') && this.#tvHandler) {
+          this.#logger.debug(`[DEBUG] Delegating to TvHandler for ${args.type} meta request`);
           const result = await this.#tvHandler.createMetaHandler()(args);
           this.#logger.debug(`[DEBUG] TvHandler meta result:`, {
             hasMetaId: !!result?.meta?.id,
@@ -223,7 +223,7 @@ class MagnetAddon {
           return result;
         }
         
-        this.#logger.debug(`[DEBUG] Non-TV meta request or no TvHandler - returning empty meta`);
+        this.#logger.debug(`[DEBUG] Non-TV/CHANNEL meta request or no TvHandler - returning empty meta`);
         // Respuesta por defecto para otros tipos
         return { meta: {} };
       } catch (error) {
@@ -246,7 +246,9 @@ class MagnetAddon {
   async start() {
     await this.initialize();
 
-    const { port } = this.#config.server;
+    // Usar siempre el puerto configurado en addonConfig para evitar conflictos con variables de entorno del sistema
+    const { port: defaultPort } = this.#config.server;
+    const port = Number(defaultPort);
     this.#logger.info(`Iniciando servidor en el puerto ${port}...`);
 
     // Usar serveHTTP nativo del SDK de Stremio

@@ -39,21 +39,21 @@ const config = {
     resources: [
       {
         name: 'catalog',
-        types: ['movie', 'series', 'anime', 'tv'],
+        types: ['movie', 'series', 'anime', 'tv', 'channel'],
         idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv_']
       },
       {
         name: 'meta',
-        types: ['movie', 'series', 'anime', 'tv'],
+        types: ['movie', 'series', 'anime', 'tv', 'channel'],
         idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv_']
       },
       {
         name: 'stream',
-        types: ['movie', 'series', 'anime', 'tv'],
+        types: ['movie', 'series', 'anime', 'tv', 'channel'],
         idPrefixes: ['tt', 'kitsu:', 'mal:', 'anilist:', 'anidb:', 'tv_']
       }
     ],
-    types: ['movie', 'series', 'anime', 'tv'],
+    types: ['movie', 'series', 'anime', 'tv', 'channel'],
     catalogs: [
       {
         type: 'movie',
@@ -72,6 +72,18 @@ const config = {
       },
       {
         type: 'tv',
+        id: 'tv_catalog',
+        name: 'TV Channels',
+        extra: [
+          { name: 'search', isRequired: false },
+          { name: 'genre', isRequired: false },
+          { name: 'skip', isRequired: false },
+          { name: 'limit', isRequired: false }
+        ]
+      }
+      ,
+      {
+        type: 'channel',
         id: 'tv_catalog',
         name: 'TV Channels',
         extra: [

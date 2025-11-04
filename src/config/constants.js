@@ -36,7 +36,7 @@ export const NETWORK_CONSTANTS = {
   TOR_CHECK_TIMEOUT: 3000, // 3 segundos
   
   // Puertos
-  DEFAULT_SERVER_PORT: 7000,
+  DEFAULT_SERVER_PORT: 7011,
   
   // Headers HTTP
   USER_AGENT: 'Stremio-Magnet-Search-Addon/1.0.0',

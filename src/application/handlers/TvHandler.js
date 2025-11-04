@@ -91,7 +91,7 @@ export class TvHandler {
         }
 
         return {
-          metas: pagedTvs.map(tv => tv.toStremioMeta()),
+          metas: pagedTvs.map(tv => tv.toStremioMeta(args.type)),
           cacheMaxAge: this.#config.cache.tvCatalogMaxAge
         };
       } catch (error) {
@@ -116,7 +116,7 @@ export class TvHandler {
         }
 
         return {
-          meta: tv.toStremioMeta(),
+          meta: tv.toStremioMeta(args.type),
           cacheMaxAge: this.#config.cache.metadataCacheMaxAge
         };
       } catch (error) {

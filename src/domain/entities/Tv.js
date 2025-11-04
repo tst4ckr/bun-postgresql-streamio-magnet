@@ -91,10 +91,10 @@ export class Tv {
    * Convierte el canal a formato de metadatos de Stremio.
    * @returns {Object} Metadatos en formato Stremio
    */
-  toStremioMeta() {
+  toStremioMeta(typeOverride = 'tv') {
     return {
       id: this.#id,
-      type: 'tv',
+      type: typeOverride || 'tv',
       name: this.#name,
       poster: this.#logo,
       posterShape: 'landscape',
