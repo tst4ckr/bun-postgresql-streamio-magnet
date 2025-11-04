@@ -63,8 +63,8 @@ export class TvHandler {
       try {
         const { type, id, extra = {} } = args;
 
-        // Validar tipo de contenido
-        if (type !== 'tv') {
+        // Validar tipo de contenido (Stremio puede enviar 'channel' para catálogos de TV)
+        if (type !== 'tv' && type !== 'channel') {
           return { metas: [] };
         }
 
