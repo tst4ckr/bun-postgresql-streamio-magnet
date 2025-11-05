@@ -265,6 +265,7 @@ class MagnetAddon {
             metaType: result?.meta?.type,
             metaName: result?.meta?.name,
             defaultVideoId: result?.meta?.behaviorHints?.defaultVideoId,
+            videosCount: Array.isArray(result?.meta?.videos) ? result.meta.videos.length : 0,
             cacheMaxAge: result?.cacheMaxAge
           });
           return result;

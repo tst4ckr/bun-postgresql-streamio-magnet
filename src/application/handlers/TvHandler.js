@@ -133,9 +133,15 @@ export class TvHandler {
         const tv = await this.#getTvById(channelId);
         const meta = tv.toStremioMeta(args.type);
 
+        // Algunos clientes de Stremio esperan type='channel' para TV en vivo
+        if (args.type === 'tv' || args.type === 'channel') {
+          meta.type = 'channel';
+        }
+
+        // Para TV/Channel usar un TTL más corto para evitar meta obsoleto
         return {
           meta,
-          cacheMaxAge: this.#config.cache.metadataCacheMaxAge
+          cacheMaxAge: this.#config.cache.tvCatalogMaxAge
         };
       },
       {
