@@ -3,12 +3,12 @@
  * Carga la configuración desde variables de entorno y define el manifiesto del addon.
  */
 
-import dotenv from 'dotenv';
+import './loadEnv.js';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { CONSTANTS } from './constants.js';
+import { envString, envInt, envBool, envDurationMs } from '../infrastructure/utils/env.js';
 
-dotenv.config();
 
 // Detectar si estamos en un contenedor
 const isContainer = process.env.NODE_ENV === 'production' && process.env.CONTAINER_ENV === 'true';
@@ -80,51 +80,51 @@ const config = {
     idPrefixes: ['tt', 'tv_']
   },
   server: {
-    port: process.env.PORT || CONSTANTS.NETWORK.DEFAULT_SERVER_PORT,
+    port: envInt('PORT', CONSTANTS.NETWORK.DEFAULT_SERVER_PORT),
   },
   cache: {
-    streamCacheMaxAge: parseInt(process.env.CACHE_STREAM_MAX_AGE) || CONSTANTS.CACHE.STREAM_MAX_AGE,
-    streamStaleRevalidate: parseInt(process.env.CACHE_STREAM_STALE_REVALIDATE) || CONSTANTS.CACHE.STREAM_STALE_REVALIDATE,
-    streamStaleError: parseInt(process.env.CACHE_STREAM_STALE_ERROR) || CONSTANTS.CACHE.STREAM_STALE_ERROR,
+    streamCacheMaxAge: envInt('CACHE_STREAM_MAX_AGE', CONSTANTS.CACHE.STREAM_MAX_AGE),
+    streamStaleRevalidate: envInt('CACHE_STREAM_STALE_REVALIDATE', CONSTANTS.CACHE.STREAM_STALE_REVALIDATE),
+    streamStaleError: envInt('CACHE_STREAM_STALE_ERROR', CONSTANTS.CACHE.STREAM_STALE_ERROR),
     // Cache específico para anime (más tiempo debido a menor frecuencia de cambios)
-    animeCacheMaxAge: parseInt(process.env.CACHE_ANIME_MAX_AGE) || CONSTANTS.CACHE.ANIME_MAX_AGE,
+    animeCacheMaxAge: envInt('CACHE_ANIME_MAX_AGE', CONSTANTS.CACHE.ANIME_MAX_AGE),
     // Cache para metadatos
-    metadataCacheMaxAge: parseInt(process.env.CACHE_METADATA_MAX_AGE) || CONSTANTS.CACHE.METADATA_MAX_AGE,
+    metadataCacheMaxAge: envInt('CACHE_METADATA_MAX_AGE', CONSTANTS.CACHE.METADATA_MAX_AGE),
     // Cache específico para TV M3U (streams en vivo requieren cache más corto)
-    tvCacheMaxAge: parseInt(process.env.CACHE_TV_MAX_AGE) || CONSTANTS.CACHE.TV_CACHE_MAX_AGE,
-    tvCatalogMaxAge: parseInt(process.env.CACHE_TV_CATALOG_MAX_AGE) || CONSTANTS.CACHE.TV_CATALOG_MAX_AGE,
-    tvStreamStaleRevalidate: parseInt(process.env.CACHE_TV_STREAM_STALE_REVALIDATE) || CONSTANTS.CACHE.TV_STREAM_STALE_REVALIDATE,
-    tvStreamStaleError: parseInt(process.env.CACHE_TV_STREAM_STALE_ERROR) || CONSTANTS.CACHE.TV_STREAM_STALE_ERROR
+    tvCacheMaxAge: envInt('CACHE_TV_MAX_AGE', CONSTANTS.CACHE.TV_CACHE_MAX_AGE),
+    tvCatalogMaxAge: envInt('CACHE_TV_CATALOG_MAX_AGE', CONSTANTS.CACHE.TV_CATALOG_MAX_AGE),
+    tvStreamStaleRevalidate: envInt('CACHE_TV_STREAM_STALE_REVALIDATE', CONSTANTS.CACHE.TV_STREAM_STALE_REVALIDATE),
+    tvStreamStaleError: envInt('CACHE_TV_STREAM_STALE_ERROR', CONSTANTS.CACHE.TV_STREAM_STALE_ERROR)
   },
   logging: {
     // Optimización para producción: usar 'warn' por defecto en producción, 'info' en desarrollo
-    logLevel: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'warn' : 'info'),
-    enableDetailedLogging: process.env.ENABLE_DETAILED_LOGGING === 'true' || (process.env.NODE_ENV !== 'production'),
-    logFormat: process.env.LOG_FORMAT || (process.env.NODE_ENV === 'production' ? 'simple' : 'detailed'),
-    logToFile: process.env.LOG_TO_FILE === 'true' || false,
+    logLevel: envString('LOG_LEVEL', (process.env.NODE_ENV === 'production' ? 'warn' : 'info')),
+    enableDetailedLogging: envBool('ENABLE_DETAILED_LOGGING', (process.env.NODE_ENV !== 'production')),
+    logFormat: envString('LOG_FORMAT', (process.env.NODE_ENV === 'production' ? 'simple' : 'detailed')),
+    logToFile: envBool('LOG_TO_FILE', false),
     logFilePath: process.env.LOG_FILE_PATH || resolvePath('logs/addon.log'),
     // Configuración específica para producción
     production: {
       disableSourceTracking: true,
       minimalOutput: true,
-      errorOnly: process.env.PRODUCTION_ERROR_ONLY === 'true' || false
+      errorOnly: envBool('PRODUCTION_ERROR_ONLY', false)
     }
   },
   repository: {
-    primaryCsvPath: process.env.PRIMARY_CSV_PATH || resolvePath('data/torrents/magnets.csv'),
-    secondaryCsvPath: process.env.SECONDARY_CSV_PATH || resolvePath('data/torrents/torrentio.csv'),
-    animeCsvPath: process.env.ANIME_CSV_PATH || resolvePath('data/torrents/anime.csv'),
-    torrentioApiUrl: process.env.TORRENTIO_API_URL || 'https://torrentio.strem.fun/',
-    timeout: parseInt(process.env.CSV_TIMEOUT) || CONSTANTS.TIME.DEFAULT_TIMEOUT,
+    primaryCsvPath: envString('PRIMARY_CSV_PATH', resolvePath('data/torrents/magnets.csv')),
+    secondaryCsvPath: envString('SECONDARY_CSV_PATH', resolvePath('data/torrents/torrentio.csv')),
+    animeCsvPath: envString('ANIME_CSV_PATH', resolvePath('data/torrents/anime.csv')),
+    torrentioApiUrl: envString('TORRENTIO_API_URL', 'https://torrentio.strem.fun/'),
+    timeout: envInt('CSV_TIMEOUT', CONSTANTS.TIME.DEFAULT_TIMEOUT),
     // Configuración específica para TV M3U
-    m3uUrl: process.env.M3U_URL || null,
-    m3uCacheTimeout: parseInt(process.env.M3U_CACHE_TIMEOUT) || CONSTANTS.CACHE.TV_M3U_CACHE_TIMEOUT,
-    maxTvChannels: parseInt(process.env.MAX_TV_CHANNELS) || CONSTANTS.LIMIT.MAX_TV_CHANNELS
+    m3uUrl: envString('M3U_URL', null),
+    m3uCacheTimeout: envDurationMs('M3U_CACHE_TIMEOUT', CONSTANTS.CACHE.TV_M3U_CACHE_TIMEOUT),
+    maxTvChannels: envInt('MAX_TV_CHANNELS', CONSTANTS.LIMIT.MAX_TV_CHANNELS)
   },
   tor: {
-    enabled: process.env.TOR_ENABLED === 'true' || false, // Por defecto false, se activa explícitamente con TOR_ENABLED=true
+    enabled: envBool('TOR_ENABLED', false), // Por defecto false, se activa explícitamente con TOR_ENABLED=true
     host: process.env.TOR_HOST || CONSTANTS.NETWORK.TOR_DEFAULT_HOST,
-    port: parseInt(process.env.TOR_PORT) || CONSTANTS.NETWORK.TOR_DEFAULT_PORT
+    port: envInt('TOR_PORT', CONSTANTS.NETWORK.TOR_DEFAULT_PORT)
   },
   torrentio: {
     movie: {
@@ -170,7 +170,7 @@ const config = {
       limit: parseInt(process.env.TORRENTIO_ANIME_LIMIT) || CONSTANTS.LIMIT.DEFAULT_ANIME_LIMIT,
       priorityLanguage: process.env.TORRENTIO_ANIME_LANGUAGE || CONSTANTS.LANGUAGE.DEFAULT_ANIME_LANGUAGE,
       // Configuraciones específicas para anime
-      enableSubtitles: process.env.TORRENTIO_ANIME_SUBTITLES === 'true' || true,
+      enableSubtitles: envBool('TORRENTIO_ANIME_SUBTITLES', true),
       preferredFansubs: process.env.TORRENTIO_ANIME_FANSUBS || CONSTANTS.PROVIDER.ANIME_PROVIDERS.PREFERRED_FANSUBS,
       qualityPriority: process.env.TORRENTIO_ANIME_QUALITY_PRIORITY || '1080p,720p,480p',
       enableBatch: process.env.TORRENTIO_ANIME_BATCH === 'true' || false,
@@ -197,11 +197,11 @@ const config = {
       quality: parseInt(process.env.MAGNET_QUALITY_WEIGHT) || CONSTANTS.LIMIT.BALANCED_WEIGHTS.QUALITY
     },
     // Filtros de calidad
-    minSeeders: parseInt(process.env.MAGNET_MIN_SEEDERS) || CONSTANTS.LIMIT.MIN_SEEDERS,
+    minSeeders: envInt('MAGNET_MIN_SEEDERS', CONSTANTS.LIMIT.MIN_SEEDERS),
     // Calidades preferidas en orden de prioridad (array)
     qualityPriority: (process.env.MAGNET_QUALITY_PRIORITY || CONSTANTS.QUALITY.QUALITY_PRIORITIES.join(',')).split(','),
     // Habilitar logging detallado de selección
-    enableSelectionLogging: process.env.MAGNET_SELECTION_LOGGING === 'true' || false
+    enableSelectionLogging: envBool('MAGNET_SELECTION_LOGGING', false)
   },
   // Configuración específica para metadatos
   metadata: {
@@ -258,10 +258,10 @@ const config = {
   },
   // Configuración del sistema de búsqueda en cascada
   cascadeSearch: {
-    enabled: process.env.CASCADE_SEARCH_ENABLED === 'true' || true,
-    maxRetries: parseInt(process.env.CASCADE_MAX_RETRIES) || CONSTANTS.CASCADE.MAX_RETRIES,
-    retryDelay: parseInt(process.env.CASCADE_RETRY_DELAY) || CONSTANTS.CASCADE.RETRY_DELAY,
-    timeout: parseInt(process.env.CASCADE_TIMEOUT) || CONSTANTS.CASCADE.TIMEOUT,
+    enabled: envBool('CASCADE_SEARCH_ENABLED', true),
+    maxRetries: envInt('CASCADE_MAX_RETRIES', CONSTANTS.CASCADE.MAX_RETRIES),
+    retryDelay: envInt('CASCADE_RETRY_DELAY', CONSTANTS.CASCADE.RETRY_DELAY),
+    timeout: envInt('CASCADE_TIMEOUT', CONSTANTS.CASCADE.TIMEOUT),
     // Prioridades por tipo de contenido
     priorities: CONSTANTS.CASCADE.SEARCH_PRIORITIES,
     // Configuración de logging para cascada

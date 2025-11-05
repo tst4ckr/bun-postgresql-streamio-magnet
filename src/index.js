@@ -3,6 +3,9 @@
  * Configura e inicia el servidor del addon de Stremio.
  */
 
+// Cargar variables de entorno una sola vez, antes de cualquier otro import
+import './config/loadEnv.js';
+
 import { addonBuilder, serveHTTP } from 'stremio-addon-sdk';
 import { existsSync } from 'fs';
 import { addonConfig, manifest } from './config/addonConfig.js';
@@ -23,6 +26,7 @@ class MagnetAddon {
   #streamHandler;
   #tvHandler;
   #tvRepository;
+  #tvRefreshIntervalId;
 
   constructor() {
     this.#config = addonConfig;
@@ -176,10 +180,16 @@ class MagnetAddon {
       this.#tvHandler = new TvHandler(this.#tvRepository, this.#config, this.#logger);
       this.#logger.info('TvHandler configurado');
 
+      // Evitar crear más de un intervalo de refresco
+      if (this.#tvRefreshIntervalId) {
+        this.#logger.warn('Intervalo de refresco de TV ya existe. No se crea otro.');
+        return;
+      }
+
       // Iniciar el refresco periódico de canales de TV (protegido contra solapamientos)
       const refreshInterval = Number(this.#config.repository.m3uCacheTimeout || (5 * 60 * 1000));
       let isRefreshingTv = false;
-      setInterval(async () => {
+      this.#tvRefreshIntervalId = setInterval(async () => {
         if (isRefreshingTv) {
           this.#logger.warn('Saltando refresh de TV: ya hay un proceso de refresh en curso');
           return;
@@ -281,6 +291,17 @@ class MagnetAddon {
    * Inicia el servidor HTTP del addon usando serveHTTP nativo del SDK.
    */
   async start() {
+    // Protege contra múltiples inicios en el mismo proceso
+    const START_FLAG = '__magnet_addon_started__';
+    if (globalThis[START_FLAG]) {
+      if (this.#logger) {
+        this.#logger.warn('Detectado segundo intento de inicio del addon en el mismo proceso. Se omite.');
+      } else {
+        console.warn('Detectado segundo intento de inicio del addon en el mismo proceso. Se omite.');
+      }
+      return;
+    }
+    globalThis[START_FLAG] = true;
     await this.initialize();
 
     const port = Number(process.env.PORT || this.#config.server.port);
