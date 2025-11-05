@@ -173,7 +173,9 @@ export const LANGUAGE_CONSTANTS = {
  */
 export const CONTENT_TYPE_CONSTANTS = {
   // Tipos de contenido soportados
-  SUPPORTED_TYPES: ['movie', 'series', 'tv'],
+  // Tipos soportados por el addon. Se añade 'channel' para compatibilidad con clientes
+  // que utilizan este tipo para TV en vivo.
+  SUPPORTED_TYPES: ['movie', 'series', 'tv', 'channel'],
 
   // Mapeo de tipos de contenido
   TYPE_MAPPING: {

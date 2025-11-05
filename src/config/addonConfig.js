@@ -39,21 +39,23 @@ const config = {
     resources: [
       {
         name: 'catalog',
-        types: ['movie', 'series', 'tv'],
+        // Incluir 'channel' para compatibilidad con clientes que usan este tipo
+        types: ['movie', 'series', 'tv', 'channel'],
         idPrefixes: ['tt', 'tv_']
       },
       {
         name: 'meta',
-        types: ['movie', 'series', 'tv'],
+        types: ['movie', 'series', 'tv', 'channel'],
         idPrefixes: ['tt', 'tv_']
       },
       {
         name: 'stream',
-        types: ['movie', 'series', 'tv'],
+        types: ['movie', 'series', 'tv', 'channel'],
         idPrefixes: ['tt', 'tv_']
       }
     ],
-    types: ['movie', 'series', 'tv'],
+    // Exponer también 'channel' en la lista global de tipos del manifest
+    types: ['movie', 'series', 'tv', 'channel'],
     catalogs: [
       {
         type: 'movie',

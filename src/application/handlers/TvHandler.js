@@ -76,7 +76,8 @@ export class TvHandler {
     this.#logger.info(`TV catalog request: id=${args.id}`, { extra: args.extra });
     const { type, id, extra = {} } = args;
 
-    if (type !== 'tv') {
+    // Aceptar tanto 'tv' como 'channel' para compatibilidad con distintos clientes
+    if (type !== 'tv' && type !== 'channel') {
       return { metas: [] };
     }
 
@@ -108,7 +109,8 @@ export class TvHandler {
 
     const metas = pagedTvs.map(tv => {
       const meta = tv.toStremioMeta('tv');
-      meta.type = 'tv'; // Forzar siempre el tipo 'tv'
+      // Forzar siempre el tipo 'tv' para que el cliente solicite streams correctamente
+      meta.type = 'tv';
       return meta;
     });
     this.#logger.info(`Catálogo '${id}': ${metas.length} de ${filteredTvs.length}`);
