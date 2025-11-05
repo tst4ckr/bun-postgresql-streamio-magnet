@@ -252,27 +252,30 @@ class MagnetAddon {
   async start() {
     await this.initialize();
 
-    // Usar siempre el puerto configurado en addonConfig para evitar conflictos con variables de entorno del sistema
-    const { port: defaultPort } = this.#config.server;
-    const port = Number(defaultPort);
+    const port = Number(process.env.PORT || this.#config.server.port);
     this.#logger.info(`Iniciando servidor en el puerto ${port}...`);
 
-    // Usar serveHTTP nativo del SDK de Stremio
-    // Incluye CORS automático y optimizaciones para addons
     const addonInterface = this.#addonBuilder.getInterface();
     
     const serverOptions = {
       port: port,
-      cacheMaxAge: this.#config.cache?.metadataCacheMaxAge || 3600 // 1 hora por defecto
+      cacheMaxAge: this.#config.cache?.metadataCacheMaxAge || 3600,
     };
 
-    // Iniciar servidor con serveHTTP nativo
-    serveHTTP(addonInterface, serverOptions);
-    
-    const baseUrl = `http://127.0.0.1:${port}`;
-    this.#logger.info(`✅ Addon iniciado en: ${baseUrl}`);
-    this.#logger.info(`🔗 Manifiesto: ${baseUrl}/manifest.json`);
-    this.#logger.info(`🚀 Servidor optimizado con SDK nativo de Stremio`);
+    serveHTTP(addonInterface, serverOptions)
+      .then(({ url }) => {
+        this.#logger.info(`✅ Addon iniciado en: ${url}`);
+        this.#logger.info(`🔗 Manifiesto: ${url}/manifest.json`);
+        this.#logger.info(`🚀 Servidor optimizado con SDK nativo de Stremio`);
+      })
+      .catch(error => {
+        this.#logger.error('❌ Error al iniciar el servidor:', {
+          error: error.message,
+          stack: error.stack,
+          code: error.code,
+        });
+        process.exit(1);
+      });
   }
 
   /**
