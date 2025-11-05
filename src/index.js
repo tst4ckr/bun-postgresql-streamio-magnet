@@ -4,6 +4,7 @@
  */
 
 import { addonBuilder, serveHTTP } from 'stremio-addon-sdk';
+import { existsSync } from 'fs';
 import { addonConfig, manifest } from './config/addonConfig.js';
 import { CascadingMagnetRepository } from './infrastructure/repositories/CascadingMagnetRepository.js';
 import { StreamHandler } from './application/handlers/StreamHandler.js';
@@ -73,16 +74,28 @@ class MagnetAddon {
     this.#setupStreamHandler();
     
     if (m3uUrl) {
-      // Validar que M3U_URL sea http/https válido antes de configurar TV
+      // Validar que la fuente M3U sea usable: http/https, file:// o ruta local existente
+      let canSetupTv = false;
       try {
         const urlObj = new URL(m3uUrl);
-        if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') {
-          await this.#setupTvHandler(m3uUrl);
+        if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:' || urlObj.protocol === 'file:') {
+          canSetupTv = true;
         } else {
-          this.#logger.warn(`M3U_URL inválido (protocolo no soportado): ${m3uUrl}. TV deshabilitado.`);
+          this.#logger.warn(`M3U_URL con protocolo no soportado: ${m3uUrl}.`);
         }
-      } catch (e) {
-        this.#logger.warn(`M3U_URL inválido: ${m3uUrl}. TV deshabilitado.`, { error: e.message });
+      } catch (_err) {
+        // No es URL válida, intentar como ruta local
+        if (existsSync(m3uUrl)) {
+          canSetupTv = true;
+        } else {
+          this.#logger.warn(`Ruta local M3U no encontrada: ${m3uUrl}.`);
+        }
+      }
+
+      if (canSetupTv) {
+        await this.#setupTvHandler(m3uUrl);
+      } else {
+        this.#logger.warn('TV deshabilitado por fuente M3U inválida');
       }
     }
 

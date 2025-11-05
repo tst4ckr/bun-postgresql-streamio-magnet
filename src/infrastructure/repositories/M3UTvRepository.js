@@ -4,6 +4,8 @@
  */
 
 import { M3UParser } from '../utils/M3UParser.js';
+import { readFile } from 'fs/promises';
+import { fileURLToPath } from 'url';
 
 /**
  * Repositorio para canales de TV M3U que implementa cache en memoria.
@@ -149,21 +151,9 @@ export class M3UTvRepository {
    * @returns {Promise<void>}
    */
   async #loadTvsFromSource() {
-    this.#logger.debug(`Fetching M3U from: ${this.#m3uUrl}`);
-    
-    const response = await fetch(this.#m3uUrl, {
-      headers: {
-        'User-Agent': 'Stremio-Addon/1.0',
-        'Accept': 'application/x-mpegURL, text/plain, */*'
-      },
-      timeout: 10000
-    });
+    this.#logger.debug(`Loading M3U source: ${this.#m3uUrl}`);
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const m3uContent = await response.text();
+    const m3uContent = await this.#loadM3UContent();
     
     if (!M3UParser.isValidM3U(m3uContent)) {
       throw new Error('Invalid M3U format received');
@@ -180,6 +170,44 @@ export class M3UTvRepository {
     this.#lastFetch = Date.now();
     
     this.#logger.debug(`Loaded ${tvs.length} tvs from M3U source`);
+  }
+
+  /**
+   * Carga el contenido M3U desde HTTP/HTTPS, file:// o ruta local.
+   * @private
+   * @returns {Promise<string>} Contenido del M3U
+   */
+  async #loadM3UContent() {
+    // Intentar interpretar como URL primero
+    try {
+      const urlObj = new URL(this.#m3uUrl);
+      if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') {
+        const response = await fetch(this.#m3uUrl, {
+          headers: {
+            'User-Agent': 'Stremio-Addon/1.0',
+            'Accept': 'application/x-mpegURL, text/plain, */*'
+          },
+          timeout: 10000
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return await response.text();
+      }
+
+      if (urlObj.protocol === 'file:') {
+        const filePath = fileURLToPath(urlObj);
+        this.#logger.debug(`Reading M3U from local file URL: ${filePath}`);
+        return await readFile(filePath, 'utf-8');
+      }
+
+      throw new Error(`Unsupported protocol for M3U source: ${urlObj.protocol}`);
+    } catch (e) {
+      // Si no es una URL válida, tratar como ruta local
+      this.#logger.debug(`Reading M3U from local path: ${this.#m3uUrl}`);
+      return await readFile(this.#m3uUrl, 'utf-8');
+    }
   }
 
   /**
