@@ -152,7 +152,8 @@ export class TvHandler {
         const tv = await this.#getTvById(channelId);
         return {
           streams: [tv.toStremioStream()],
-          cacheMaxAge: this.#config.cache.streamCacheMaxAge
+          // Use TV-specific cache for live streams to avoid over-caching
+          cacheMaxAge: this.#config.cache.tvCacheMaxAge
         };
       },
       {

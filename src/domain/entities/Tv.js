@@ -100,7 +100,11 @@ export class Tv {
       id: this.#id,
       type: typeOverride || 'tv',
       name: this.#name,
-      poster: poster
+      poster: poster,
+      // Provide helpful behavior hints for Stremio clients
+      behaviorHints: {
+        defaultVideoId: CONSTANTS.METADATA.TV_METADATA.DEFAULT_VIDEO_ID
+      }
     };
   }
 

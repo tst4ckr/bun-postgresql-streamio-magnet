@@ -73,7 +73,17 @@ class MagnetAddon {
     this.#setupStreamHandler();
     
     if (m3uUrl) {
-      await this.#setupTvHandler(m3uUrl);
+      // Validar que M3U_URL sea http/https válido antes de configurar TV
+      try {
+        const urlObj = new URL(m3uUrl);
+        if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') {
+          await this.#setupTvHandler(m3uUrl);
+        } else {
+          this.#logger.warn(`M3U_URL inválido (protocolo no soportado): ${m3uUrl}. TV deshabilitado.`);
+        }
+      } catch (e) {
+        this.#logger.warn(`M3U_URL inválido: ${m3uUrl}. TV deshabilitado.`, { error: e.message });
+      }
     }
 
     this.#setupCatalogHandler();
@@ -153,15 +163,23 @@ class MagnetAddon {
       this.#tvHandler = new TvHandler(this.#tvRepository, this.#config, this.#logger);
       this.#logger.info('TvHandler configurado');
 
-      // Iniciar el refresco periódico de canales de TV
-      const refreshInterval = 5 * 60 * 1000; // 5 minutos
+      // Iniciar el refresco periódico de canales de TV (protegido contra solapamientos)
+      const refreshInterval = Number(this.#config.repository.m3uCacheTimeout || (5 * 60 * 1000));
+      let isRefreshingTv = false;
       setInterval(async () => {
+        if (isRefreshingTv) {
+          this.#logger.warn('Saltando refresh de TV: ya hay un proceso de refresh en curso');
+          return;
+        }
+        isRefreshingTv = true;
         try {
           this.#logger.info('Refrescando canales de TV desde la fuente M3U...');
           await this.#tvRepository.refreshTvs();
           this.#logger.info('Canales de TV refrescados con éxito.');
         } catch (error) {
           this.#logger.error('Error al refrescar los canales de TV:', error);
+        } finally {
+          isRefreshingTv = false;
         }
       }, refreshInterval);
     } catch (error) {
