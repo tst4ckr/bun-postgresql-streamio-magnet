@@ -107,7 +107,9 @@ export class Tv {
         {
           id: defaultVideoId,
           title: this.#name,
+          released: new Date().toISOString(),
           overview: 'Live stream',
+          available: true,
         }
       ],
       // Provide helpful behavior hints for Stremio clients
