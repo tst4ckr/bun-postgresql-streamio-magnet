@@ -4,6 +4,7 @@
  */
 
 import { ErrorHandler, safeExecute, createError, ERROR_TYPES } from '../../infrastructure/errors/ErrorHandler.js';
+import { CONSTANTS } from '../../config/constants.js';
 
 /**
  * Manejador para la lógica de canales de TV en Stremio.
@@ -96,8 +97,13 @@ export class TvHandler {
       filteredTvs.sort((a, b) => a.name.localeCompare(b.name));
     }
 
-    const skip = parseInt(extra.skip) || 0;
-    const pageSize = 100;
+    // Paginación robusta según extras declarados en manifest
+    const rawSkip = Number.isFinite(parseInt(extra.skip)) ? parseInt(extra.skip) : 0;
+    const maxPage = CONSTANTS.LIMIT.MAX_PAGE_SIZE;
+    const defaultPage = CONSTANTS.LIMIT.DEFAULT_TV_CATALOG_SIZE;
+    const rawLimit = Number.isFinite(parseInt(extra.limit)) ? parseInt(extra.limit) : defaultPage;
+    const pageSize = Math.min(Math.max(rawLimit, CONSTANTS.LIMIT.MIN_PAGE_SIZE), maxPage);
+    const skip = Math.max(0, rawSkip);
     const { items: pagedTvs, hasMore } = this.#paginateTvs(filteredTvs, skip, pageSize);
 
     const metas = pagedTvs.map(tv => {

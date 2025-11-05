@@ -138,7 +138,7 @@ export class ErrorHandler {
     this.#logError(enhancedError);
     
     // Aplicar estrategia de recuperación
-    return await this.#applyRecoveryStrategy(enhancedError, operation);
+    return await this.#applyRecoveryStrategy(enhancedError, operation, context);
   }
 
   /**
@@ -217,7 +217,7 @@ export class ErrorHandler {
    * Aplica la estrategia de recuperación apropiada
    * @private
    */
-  async #applyRecoveryStrategy(error, operation) {
+  async #applyRecoveryStrategy(error, operation, context = {}) {
     const operationKey = operation?.name || 'unknown';
     
     switch (error.strategy) {
@@ -230,7 +230,7 @@ export class ErrorHandler {
       case RECOVERY_STRATEGIES.FALLBACK:
       case RECOVERY_STRATEGIES.CACHE_FALLBACK:
       case RECOVERY_STRATEGIES.GRACEFUL_DEGRADATION:
-        return this.#applyFallbackStrategy(error, error.strategy);
+        return this.#applyFallbackStrategy(error, error.strategy, context);
         
       case RECOVERY_STRATEGIES.FAIL_FAST:
       default:
@@ -305,7 +305,7 @@ export class ErrorHandler {
    * Implementa estrategias de fallback unificadas
    * @private
    */
-  #applyFallbackStrategy(error, strategy) {
+  #applyFallbackStrategy(error, strategy, context = {}) {
     const fallbackConfigs = {
       [RECOVERY_STRATEGIES.FALLBACK]: {
         logLevel: 'warn',
@@ -344,6 +344,10 @@ export class ErrorHandler {
     }
 
     this.#logger[config.logLevel](config.message, { error: error.message });
+    // Si existe un fallbackResponse específico en el contexto, usarlo para respetar la forma esperada del recurso (meta/catalog/stream)
+    if (context && context.fallbackResponse) {
+      return context.fallbackResponse;
+    }
     return config.response;
   }
 
@@ -459,6 +463,14 @@ export async function safeExecute(operation, context = {}) {
   try {
     return await operation();
   } catch (error) {
-    return await errorHandler.handleError(error, context, operation);
+    try {
+      return await errorHandler.handleError(error, context, operation);
+    } catch (finalError) {
+      // En caso de estrategia FAIL_FAST u otra que lance, devolver fallbackResponse si fue proporcionado para mantener estabilidad del addon.
+      if (context && context.fallbackResponse) {
+        return context.fallbackResponse;
+      }
+      throw finalError;
+    }
   }
 }
