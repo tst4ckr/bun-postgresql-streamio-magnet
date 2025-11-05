@@ -110,6 +110,7 @@ export class Tv {
           released: new Date().toISOString(),
           overview: 'Live stream',
           available: true,
+          streams: [this.toStremioStream()]
         }
       ],
       // Provide helpful behavior hints for Stremio clients
