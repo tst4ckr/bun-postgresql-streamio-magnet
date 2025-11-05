@@ -96,14 +96,23 @@ export class Tv {
   toStremioMeta(typeOverride = 'tv') {
     const fallbackLogo = CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO;
     const poster = this.#logo || fallbackLogo;
+    const defaultVideoId = CONSTANTS.METADATA.TV_METADATA.DEFAULT_VIDEO_ID;
     return {
       id: this.#id,
       type: typeOverride || 'tv',
       name: this.#name,
       poster: poster,
+      // Include a videos array so Stremio can select a videoId (required for stream requests)
+      videos: [
+        {
+          id: defaultVideoId,
+          title: this.#name,
+          overview: 'Live stream',
+        }
+      ],
       // Provide helpful behavior hints for Stremio clients
       behaviorHints: {
-        defaultVideoId: CONSTANTS.METADATA.TV_METADATA.DEFAULT_VIDEO_ID
+        defaultVideoId
       }
     };
   }
