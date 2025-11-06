@@ -56,9 +56,9 @@ export class CsvTvRepository {
             const tv = new Tv({
               id: data.id || Tv.generateId(data.name),
               name: data.name,
-              streamUrl: data.stream_url, // Corregido: usar 'stream_url' del CSV.
-              logo: data.logo || data['tvg-logo'], // Corregido: usar 'tvg-logo' del CSV.
-              group: data.genre || data['group-title'], // Corregido: usar 'group-title' del CSV.
+              streamUrl: data.stream_url,
+              poster: data.poster || data.logo || data['tvg-logo'], // Prioriza poster, luego logo, luego tvg-logo
+              group: data.genre || data['group-title'],
               tvgId: data['tvg-id'],
               tvgName: data['tvg-name'],
               description: data.description,

@@ -41,7 +41,7 @@ export class RemoteCsvTvRepository {
                 id: data.id || Tv.generateId(data.name),
                 name: data.name,
                 streamUrl: data.stream_url,
-                logo: data.logo,
+                poster: data.poster, // Usar poster en lugar de logo
                 group: data.genre,
                 description: data.description,
                 background: data.background,

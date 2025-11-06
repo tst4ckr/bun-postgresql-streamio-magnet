@@ -13,7 +13,7 @@ export class Tv {
   #id;
   #name;
   #streamUrl;
-  #logo;
+  #poster; // Renombrado de #logo a #poster
   #group;
   #tvgId;
   #tvgName;
@@ -25,7 +25,7 @@ export class Tv {
    * @param {string} tvData.id - ID único del canal
    * @param {string} tvData.name - Nombre del canal
    * @param {string} tvData.streamUrl - URL del stream M3U8
-   * @param {string} [tvData.logo] - URL del logo del canal
+   * @param {string} [tvData.poster] - URL del póster del canal
    * @param {string} [tvData.group] - Grupo/categoría del canal
    * @param {string} [tvData.tvgId] - ID TVG del canal
    * @param {string} [tvData.tvgName] - Nombre TVG del canal
@@ -38,7 +38,7 @@ export class Tv {
     this.#id = tvData.id;
     this.#name = tvData.name;
     this.#streamUrl = tvData.streamUrl;
-    this.#logo = tvData.logo || null;
+    this.#poster = tvData.poster || null; // Renombrado de logo a poster
     this.#group = tvData.group || 'General';
     this.#tvgId = tvData.tvgId || null;
     this.#tvgName = tvData.tvgName || tvData.name;
@@ -90,8 +90,8 @@ export class Tv {
   get id() { return this.#id; }
   get name() { return this.#name; }
   get streamUrl() { return this.#streamUrl; }
-  get logo() {
-    return this.#resolveImageUrl(this.#logo);
+  get poster() { // Renombrado de logo a poster
+    return this.#resolveImageUrl(this.#poster);
   }
   get group() { return this.#group; }
   get tvgId() { return this.#tvgId; }
@@ -141,7 +141,7 @@ export class Tv {
       id: this.#id,
       type: 'tv',
       name: this.#name,
-      poster: this.logo || CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO,
+      poster: this.poster || CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO, // Usar this.poster
       posterShape: 'landscape',
       genres: [this.#group],
       description: description
@@ -153,8 +153,8 @@ export class Tv {
    * @returns {Object} Metadatos en formato Stremio
    */
   toStremioMeta(typeOverride = 'tv') {
-    const fallbackLogo = CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO;
-    const poster = this.logo || fallbackLogo;
+    const fallbackPoster = CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO;
+    const poster = this.poster || fallbackPoster;
     const background = this.background || poster;
     const defaultVideoId = CONSTANTS.METADATA.TV_METADATA.DEFAULT_VIDEO_ID;
     const description = this.#description || `Transmisión en vivo del canal ${this.#name}. Categoría: ${this.#group}.`;
@@ -164,6 +164,7 @@ export class Tv {
       type: typeOverride || 'tv',
       name: this.#name,
       poster: poster,
+      logo: poster, // Añadido para reutilizar el póster como logo
       background: background,
       genres: [this.#group],
       description: description,
