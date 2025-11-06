@@ -48,7 +48,7 @@ export class CsvTvRepository {
         .on('data', (data) => {
           try {
             // Validación de datos de fila: asegurarse de que 'name' y 'url' existan.
-            if (!data.name || !data.url) {
+            if (!data.name || !data.stream_url) {
               this.#logger.warn('Fila de TV CSV omitida por falta de datos esenciales (name o url)', { row: data });
               return;
             }
@@ -56,7 +56,7 @@ export class CsvTvRepository {
             const tv = new Tv({
               id: data.id || Tv.generateId(data.name),
               name: data.name,
-              streamUrl: data.url, // Corregido: usar 'url' del CSV.
+              streamUrl: data.stream_url, // Corregido: usar 'stream_url' del CSV.
               logo: data['tvg-logo'], // Corregido: usar 'tvg-logo' del CSV.
               group: data['group-title'], // Corregido: usar 'group-title' del CSV.
               tvgId: data['tvg-id'],
