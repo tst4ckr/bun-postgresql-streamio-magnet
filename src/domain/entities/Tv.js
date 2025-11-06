@@ -153,11 +153,7 @@ export class Tv {
       behaviorHints: {
         notWebReady: false,
         bingeGroup: `tv-${this.#group}`,
-        proxyHeaders: {
-          request: {
-            'User-Agent': 'Stremio/4.4.142 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
-        }
+
       },
       isLive: true
     };
