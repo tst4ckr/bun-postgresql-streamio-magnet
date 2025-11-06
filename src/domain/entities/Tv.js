@@ -115,13 +115,16 @@ export class Tv {
    * @returns {Object} Metadatos de catálogo en formato Stremio
    */
   toStremioCatalogMeta() {
+    const description = `Canal de TV en vivo: ${this.#name}. Disfruta de la mejor programación en la categoría ${this.#group}.`;
+
     return {
       id: this.#id,
       type: 'tv',
       name: this.#name,
       poster: this.logo || CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO,
       posterShape: 'landscape',
-      description: `Grupo: ${this.#group}`
+      genres: [this.#group],
+      description: description
     };
   }
 
@@ -133,23 +136,28 @@ export class Tv {
     const fallbackLogo = CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO;
     const poster = this.logo || fallbackLogo;
     const defaultVideoId = CONSTANTS.METADATA.TV_METADATA.DEFAULT_VIDEO_ID;
+    const description = `Transmisión en vivo del canal ${this.#name}. Categoría: ${this.#group}.`;
+
     return {
       id: this.#id,
       type: typeOverride || 'tv',
       name: this.#name,
       poster: poster,
-      // Include a videos array so Stremio can select a videoId (required for stream requests)
+      background: poster, // Usar el poster como background si no hay otro disponible
+      genres: [this.#group],
+      description: description,
+      
       videos: [
         {
           id: defaultVideoId,
           title: this.#name,
           released: new Date().toISOString(),
-          overview: 'Live stream',
+          overview: `Disfruta de la transmisión en vivo de ${this.#name}.`,
           available: true,
           streams: [this.toStremioStream()]
         }
       ],
-      // Provide helpful behavior hints for Stremio clients
+      
       behaviorHints: {
         defaultVideoId
       }
