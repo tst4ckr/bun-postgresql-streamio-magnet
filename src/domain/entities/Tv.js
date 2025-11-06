@@ -151,7 +151,7 @@ export class Tv {
       description: `Canal: ${this.#name}${this.#group ? ` (${this.#group})` : ''}`,
       url: this.#streamUrl,
       behaviorHints: {
-        notWebReady: true,
+        notWebReady: false,
         bingeGroup: `tv-${this.#group}`,
         proxyHeaders: {
           request: {
