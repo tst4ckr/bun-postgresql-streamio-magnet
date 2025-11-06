@@ -88,7 +88,9 @@ export class Tv {
     if (!this.#logo) return null;
     // Asume que los logos están en /static/logos/ y construye una URL absoluta
     const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:7000';
-    return `${baseUrl}/static/${this.#logo}`;
+    // Corrige la ruta del logo si viene del CSV con 'logo/' en lugar de 'logos/'
+    const correctedLogoPath = this.#logo.replace('logo/', 'logos/');
+    return `${baseUrl}/static/${correctedLogoPath}`;
   }
   get group() { return this.#group; }
   get tvgId() { return this.#tvgId; }
