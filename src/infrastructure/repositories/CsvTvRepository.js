@@ -53,16 +53,21 @@ export class CsvTvRepository {
               return;
             }
 
+            const posterValue = data.poster;
+            const logoValue = data.logo || data['tvg-logo'];
+            const backgroundValue = data.background;
+
             const tv = new Tv({
               id: data.id || Tv.generateId(data.name),
               name: data.name,
               streamUrl: data.stream_url,
-              poster: data.poster || data.logo || data['tvg-logo'], // Prioriza poster, luego logo, luego tvg-logo
+              poster: posterValue ? `poster/${posterValue}` : undefined,
+              logo: logoValue ? `logos/${logoValue}` : undefined,
               group: data.genre || data['group-title'],
               tvgId: data['tvg-id'],
               tvgName: data['tvg-name'],
               description: data.description,
-              background: data.background,
+              background: backgroundValue ? `background/${backgroundValue}` : undefined,
             });
             tvs.push(tv);
           } catch (error) {
