@@ -30,38 +30,36 @@ export class CsvTvRepository {
   async init() {
     return new Promise((resolve, reject) => {
       const tvs = [];
-      let headersValidated = false;
-      const expectedHeaders = ['name', 'stream_url']; // Cabeceras mínimas requeridas
+      // Las cabeceras esperadas en el CSV son 'name' y 'url'.
+      const expectedHeaders = ['name', 'url'];
 
       fs.createReadStream(this.#csvPath)
         .pipe(csv())
         .on('headers', (headers) => {
           const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
           if (missingHeaders.length > 0) {
-            const error = new Error(`Cabeceras CSV faltantes: ${missingHeaders.join(', ')}`);
-            this.#logger.error(error.message, { path: this.#csvPath });
-            reject(error);
-            // Detener el stream si las cabeceras no son válidas
-            // Esto es un poco complicado con la API de streams, pero el reject debería ser suficiente
+            const error = new Error(`Cabeceras CSV faltantes o incorrectas. Se esperaban: ${expectedHeaders.join(', ')}. Faltan: ${missingHeaders.join(', ')}`);
+            this.#logger.error(error.message, { path: this.#csvPath, foundHeaders: headers });
+            // Rechazar la promesa para detener la inicialización.
+            return reject(error);
           }
-          headersValidated = true;
         })
         .on('data', (data) => {
-          if (!headersValidated) return; // No procesar datos si las cabeceras no son válidas
-
           try {
-            // Validación de datos de fila
-            if (!data.name || !data.stream_url) {
-              this.#logger.warn('Fila de TV CSV omitida por falta de datos esenciales (name o stream_url)', { row: data });
+            // Validación de datos de fila: asegurarse de que 'name' y 'url' existan.
+            if (!data.name || !data.url) {
+              this.#logger.warn('Fila de TV CSV omitida por falta de datos esenciales (name o url)', { row: data });
               return;
             }
 
             const tv = new Tv({
               id: data.id || Tv.generateId(data.name),
               name: data.name,
-              streamUrl: data.stream_url, // Corregido: usar stream_url en lugar de url
-              logo: data.logo,
-              group: data.genre, // Corregido: usar genre en lugar de category
+              streamUrl: data.url, // Corregido: usar 'url' del CSV.
+              logo: data['tvg-logo'], // Corregido: usar 'tvg-logo' del CSV.
+              group: data['group-title'], // Corregido: usar 'group-title' del CSV.
+              tvgId: data['tvg-id'],
+              tvgName: data['tvg-name'],
             });
             tvs.push(tv);
           } catch (error) {
@@ -70,7 +68,11 @@ export class CsvTvRepository {
         })
         .on('end', () => {
           this.#tvs = tvs;
-          this.#logger.info(`Cargados ${this.#tvs.length} canales de TV desde ${this.#csvPath}`);
+          if (this.#tvs.length === 0) {
+            this.#logger.warn(`No se cargaron canales de TV desde ${this.#csvPath}. El archivo podría estar vacío o todas las filas son inválidas.`);
+          } else {
+            this.#logger.info(`Cargados ${this.#tvs.length} canales de TV desde ${this.#csvPath}`);
+          }
           resolve();
         })
         .on('error', (error) => {
