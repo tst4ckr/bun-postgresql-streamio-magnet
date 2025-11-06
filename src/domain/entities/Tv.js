@@ -106,7 +106,7 @@ export class Tv {
       id: this.#id,
       type: 'tv',
       name: this.#name,
-      poster: this.#logo || CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO,
+      poster: this.logo || CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO,
       posterShape: 'landscape',
       description: `Grupo: ${this.#group}`
     };
@@ -118,7 +118,7 @@ export class Tv {
    */
   toStremioMeta(typeOverride = 'tv') {
     const fallbackLogo = CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO;
-    const poster = this.#logo || fallbackLogo;
+    const poster = this.logo || fallbackLogo;
     const defaultVideoId = CONSTANTS.METADATA.TV_METADATA.DEFAULT_VIDEO_ID;
     return {
       id: this.#id,
