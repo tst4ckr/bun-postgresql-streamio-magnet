@@ -86,10 +86,23 @@ export class Tv {
   get streamUrl() { return this.#streamUrl; }
   get logo() {
     if (!this.#logo) return null;
-    // Asume que los logos están en /static/logos/ y construye una URL absoluta
+
+    // Check if this.#logo is already a full URL
+    try {
+      const url = new URL(this.#logo);
+      if (url.protocol === 'http:' || url.protocol === 'https:') {
+        return this.#logo; // It's a valid, full URL
+      }
+    } catch (e) {
+      // Not a full URL, treat as a relative path
+    }
+
+    // Assume it's a relative path and construct the full URL
     const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:7000';
-    // Corrige la ruta del logo si viene del CSV con 'logo/' en lugar de 'logos/'
-    const correctedLogoPath = this.#logo.replace('logo/', 'logos/');
+    
+    // Correct the path if it uses 'logo/' instead of 'logos/'
+    const correctedLogoPath = this.#logo.includes('logos/') ? this.#logo : this.#logo.replace('logo/', 'logos/');
+
     return `${baseUrl}/static/${correctedLogoPath}`;
   }
   get group() { return this.#group; }
