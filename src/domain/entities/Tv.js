@@ -17,6 +17,8 @@ export class Tv {
   #group;
   #tvgId;
   #tvgName;
+  #description;
+  #background;
 
   /**
    * @param {Object} tvData - Datos del canal
@@ -27,6 +29,8 @@ export class Tv {
    * @param {string} [tvData.group] - Grupo/categoría del canal
    * @param {string} [tvData.tvgId] - ID TVG del canal
    * @param {string} [tvData.tvgName] - Nombre TVG del canal
+   * @param {string} [tvData.description] - Descripción del canal
+   * @param {string} [tvData.background] - URL de la imagen de fondo del canal
    */
   constructor(tvData) {
     this.#validateTvData(tvData);
@@ -38,6 +42,8 @@ export class Tv {
     this.#group = tvData.group || 'General';
     this.#tvgId = tvData.tvgId || null;
     this.#tvgName = tvData.tvgName || tvData.name;
+    this.#description = tvData.description || null;
+    this.#background = tvData.background || null;
     
     Object.freeze(this);
   }
@@ -85,29 +91,43 @@ export class Tv {
   get name() { return this.#name; }
   get streamUrl() { return this.#streamUrl; }
   get logo() {
-    if (!this.#logo) return null;
-
-    // Check if this.#logo is already a full URL
-    try {
-      const url = new URL(this.#logo);
-      if (url.protocol === 'http:' || url.protocol === 'https:') {
-        return this.#logo; // It's a valid, full URL
-      }
-    } catch (e) {
-      // Not a full URL, treat as a relative path
-    }
-
-    // Assume it's a relative path and construct the full URL
-    const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:7000';
-    
-    // Correct the path if it uses 'logo/' instead of 'logos/'
-    const correctedLogoPath = this.#logo.includes('logos/') ? this.#logo : this.#logo.replace('logo/', 'logos/');
-
-    return `${baseUrl}/static/${correctedLogoPath}`;
+    return this.#resolveImageUrl(this.#logo);
   }
   get group() { return this.#group; }
   get tvgId() { return this.#tvgId; }
   get tvgName() { return this.#tvgName; }
+  get description() { return this.#description; }
+  get background() {
+    return this.#resolveImageUrl(this.#background);
+  }
+
+  /**
+   * Resuelve una ruta de imagen, ya sea una URL completa o una ruta relativa.
+   * @private
+   * @param {string | null} path - La ruta de la imagen.
+   * @returns {string | null} La URL completa de la imagen o null.
+   */
+  #resolveImageUrl(path) {
+    if (!path) return null;
+
+    // Comprueba si la ruta ya es una URL completa
+    try {
+      const url = new URL(path);
+      if (url.protocol === 'http:' || url.protocol === 'https:') {
+        return path; // Es una URL válida y completa
+      }
+    } catch (e) {
+      // No es una URL completa, se tratará como una ruta relativa
+    }
+
+    // Asume que es una ruta relativa y construye la URL completa
+    const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:7000';
+    
+    // Corrige errores comunes en la ruta, como 'logo/' en lugar de 'logos/'
+    const correctedPath = path.replace('logo/', 'logos/');
+
+    return `${baseUrl}/static/${correctedPath}`;
+  }
 
   /**
    * Convierte el canal a formato de metadatos de catálogo de Stremio.
@@ -115,7 +135,7 @@ export class Tv {
    * @returns {Object} Metadatos de catálogo en formato Stremio
    */
   toStremioCatalogMeta() {
-    const description = `Canal de TV en vivo: ${this.#name}. Disfruta de la mejor programación en la categoría ${this.#group}.`;
+    const description = this.#description || `Canal de TV en vivo: ${this.#name}. Disfruta de la mejor programación en la categoría ${this.#group}.`;
 
     return {
       id: this.#id,
@@ -129,21 +149,22 @@ export class Tv {
   }
 
   /**
-   * Convierte el canal a formato de metadatos de Stremio.
+   * Convierte el canal a formato de Stremio.
    * @returns {Object} Metadatos en formato Stremio
    */
   toStremioMeta(typeOverride = 'tv') {
     const fallbackLogo = CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO;
     const poster = this.logo || fallbackLogo;
+    const background = this.background || poster;
     const defaultVideoId = CONSTANTS.METADATA.TV_METADATA.DEFAULT_VIDEO_ID;
-    const description = `Transmisión en vivo del canal ${this.#name}. Categoría: ${this.#group}.`;
+    const description = this.#description || `Transmisión en vivo del canal ${this.#name}. Categoría: ${this.#group}.`;
 
     return {
       id: this.#id,
       type: typeOverride || 'tv',
       name: this.#name,
       poster: poster,
-      background: poster, // Usar el poster como background si no hay otro disponible
+      background: background,
       genres: [this.#group],
       description: description,
       
@@ -152,7 +173,7 @@ export class Tv {
           id: defaultVideoId,
           title: this.#name,
           released: new Date().toISOString(),
-          overview: `Disfruta de la transmisión en vivo de ${this.#name}.`,
+          overview: this.#description || `Disfruta de la transmisión en vivo de ${this.#name}.`,
           available: true,
           streams: [this.toStremioStream()]
         }
