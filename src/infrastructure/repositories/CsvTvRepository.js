@@ -31,12 +31,13 @@ export class CsvTvRepository {
     return new Promise((resolve, reject) => {
       const tvs = [];
       // Las cabeceras esperadas en el CSV son 'name' y 'url'.
-      const expectedHeaders = ['name', 'url'];
+      const expectedHeaders = ['name', 'stream_url'];
 
       fs.createReadStream(this.#csvPath)
         .pipe(csv())
         .on('headers', (headers) => {
-          const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
+          const trimmedHeaders = headers.map(h => h.trim());
+          const missingHeaders = expectedHeaders.filter(h => !trimmedHeaders.includes(h));
           if (missingHeaders.length > 0) {
             const error = new Error(`Cabeceras CSV faltantes o incorrectas. Se esperaban: ${expectedHeaders.join(', ')}. Faltan: ${missingHeaders.join(', ')}`);
             this.#logger.error(error.message, { path: this.#csvPath, foundHeaders: headers });

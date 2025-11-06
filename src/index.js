@@ -156,8 +156,8 @@ class MagnetAddon {
    */
   async #setupTvHandlerFromCsv(csvPath) {
     try {
-      const tvRepository = new CsvTvRepository(csvPath, this.#config, this.#logger);
-      await tvRepository.getAllTvs(); // Cargar los datos del CSV
+      const tvRepository = new CsvTvRepository(csvPath, this.#logger);
+      await tvRepository.init(); // Cargar los datos del CSV
       this.#tvHandler = new TvHandler(tvRepository, this.#config, this.#logger);
       this.#logger.info('TvHandler configurado con CsvTvRepository');
     } catch (error) {
