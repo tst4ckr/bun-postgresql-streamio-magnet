@@ -120,13 +120,19 @@ export class Tv {
       // No es una URL completa, se tratará como una ruta relativa
     }
 
-    // Asume que es una ruta relativa y construye la URL completa
-    const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:7000';
-    
     // Corrige errores comunes en la ruta, como 'logo/' en lugar de 'logos/'
     const correctedPath = path.replace('logo/', 'logos/');
+    
+    // Asume que es una ruta relativa y construye la URL completa
+    const baseUrl = process.env.BASE_URL;
 
-    return `${baseUrl}/static/${correctedPath}`;
+    // Si BASE_URL está definida, construye una URL absoluta.
+    // Si no, construye una ruta relativa al servidor, ideal para proxies inversos.
+    if (baseUrl) {
+      return `${baseUrl}/static/${correctedPath}`;
+    }
+
+    return `/static/${correctedPath}`;
   }
 
   /**
