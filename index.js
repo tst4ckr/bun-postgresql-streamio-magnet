@@ -7,23 +7,27 @@ import { MagnetAddon } from './src/index.js';
  * Usa únicamente Stremio SDK nativo sin Express
  */
 
+// Almacenar la instancia del addon en una variable global para persistir entre recargas en caliente
+let addonInstance;
+
 /**
  * Función principal
  */
 async function main() {
   try {
-    console.log('🎬 Iniciando Stremio Magnet Search Addon...');
+    if (!addonInstance) {
+      console.log('🎬 Creando nueva instancia de Stremio Magnet Search Addon...');
+      addonInstance = new MagnetAddon();
+      await addonInstance.start();
+    } else {
+      console.log('♻️ Reutilizando instancia existente del addon.');
+    }
+    
     console.log('📅 Versión:', process.env.npm_package_version || '1.0.0');
     console.log('🟢 Runtime:', process.version);
     console.log('🏗️  Entorno:', process.env.NODE_ENV || 'development');
     console.log('');
-    
-    // Crear y inicializar el addon
-    const addon = new MagnetAddon();
-    
-    // Iniciar el servidor
-    await addon.start();
-    
+        
   } catch (error) {
     console.error('❌ Error fatal al iniciar la aplicación:', error);
     process.exit(1);

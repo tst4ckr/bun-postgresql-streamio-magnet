@@ -84,7 +84,12 @@ export class Tv {
   get id() { return this.#id; }
   get name() { return this.#name; }
   get streamUrl() { return this.#streamUrl; }
-  get logo() { return this.#logo; }
+  get logo() {
+    if (!this.#logo) return null;
+    // Asume que los logos están en /static/logos/ y construye una URL absoluta
+    const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:7000';
+    return `${baseUrl}/static/${this.#logo}`;
+  }
   get group() { return this.#group; }
   get tvgId() { return this.#tvgId; }
   get tvgName() { return this.#tvgName; }

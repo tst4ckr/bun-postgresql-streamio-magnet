@@ -6,7 +6,8 @@
 // Cargar variables de entorno una sola vez, antes de cualquier otro import
 import './config/loadEnv.js';
 
-import { addonBuilder, serveHTTP } from 'stremio-addon-sdk';
+import { addonBuilder, serveHTTP, getRouter } from 'stremio-addon-sdk';
+import express from 'express';
 import { existsSync } from 'fs';
 import { addonConfig, manifest } from './config/addonConfig.js';
 import { CascadingMagnetRepository } from './infrastructure/repositories/CascadingMagnetRepository.js';
@@ -19,8 +20,6 @@ import { EnhancedLogger } from './infrastructure/utils/EnhancedLogger.js';
 /**
  * Clase principal que encapsula la lógica del addon.
  */
-let addon;
-
 class MagnetAddon {
   #config;
   #logger;
@@ -66,9 +65,6 @@ class MagnetAddon {
 
     // 4. Configurar handlers
     await this.#setupHandlers();
-
-    // 5. Configurar rutas adicionales
-    this.#setupAdditionalRoutes();
   }
 
   /**
@@ -118,7 +114,8 @@ class MagnetAddon {
    * Configura rutas adicionales.
    * @private
    */
-  #setupAdditionalRoutes() {
+  #setupAdditionalRoutes(router) {
+    router.use('/static', express.static('static'));
     this.#logger.info('Rutas adicionales configuradas');
   }
 
@@ -265,8 +262,6 @@ class MagnetAddon {
     this.#logger.info('CatalogHandler configurado.');
   }
 
-
-
   /**
    * Configura Meta Handler.
    * @private
@@ -334,6 +329,8 @@ class MagnetAddon {
     this.#logger.info(`Iniciando servidor en el puerto ${port}...`);
 
     const addonInterface = this.#addonBuilder.getInterface();
+    const router = getRouter(addonInterface);
+    this.#setupAdditionalRoutes(router);
     
     const serverOptions = {
       port: port,
@@ -343,7 +340,7 @@ class MagnetAddon {
     serveHTTP(addonInterface, serverOptions)
       .then(({ url }) => {
         this.#logger.info(`✅ Addon iniciado en: ${url}`);
-        this.#logger.info(`🔗 Manifiesto: ${url}/manifest.json`);
+        this.#logger.info(`🔗 Manifiesto: ${url}`);
         this.#logger.info(`🚀 Servidor optimizado con SDK nativo de Stremio`);
       })
       .catch(error => {
@@ -378,12 +375,6 @@ class MagnetAddon {
 async function main() {
   let logger;
   try {
-    // Crear logger para errores fatales
-    logger = new EnhancedLogger('error', false, {
-      errorOnly: true,
-      minimalOutput: true
-    });
-    
     const addon = new MagnetAddon();
     await addon.start();
   } catch (error) {
@@ -408,23 +399,6 @@ async function main() {
 export { MagnetAddon };
 
 // Ejecutar si es el módulo principal
-if (import.meta.main) {
-  main();
-}
-
-
-async function main() {
-  if (addon) {
-    console.log('[INFO] Recargando el addon...');
-    // Aquí se podría añadir lógica para detener el servidor anterior si fuera necesario
-    // pero por ahora, simplemente evitamos la reinicialización.
-    return;
-  }
-  addon = new MagnetAddon();
-  await addon.init();
-}
-
-// Asegurarse de que el addon se inicializa solo una vez
 if (import.meta.main) {
   main();
 }
