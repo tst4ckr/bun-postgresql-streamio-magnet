@@ -109,32 +109,32 @@ class MagnetAddon {
       });
 
       try {
-        // Delegar a StreamHandler para todo tipo excepto TV o Channel
-        if (args.type !== 'tv' && args.type !== 'channel') {
-          this.#logger.debug(`[DEBUG] Delegating to StreamHandler for type: ${args.type}`);
-          const result = await this.#streamHandler.createAddonHandler()(args);
-          this.#logger.debug(`[DEBUG] StreamHandler result:`, {
-            streamsCount: result?.streams?.length || 0,
-            hasStreams: !!(result?.streams?.length)
-          });
-          return result;
-        }
-        
         // Para TV o Channel, usar TvHandler si está disponible
-        this.#logger.debug(`[DEBUG] Processing TV request - TvHandler available: ${!!this.#tvHandler}`);
-        if (this.#tvHandler) {
-          this.#logger.debug(`[DEBUG] Delegating to TvHandler for type: ${args.type}`);
-          const result = await this.#tvHandler.createStreamHandler()(args);
-          this.#logger.debug(`[DEBUG] TvHandler result:`, {
-            streamsCount: result?.streams?.length || 0,
-            hasStreams: !!(result?.streams?.length),
-            cacheMaxAge: result?.cacheMaxAge
-          });
-          return result;
+        if (args.type === 'tv' || args.type === 'channel') {
+          this.#logger.debug(`[DEBUG] Processing TV request - TvHandler available: ${!!this.#tvHandler}`);
+          if (this.#tvHandler) {
+            this.#logger.debug(`[DEBUG] Delegating to TvHandler for type: ${args.type}`);
+            const result = await this.#tvHandler.createStreamHandler()(args);
+            this.#logger.debug(`[DEBUG] TvHandler result:`, {
+              streamsCount: result?.streams?.length || 0,
+              hasStreams: !!(result?.streams?.length),
+              cacheMaxAge: result?.cacheMaxAge
+            });
+            return result;
+          }
+          
+          this.#logger.warn(`[DEBUG] No TvHandler available for TV request - returning empty streams`);
+          return { streams: [] };
         }
         
-        this.#logger.warn(`[DEBUG] No TvHandler available for TV request - returning empty streams`);
-        return { streams: [] };
+        // Delegar a StreamHandler para el resto de tipos
+        this.#logger.debug(`[DEBUG] Delegating to StreamHandler for type: ${args.type}`);
+        const result = await this.#streamHandler.createAddonHandler()(args);
+        this.#logger.debug(`[DEBUG] StreamHandler result:`, {
+          streamsCount: result?.streams?.length || 0,
+          hasStreams: !!(result?.streams?.length)
+        });
+        return result;
       } catch (error) {
         this.#logger.error('[DEBUG] Error in main stream handler', { 
           error: error.message, 
