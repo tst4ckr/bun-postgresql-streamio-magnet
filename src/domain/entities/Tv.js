@@ -90,6 +90,22 @@ export class Tv {
   get tvgName() { return this.#tvgName; }
 
   /**
+   * Convierte el canal a formato de metadatos de catálogo de Stremio.
+   * Este formato es más ligero y se usa en las listas de catálogos.
+   * @returns {Object} Metadatos de catálogo en formato Stremio
+   */
+  toStremioCatalogMeta() {
+    return {
+      id: this.#id,
+      type: 'tv',
+      name: this.#name,
+      poster: this.#logo || CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO,
+      posterShape: 'landscape',
+      description: `Grupo: ${this.#group}`
+    };
+  }
+
+  /**
    * Convierte el canal a formato de metadatos de Stremio.
    * @returns {Object} Metadatos en formato Stremio
    */

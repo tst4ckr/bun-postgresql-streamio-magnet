@@ -107,12 +107,7 @@ export class TvHandler {
     const skip = Math.max(0, rawSkip);
     const { items: pagedTvs, hasMore } = this.#paginateTvs(filteredTvs, skip, pageSize);
 
-    const metas = pagedTvs.map(tv => {
-      const meta = tv.toStremioMeta('tv');
-      // Forzar siempre el tipo 'tv' para que el cliente solicite streams correctamente
-      meta.type = 'tv';
-      return meta;
-    });
+    const metas = pagedTvs.map(tv => tv.toStremioCatalogMeta());
     this.#logger.info(`Catálogo '${id}': ${metas.length} de ${filteredTvs.length}`);
 
     return {

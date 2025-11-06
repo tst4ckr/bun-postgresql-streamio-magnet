@@ -19,6 +19,8 @@ import { EnhancedLogger } from './infrastructure/utils/EnhancedLogger.js';
 /**
  * Clase principal que encapsula la lógica del addon.
  */
+let addon;
+
 class MagnetAddon {
   #config;
   #logger;
@@ -406,6 +408,23 @@ async function main() {
 export { MagnetAddon };
 
 // Ejecutar si es el módulo principal
+if (import.meta.main) {
+  main();
+}
+
+
+async function main() {
+  if (addon) {
+    console.log('[INFO] Recargando el addon...');
+    // Aquí se podría añadir lógica para detener el servidor anterior si fuera necesario
+    // pero por ahora, simplemente evitamos la reinicialización.
+    return;
+  }
+  addon = new MagnetAddon();
+  await addon.init();
+}
+
+// Asegurarse de que el addon se inicializa solo una vez
 if (import.meta.main) {
   main();
 }
