@@ -13,6 +13,7 @@ import { CascadingMagnetRepository } from './infrastructure/repositories/Cascadi
 import { StreamHandler } from './application/handlers/StreamHandler.js';
 import { TvHandler } from './application/handlers/TvHandler.js';
 import { M3UTvRepository } from './infrastructure/repositories/M3UTvRepository.js';
+import { CsvTvRepository } from './infrastructure/repositories/CsvTvRepository.js';
 import { EnhancedLogger } from './infrastructure/utils/EnhancedLogger.js';
 
 /**
@@ -74,15 +75,19 @@ class MagnetAddon {
    */
   async #setupHandlers() {
     const m3uUrl = this.#config.repository.m3uUrl;
-    
+    const csvPath = this.#config.repository.tvCsvPath; // Nueva variable para la ruta del CSV
+
     this.#setupStreamHandler();
-    
-    if (m3uUrl) {
+
+    if (csvPath && existsSync(csvPath)) {
+      this.#logger.info(`Usando TV_CSV_PATH: ${csvPath}`);
+      await this.#setupTvHandlerFromCsv(csvPath);
+    } else if (m3uUrl) {
       // Validar que la fuente M3U sea usable: http/https, file:// o ruta local existente
       let canSetupTv = false;
       try {
         const urlObj = new URL(m3uUrl);
-        if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:' || urlObj.protocol === 'file:') {
+        if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') {
           canSetupTv = true;
         } else {
           this.#logger.warn(`M3U_URL con protocolo no soportado: ${m3uUrl}.`);
@@ -97,7 +102,7 @@ class MagnetAddon {
       }
 
       if (canSetupTv) {
-        await this.#setupTvHandler(m3uUrl);
+        await this.#setupTvHandlerFromM3U(m3uUrl);
       } else {
         this.#logger.warn('TV deshabilitado por fuente M3U inválida');
       }
@@ -174,11 +179,12 @@ class MagnetAddon {
    * @private
    * @param {string} m3uUrl - URL del archivo M3U
    */
-  async #setupTvHandler(m3uUrl) {
+  async #setupTvHandlerFromM3U(m3uUrl) {
     try {
-      this.#tvRepository = new M3UTvRepository(m3uUrl, this.#config, this.#logger);
-      this.#tvHandler = new TvHandler(this.#tvRepository, this.#config, this.#logger);
-      this.#logger.info('TvHandler configurado');
+      const tvRepository = new M3UTvRepository(m3uUrl, this.#config, this.#logger);
+      await tvRepository.init(); // Asegurarse de que init se llama
+      this.#tvHandler = new TvHandler(tvRepository, this.#config, this.#logger);
+      this.#logger.info('TvHandler configurado con M3UTvRepository');
 
       // Evitar crear más de un intervalo de refresco
       if (this.#tvRefreshIntervalId) {
@@ -206,7 +212,24 @@ class MagnetAddon {
         }
       }, refreshInterval);
     } catch (error) {
-      this.#logger.error('Error configurando TvHandler:', error);
+      this.#logger.error('Error configurando TvHandler con M3U:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Configura TvHandler para canales de TV desde un archivo CSV.
+   * @private
+   * @param {string} csvPath - Ruta al archivo CSV
+   */
+  async #setupTvHandlerFromCsv(csvPath) {
+    try {
+      const tvRepository = new CsvTvRepository(csvPath, this.#logger);
+      await tvRepository.init(); // Cargar los datos del CSV
+      this.#tvHandler = new TvHandler(tvRepository, this.#config, this.#logger);
+      this.#logger.info('TvHandler configurado con CsvTvRepository');
+    } catch (error) {
+      this.#logger.error('Error configurando TvHandler con CSV:', error);
       throw error;
     }
   }

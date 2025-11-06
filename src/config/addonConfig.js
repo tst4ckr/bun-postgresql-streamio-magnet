@@ -116,6 +116,7 @@ const config = {
     primaryCsvPath: envString('PRIMARY_CSV_PATH', resolvePath('data/torrents/magnets.csv')),
     secondaryCsvPath: envString('SECONDARY_CSV_PATH', resolvePath('data/torrents/torrentio.csv')),
     animeCsvPath: envString('ANIME_CSV_PATH', resolvePath('data/torrents/anime.csv')),
+    tvCsvPath: envString('TV_CSV_PATH', resolvePath('data/tvs/tv.csv')), // Nueva línea
     torrentioApiUrl: envString('TORRENTIO_API_URL', 'https://torrentio.strem.fun/'),
     timeout: envInt('CSV_TIMEOUT', CONSTANTS.TIME.DEFAULT_TIMEOUT),
     // Configuración específica para TV M3U

@@ -30,10 +30,32 @@ export class CsvTvRepository {
   async init() {
     return new Promise((resolve, reject) => {
       const tvs = [];
+      let headersValidated = false;
+      const expectedHeaders = ['name', 'stream_url']; // Cabeceras mínimas requeridas
+
       fs.createReadStream(this.#csvPath)
         .pipe(csv())
+        .on('headers', (headers) => {
+          const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
+          if (missingHeaders.length > 0) {
+            const error = new Error(`Cabeceras CSV faltantes: ${missingHeaders.join(', ')}`);
+            this.#logger.error(error.message, { path: this.#csvPath });
+            reject(error);
+            // Detener el stream si las cabeceras no son válidas
+            // Esto es un poco complicado con la API de streams, pero el reject debería ser suficiente
+          }
+          headersValidated = true;
+        })
         .on('data', (data) => {
+          if (!headersValidated) return; // No procesar datos si las cabeceras no son válidas
+
           try {
+            // Validación de datos de fila
+            if (!data.name || !data.stream_url) {
+              this.#logger.warn('Fila de TV CSV omitida por falta de datos esenciales (name o stream_url)', { row: data });
+              return;
+            }
+
             const tv = new Tv({
               id: data.id || Tv.generateId(data.name),
               name: data.name,
