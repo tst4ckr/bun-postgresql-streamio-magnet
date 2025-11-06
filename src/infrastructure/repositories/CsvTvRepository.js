@@ -57,10 +57,12 @@ export class CsvTvRepository {
               id: data.id || Tv.generateId(data.name),
               name: data.name,
               streamUrl: data.stream_url, // Corregido: usar 'stream_url' del CSV.
-              logo: data['tvg-logo'], // Corregido: usar 'tvg-logo' del CSV.
-              group: data['group-title'], // Corregido: usar 'group-title' del CSV.
+              logo: data.logo || data['tvg-logo'], // Corregido: usar 'tvg-logo' del CSV.
+              group: data.genre || data['group-title'], // Corregido: usar 'group-title' del CSV.
               tvgId: data['tvg-id'],
               tvgName: data['tvg-name'],
+              description: data.description,
+              background: data.background,
             });
             tvs.push(tv);
           } catch (error) {

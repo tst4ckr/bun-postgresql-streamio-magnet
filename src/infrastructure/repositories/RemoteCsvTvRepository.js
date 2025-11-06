@@ -43,6 +43,8 @@ export class RemoteCsvTvRepository {
                 streamUrl: data.stream_url,
                 logo: data.logo,
                 group: data.genre,
+                description: data.description,
+                background: data.background,
               });
               tvs.push(tv);
             } catch (error) {
