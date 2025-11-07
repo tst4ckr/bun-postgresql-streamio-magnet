@@ -17,6 +17,7 @@
       code { background: #1a1a1f; border: 1px solid #2a2a33; border-radius: 6px; padding: 2px 6px; }
       .footer { color: #9a9aa1; font-size: 13px; margin-top: 24px; }
     </style>
+    <script src="/static/main.js" defer></script>
   </head>
   <body>
     <div class="container">
@@ -25,13 +26,14 @@
         <p>Este servidor expone un addon compatible con Stremio. Puedes instalarlo en Stremio usando la URL del manifest.</p>
         <div class="actions">
           <a class="btn" href="/manifest.json" target="_blank" rel="noopener noreferrer">Ver manifest.json</a>
+          <a id="open-stremio" class="btn" href="#" rel="noopener">Abrir en Stremio</a>
         </div>
         <p>
           Para instalarlo en Stremio:
           <ol>
             <li>Abre Stremio y ve a <strong>Addons</strong>.</li>
             <li>Elige <strong>Install via URL</strong>.</li>
-            <li>Pega la URL de este manifest: <code>http://localhost:7000/manifest.json</code> (o la URL pública del servidor).</li>
+            <li>Pega la URL de este manifest: <code><span id="manifest-url">http://localhost:7000/manifest.json</span></code> (o usa el botón "Abrir en Stremio" para abrir la app directamente).</li>
           </ol>
         </p>
         <p class="footer">Endpoints disponibles: <code>/manifest.json</code>, <code>/catalog</code>, <code>/meta</code>, <code>/stream</code>. Este landing es estático por seguridad y simplicidad.</p>

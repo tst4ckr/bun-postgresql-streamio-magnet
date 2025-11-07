@@ -75,13 +75,15 @@ const config = {
         name: 'Popular',
         // Lista de géneros visibles para selección en el cliente Stremio
         genres: [
-          'General',
-          'TV Local',
+          // Preferidos primero
           'TV Premium',
+          'TV Local',
           'Deportes',
-          'Noticias',
           'Infantil',
           'Música',
+          // Restantes
+          'General',
+          'Noticias',
           'Películas',
           'Series',
           'Documentales',
@@ -369,6 +371,8 @@ function normalizeGenresList(rawList = []) {
     'sport': 'Deportes',
     'sports': 'Deportes',
     'kids': 'Infantil',
+    'musica': 'Música',
+    'music': 'Música',
     'documentales': 'Documentales',
     'documentary': 'Documentales',
     'lifestyle': 'Estilo de Vida'
@@ -422,6 +426,34 @@ export function setTvCatalogGenreOptions(genres = []) {
     // Actualizar la propiedad auxiliar 'genres' (no estándar, útil para referencia)
     tvCatalog.genres = genres.length ? genres : tvCatalog.genres;
 
+    // Lista de prioridad solicitada por el usuario: primeros en el selector
+    const PRIORITY_TOP = ['TV Premium', 'TV Local', 'Deportes', 'Infantil', 'Música'];
+
+    // Reordenar respetando aparición original y moviendo prioridad al inicio
+    const reorderGenresWithPriority = (list, priority) => {
+      const norm = (s) => String(s).trim().toLowerCase();
+      const set = new Set();
+      const byNorm = new Map(list.map(g => [norm(g), g]));
+      const result = [];
+      // Anteponer prioridades si existen en la lista
+      for (const p of priority) {
+        const key = norm(p);
+        if (byNorm.has(key) && !set.has(key)) {
+          result.push(byNorm.get(key));
+          set.add(key);
+        }
+      }
+      // Añadir el resto manteniendo orden original
+      for (const g of list) {
+        const key = norm(g);
+        if (!set.has(key)) {
+          result.push(g);
+          set.add(key);
+        }
+      }
+      return result;
+    };
+
     // Asegurar que extra incluya 'genre' con 'options'
     if (!Array.isArray(tvCatalog.extra)) tvCatalog.extra = [];
     let genreExtra = tvCatalog.extra.find(e => e.name === 'genre');
@@ -431,7 +463,8 @@ export function setTvCatalogGenreOptions(genres = []) {
     }
     // Establecer opciones dinámicas
     if (genres && genres.length) {
-      genreExtra.options = genres;
+      // Reordenar con prioridad
+      genreExtra.options = reorderGenresWithPriority(genres, PRIORITY_TOP);
       // Limitar a selección única (Stremio suele enviar un único string)
       genreExtra.optionsLimit = 1;
     }
