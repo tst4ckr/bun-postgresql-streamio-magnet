@@ -8,6 +8,7 @@ import './config/loadEnv.js';
 
 import { addonBuilder, serveHTTP, getRouter } from 'stremio-addon-sdk';
 import express from 'express';
+import path from 'path';
 import { existsSync } from 'fs';
 import { addonConfig, getManifest, populateTvGenreOptionsFromCsv } from './config/addonConfig.js';
 import { CascadingMagnetRepository } from './infrastructure/repositories/CascadingMagnetRepository.js';
@@ -269,7 +270,42 @@ class MagnetAddon {
     const app = express();
     const router = getRouter(addonInterface);
     
-    // Montar router del addon y rutas estáticas en Express
+    // Ruta de landing segura en '/'
+    app.get('/', (req, res) => {
+      try {
+        // Cabeceras de seguridad básicas para la landing
+        res.set({
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
+          'Referrer-Policy': 'no-referrer',
+          // CSP restrictiva para contenido estático básico
+          'Content-Security-Policy': "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'"
+        });
+        const filePath = path.join(process.cwd(), 'static', 'index.html');
+        res.sendFile(filePath, (err) => {
+          if (err) {
+            // Fallback a una landing mínima si no existe index.html
+            const manifestUrl = `${process.env.BASE_URL || `http://localhost:${port}`}/manifest.json`;
+            res.status(200).send(`<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Stremio Addon</title></head>
+<body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif;max-width:800px;margin:40px auto;padding:0 16px;">
+  <h1>Addon de Stremio</h1>
+  <p>Este servidor expone un addon compatible con Stremio.</p>
+  <p>
+    <a href="${manifestUrl}" style="display:inline-block;background:#1a1a1a;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Ver manifest.json</a>
+  </p>
+  <p>Para instalarlo en Stremio, copia la URL del manifest y pégala en la sección “Install Addon via URL”.</p>
+  <hr>
+  <p style="color:#666;font-size:14px">Si ves esta página, la raíz (/) está funcionando. Los endpoints del protocolo siguen disponibles: /manifest.json, /catalog, /meta, /stream.</p>
+</body></html>`);
+          }
+        });
+      } catch (e) {
+        res.status(500).send('Landing no disponible');
+      }
+    });
+
+    // Montar router del addon (proporciona /manifest.json y endpoints del protocolo)
     app.use('/', router);
     this.#setupAdditionalRoutes(app);
 
