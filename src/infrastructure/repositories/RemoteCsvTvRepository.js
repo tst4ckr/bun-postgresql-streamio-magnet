@@ -32,6 +32,31 @@ export class RemoteCsvTvRepository {
       const response = await axios.get(this.#csvUrl, { responseType: 'stream' });
       const tvs = [];
 
+      const normalizeGenres = (raw) => {
+        if (!raw || typeof raw !== 'string') return [];
+        const parts = raw
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean);
+        const map = {
+          'tv premium': 'TV Premium',
+          'premium': 'TV Premium',
+          'tv local': 'TV Local',
+          'news': 'Noticias',
+          'sport': 'Deportes',
+          'sports': 'Deportes',
+          'kids': 'Infantil',
+          'documentales': 'Documentales',
+          'documentary': 'Documentales',
+          'lifestyle': 'Estilo de Vida'
+        };
+        const normalized = parts.map(p => {
+          const key = p.toLowerCase();
+          return map[key] || p;
+        });
+        return Array.from(new Set(normalized));
+      };
+
       return new Promise((resolve, reject) => {
         response.data
           .pipe(csv())
@@ -40,6 +65,7 @@ export class RemoteCsvTvRepository {
               const logoValue = data.logo || data['tvg-logo'];
               const posterValue = data.poster || logoValue;
               const backgroundValue = data.background || logoValue;
+              const rawGenres = data.genre || data['group-title'] || '';
               const tv = new Tv({
                 id: data.id || Tv.generateId(data.name),
                 name: data.name,
@@ -47,6 +73,7 @@ export class RemoteCsvTvRepository {
                 poster: posterValue,
                 logo: logoValue,
                 group: data.genre || data['group-title'],
+                genres: normalizeGenres(rawGenres),
                 description: data.description,
                 background: backgroundValue,
               });

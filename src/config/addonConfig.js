@@ -71,6 +71,20 @@ const config = {
         type: 'tv',
         id: 'tv_catalog',
         name: 'TV Channels',
+        // Lista de géneros visibles para selección en el cliente Stremio
+        genres: [
+          'General',
+          'TV Local',
+          'TV Premium',
+          'Deportes',
+          'Noticias',
+          'Infantil',
+          'Música',
+          'Películas',
+          'Series',
+          'Documentales',
+          'Estilo de Vida'
+        ],
         extra: [
           { name: 'search', isRequired: false },
           { name: 'genre', isRequired: false },

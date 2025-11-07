@@ -194,6 +194,14 @@ export class TvHandler {
     switch (catalogId) {
       case 'tv_all':
       case 'tv_catalog':
+        // Permitir filtrado por género directamente en el catálogo principal
+        if (extra.genre) {
+          const genreTerm = (extra.genre || '').toString().toLowerCase();
+          return tvs.filter(tv => {
+            const genres = Array.isArray(tv.genres) ? tv.genres : [tv.group].filter(Boolean);
+            return genres.some(g => g.toLowerCase() === genreTerm);
+          });
+        }
         return tvs;
 
       case 'tv_peru':
@@ -249,6 +257,13 @@ export class TvHandler {
       case 'tv_by_genre':
         if (extra.genre) {
           const genreTerm = extra.genre.toLowerCase();
+          // Intentar primero con el array de géneros normalizado
+          const byGenres = tvs.filter(tv => {
+            const genres = Array.isArray(tv.genres) ? tv.genres : [tv.group].filter(Boolean);
+            return genres.some(g => g.toLowerCase() === genreTerm);
+          });
+          if (byGenres.length > 0) return byGenres;
+          // Fallback utilizando el campo group original
           return byGroup(genreTerm);
         }
         return tvs;

@@ -33,6 +33,33 @@ export class CsvTvRepository {
       // Las cabeceras esperadas en el CSV son 'name' y 'url'.
       const expectedHeaders = ['name', 'stream_url'];
 
+      const normalizeGenres = (raw) => {
+        if (!raw || typeof raw !== 'string') return [];
+        const parts = raw
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean);
+        // Normalizar algunas variantes comunes
+        const map = {
+          'tv premium': 'TV Premium',
+          'premium': 'TV Premium',
+          'tv local': 'TV Local',
+          'news': 'Noticias',
+          'sport': 'Deportes',
+          'sports': 'Deportes',
+          'kids': 'Infantil',
+          'documentales': 'Documentales',
+          'documentary': 'Documentales',
+          'lifestyle': 'Estilo de Vida'
+        };
+        const normalized = parts.map(p => {
+          const key = p.toLowerCase();
+          return map[key] || p;
+        });
+        // Eliminar duplicados manteniendo orden
+        return Array.from(new Set(normalized));
+      };
+
       fs.createReadStream(this.#csvPath)
         .pipe(csv())
         .on('headers', (headers) => {
@@ -58,6 +85,7 @@ export class CsvTvRepository {
             const posterValue = data.poster || logoValue;
             const backgroundValue = data.background || logoValue;
 
+            const rawGenres = data.genre || data['group-title'] || '';
             const tv = new Tv({
               id: data.id || Tv.generateId(data.name),
               name: data.name,
@@ -67,6 +95,7 @@ export class CsvTvRepository {
               poster: posterValue || undefined,
               logo: logoValue || undefined,
               group: data.genre || data['group-title'],
+              genres: normalizeGenres(rawGenres),
               tvgId: data['tvg-id'],
               tvgName: data['tvg-name'],
               description: data.description,
