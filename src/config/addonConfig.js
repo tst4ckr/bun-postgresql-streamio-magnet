@@ -72,7 +72,7 @@ const config = {
       {
         type: 'tv',
         id: 'tv_catalog',
-        name: 'TV Channels',
+        name: 'Popular',
         // Lista de géneros visibles para selección en el cliente Stremio
         genres: [
           'General',
