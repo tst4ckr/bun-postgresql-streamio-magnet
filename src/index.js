@@ -275,6 +275,12 @@ class MagnetAddon {
         this.#logger.info(`✅ Addon iniciado en: ${url}`);
         this.#logger.info(`🔗 Manifiesto: ${url}`);
         this.#logger.info(`🚀 Servidor optimizado con SDK nativo de Stremio`);
+
+        // Establecer BASE_URL automáticamente si no está definida para evitar cuelgues por rutas relativas
+        if (!process.env.BASE_URL || !process.env.BASE_URL.trim()) {
+          process.env.BASE_URL = url;
+          this.#logger.info(`BASE_URL no estaba definida. Se configuró automáticamente a: ${process.env.BASE_URL}`);
+        }
       })
       .catch(error => {
         this.#logger.error('❌ Error al iniciar el servidor:', {

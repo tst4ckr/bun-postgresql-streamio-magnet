@@ -118,6 +118,11 @@ export class Tv {
       return undefined;
     }
 
+    // Si ya es una URL absoluta, devolverla tal cual
+    if (/^https?:\/\//i.test(path)) {
+      return path;
+    }
+
     // Corrige el path si es necesario, por ejemplo, de 'logo/' a 'logos/'.
     const correctedPath = path.replace('logo/', 'logos/');
 
