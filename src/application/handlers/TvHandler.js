@@ -93,10 +93,14 @@ export class TvHandler {
       filteredTvs = this.#searchTvs(filteredTvs, extra.search);
     }
 
-    const sortBy = extra.sort || 'name';
+    // Orden: por defecto respetar el orden del CSV (no ordenar)
+    // Permitir ordenar por nombre si el cliente lo solicita explícitamente
+    const sortBy = (extra.sort || 'csv').toLowerCase();
     if (sortBy === 'name') {
       filteredTvs.sort((a, b) => a.name.localeCompare(b.name));
-    }
+    } else if (sortBy === 'reverse') {
+      filteredTvs = filteredTvs.slice().reverse();
+    } // 'csv' mantiene el orden natural del repositorio
 
     // Paginación robusta según extras declarados en manifest
     const rawSkip = Number.isFinite(parseInt(extra.skip)) ? parseInt(extra.skip) : 0;

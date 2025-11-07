@@ -8,6 +8,8 @@
  * Inmutable siguiendo principios de DDD.
  */
 import { CONSTANTS } from '../../config/constants.js';
+import { existsSync } from 'fs';
+import path from 'path';
 
 export class Tv {
   #id;
@@ -126,6 +128,37 @@ export class Tv {
     // Corrige el path si es necesario, por ejemplo, de 'logo/' a 'logos/'.
     // Solo reemplazar si está al inicio para evitar duplicados como 'logos/logo/...'
     const correctedPath = path.replace(/^logo\//i, 'logos/');
+
+    // Validar que el archivo exista en /static; si no existe, usar logo por defecto
+    try {
+      const relPath = correctedPath.replace(/^\//, '');
+      const localStaticPath = path.join(process.cwd(), 'static', relPath);
+      if (!existsSync(localStaticPath)) {
+        // Intentar fallback entre carpetas 'logos' y 'poster' si existe el mismo archivo en la otra
+        let altRelPath = null;
+        if (/^logos\//i.test(relPath)) {
+          altRelPath = relPath.replace(/^logos\//i, 'poster/');
+        } else if (/^poster\//i.test(relPath)) {
+          altRelPath = relPath.replace(/^poster\//i, 'logos/');
+        }
+
+        if (altRelPath) {
+          const altLocalPath = path.join(process.cwd(), 'static', altRelPath);
+          if (existsSync(altLocalPath)) {
+            // Construir URL para el fallback encontrado
+            if (process.env.BASE_URL) {
+              return `${process.env.BASE_URL}/static/${altRelPath}`;
+            }
+            return `/static/${altRelPath}`;
+          }
+        }
+
+        // Si no existe ni el original ni el alterno, usar logo por defecto
+        return CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO;
+      }
+    } catch {
+      // Si ocurre algún error al verificar, continuar sin bloquear y usar ruta por defecto
+    }
 
     // Si BASE_URL está definida, construye una URL absoluta.
     if (process.env.BASE_URL) {
