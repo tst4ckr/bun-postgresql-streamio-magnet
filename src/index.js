@@ -9,11 +9,12 @@ import './config/loadEnv.js';
 import { addonBuilder, serveHTTP, getRouter } from 'stremio-addon-sdk';
 import express from 'express';
 import { existsSync } from 'fs';
-import { addonConfig, manifest } from './config/addonConfig.js';
+import { addonConfig, getManifest, setTvGenresOptions } from './config/addonConfig.js';
 import { CascadingMagnetRepository } from './infrastructure/repositories/CascadingMagnetRepository.js';
 import { StreamHandler } from './application/handlers/StreamHandler.js';
 import { TvHandler } from './application/handlers/TvHandler.js';
 import { CsvTvRepository } from './infrastructure/repositories/CsvTvRepository.js';
+import { buildGenreIndex } from './infrastructure/services/GenreService.js';
 import { EnhancedLogger } from './infrastructure/utils/EnhancedLogger.js';
 
 /**
@@ -55,9 +56,30 @@ class MagnetAddon {
     await this.#magnetRepository.initialize();
     this.#logger.info('Repositorio de magnets inicializado');
 
-    // 2. Crear Addon Builder
-    this.#addonBuilder = new addonBuilder(manifest);
-    this.#logger.info(`Addon: ${manifest.name} v${manifest.version}`);
+    // 2. Pre-cargar CSV de TV para extraer géneros dinámicos antes de crear el manifest
+    const csvPath = this.#config.repository.tvCsvPath;
+    if (csvPath && existsSync(csvPath)) {
+      try {
+        this.#logger.info(`Pre-cargando TV CSV para géneros dinámicos: ${csvPath}`);
+        const tmpTvRepository = new CsvTvRepository(csvPath, this.#logger);
+        await tmpTvRepository.init();
+        const tvs = await tmpTvRepository.getAllTvs();
+        const { uniqueGenres } = buildGenreIndex(tvs);
+        this.#logger.info(`Géneros únicos detectados: ${uniqueGenres.length}`);
+        setTvGenresOptions(uniqueGenres);
+        // Guardar repositorio para reutilizarlo en TvHandler
+        this.#tvRepository = tmpTvRepository;
+      } catch (error) {
+        this.#logger.warn('No se pudo pre-cargar CSV de TV para géneros dinámicos:', { error: error.message });
+      }
+    } else {
+      this.#logger.warn('TV deshabilitado para manifest dinámico: no se encontró TV_CSV_PATH o el archivo no existe.');
+    }
+
+    // 3. Crear Addon Builder usando manifest dinámico
+    const dynamicManifest = getManifest();
+    this.#addonBuilder = new addonBuilder(dynamicManifest);
+    this.#logger.info(`Addon: ${dynamicManifest.name} v${dynamicManifest.version}`);
 
     // 3. Configurar Stream Handler
     this.#streamHandler = new StreamHandler(this.#magnetRepository, this.#config, this.#logger);
@@ -77,7 +99,12 @@ class MagnetAddon {
 
     if (csvPath && existsSync(csvPath)) {
       this.#logger.info(`Usando TV_CSV_PATH: ${csvPath}`);
-      await this.#setupTvHandlerFromCsv(csvPath);
+      if (this.#tvRepository) {
+        this.#tvHandler = new TvHandler(this.#tvRepository, this.#config, this.#logger);
+        this.#logger.info('TvHandler configurado con repositorio pre-cargado');
+      } else {
+        await this.#setupTvHandlerFromCsv(csvPath);
+      }
     } else {
       this.#logger.warn('TV deshabilitado: no se encontró TV_CSV_PATH o el archivo no existe.');
     }

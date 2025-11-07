@@ -188,7 +188,11 @@ export class TvHandler {
    * @returns {Array} Canales filtrados
    */
   #filterTvsByCatalog(tvs, catalogId, extra = {}) {
-    const byGroup = (groupTerm) => tvs.filter(tv => (tv.group || '').toLowerCase().includes(groupTerm));
+    const byGroup = (groupTerm) => tvs.filter(tv => {
+      const groupStr = (tv.group || '').toLowerCase();
+      const genresArr = Array.isArray(tv.genres) ? tv.genres.map(g => (g || '').toLowerCase()) : [];
+      return groupStr.includes(groupTerm) || genresArr.some(g => g.includes(groupTerm));
+    });
     const byNameIncludes = (term) => tvs.filter(tv => tv.name.toLowerCase().includes(term));
 
     switch (catalogId) {
@@ -269,9 +273,12 @@ export class TvHandler {
   #searchTvs(tvs, searchTerm) {
     const term = searchTerm.toLowerCase().trim();
     if (!term) return tvs;
-    return tvs.filter(tv =>
-      tv.name.toLowerCase().includes(term) || (tv.group || '').toLowerCase().includes(term)
-    );
+    return tvs.filter(tv => {
+      const nameMatch = tv.name.toLowerCase().includes(term);
+      const groupMatch = (tv.group || '').toLowerCase().includes(term);
+      const genresMatch = Array.isArray(tv.genres) && tv.genres.some(g => (g || '').toLowerCase().includes(term));
+      return nameMatch || groupMatch || genresMatch;
+    });
   }
 
   /**

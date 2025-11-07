@@ -5,6 +5,7 @@
 import fs from 'fs';
 import csv from 'csv-parser';
 import { Tv } from '../../domain/entities/Tv.js';
+import { parseGenres } from '../services/GenreService.js';
 
 /**
  * Repositorio para manejar la carga de canales de TV desde un archivo CSV.
@@ -58,6 +59,11 @@ export class CsvTvRepository {
             const posterValue = data.poster || logoValue;
             const backgroundValue = data.background || logoValue;
 
+            // Parseo y normalización de géneros
+            const rawGenre = data.genre || data['group-title'] || '';
+            const genres = parseGenres(rawGenre);
+            const primaryGroup = genres[0] || rawGenre || 'General';
+
             const tv = new Tv({
               id: data.id || Tv.generateId(data.name),
               name: data.name,
@@ -66,7 +72,8 @@ export class CsvTvRepository {
               // La entidad Tv se encargará de normalizarlas y construir la URL final (BASE_URL + /static)
               poster: posterValue || undefined,
               logo: logoValue || undefined,
-              group: data.genre || data['group-title'],
+              group: primaryGroup,
+              genres,
               tvgId: data['tvg-id'],
               tvgName: data['tvg-name'],
               description: data.description,

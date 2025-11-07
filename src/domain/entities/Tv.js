@@ -18,6 +18,7 @@ export class Tv {
   #poster;
   #logo;
   #group;
+  #genres;
   #tvgId;
   #tvgName;
   #description;
@@ -45,6 +46,7 @@ export class Tv {
     this.#poster = tvData.poster || null;
     this.#logo = tvData.logo || null;
     this.#group = tvData.group || 'General';
+    this.#genres = Array.isArray(tvData.genres) ? tvData.genres.slice() : (tvData.group ? [tvData.group] : ['General']);
     this.#tvgId = tvData.tvgId || null;
     this.#tvgName = tvData.tvgName || tvData.name;
     this.#description = tvData.description || null;
@@ -102,6 +104,7 @@ export class Tv {
     return this.#resolveImageUrl(this.#logo);
   }
   get group() { return this.#group; }
+  get genres() { return this.#genres.slice(); }
   get tvgId() { return this.#tvgId; }
   get tvgName() { return this.#tvgName; }
   get description() { return this.#description; }
@@ -184,7 +187,7 @@ export class Tv {
       // Si no hay póster, usar el logo del canal como fallback. Si tampoco hay logo, usar el logo por defecto.
       poster: this.poster || this.logo || CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO,
       posterShape: 'landscape',
-      genres: [this.#group],
+      genres: (this.#genres && this.#genres.length ? this.#genres : [this.#group]),
       description: description
     };
   }
@@ -213,7 +216,7 @@ export class Tv {
       posterShape: 'landscape',
       logo: resolvedLogo,
       background: background,
-      genres: [this.#group],
+      genres: (this.#genres && this.#genres.length ? this.#genres : [this.#group]),
       description: description,
       
       videos: [

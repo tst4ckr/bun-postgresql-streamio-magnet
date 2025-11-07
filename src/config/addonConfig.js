@@ -28,6 +28,9 @@ function resolvePath(relativePath) {
   return join(projectRoot, relativePath);
 }
 
+// Lista dinámica de géneros para el catálogo de TV (se rellena al inicio)
+let dynamicTvGenres = [];
+
 const config = {
   addon: {
     id: process.env.ADDON_ID || 'org.stremio.torrent.search',
@@ -76,6 +79,10 @@ const config = {
           { name: 'genre', isRequired: false },
           { name: 'skip', isRequired: false },
           { name: 'limit', isRequired: false }
+        ],
+        // Exponer opciones de género dinámicamente (Stremio usa extraSupported para mostrar opciones)
+        extraSupported: [
+          { name: 'genre', options: dynamicTvGenres }
         ]
       }
     ],
@@ -337,5 +344,36 @@ function generateManifest() {
   return manifest;
 }
 
+/**
+ * Actualiza las opciones dinámicas de géneros para el catálogo de TV y limpia el cache del manifest.
+ * @param {string[]} genres - Lista de géneros únicos ya normalizados.
+ */
+export function setTvGenresOptions(genres = []) {
+  // Evitar referencias mutables externas
+  dynamicTvGenres = Array.from(new Set(genres.filter(Boolean))).sort((a, b) => a.localeCompare(b));
+
+  // Buscar el catálogo de TV y actualizar extraSupported
+  const tvCatalog = (config.addon.catalogs || []).find(c => c.type === 'tv' && c.id === 'tv_catalog');
+  if (tvCatalog) {
+    tvCatalog.extraSupported = tvCatalog.extraSupported || [];
+    const genreExtra = tvCatalog.extraSupported.find(e => e.name === 'genre');
+    if (genreExtra) {
+      genreExtra.options = dynamicTvGenres;
+    } else {
+      tvCatalog.extraSupported.push({ name: 'genre', options: dynamicTvGenres });
+    }
+  }
+
+  // Limpiar cache del manifest para que se regenere con las nuevas opciones
+  manifestCache = null;
+  manifestCacheTimestamp = null;
+}
+
+/**
+ * Genera y devuelve el manifest actual (sin congelar) para permitir opciones dinámicas.
+ */
+export function getManifest() {
+  return generateManifest();
+}
+
 export const addonConfig = Object.freeze(config);
-export const manifest = Object.freeze(generateManifest());

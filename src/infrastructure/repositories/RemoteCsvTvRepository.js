@@ -5,6 +5,7 @@
 import axios from 'axios';
 import csv from 'csv-parser';
 import { Tv } from '../../domain/entities/Tv.js';
+import { parseGenres } from '../services/GenreService.js';
 
 /**
  * Repositorio para manejar la carga de canales de TV desde una URL remota de CSV.
@@ -40,13 +41,19 @@ export class RemoteCsvTvRepository {
               const logoValue = data.logo || data['tvg-logo'];
               const posterValue = data.poster || logoValue;
               const backgroundValue = data.background || logoValue;
+              // Parseo y normalización de géneros
+              const rawGenre = data.genre || data['group-title'] || '';
+              const genres = parseGenres(rawGenre);
+              const primaryGroup = genres[0] || rawGenre || 'General';
+
               const tv = new Tv({
                 id: data.id || Tv.generateId(data.name),
                 name: data.name,
                 streamUrl: data.stream_url,
                 poster: posterValue,
                 logo: logoValue,
-                group: data.genre || data['group-title'],
+                group: primaryGroup,
+                genres,
                 description: data.description,
                 background: backgroundValue,
               });
