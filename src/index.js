@@ -90,8 +90,8 @@ class MagnetAddon {
    * Configura rutas adicionales.
    * @private
    */
-  #setupAdditionalRoutes(router) {
-    router.use('/static', express.static('static'));
+  #setupAdditionalRoutes(app) {
+    app.use('/static', express.static('static'));
     this.#logger.info('Rutas adicionales configuradas');
   }
 
@@ -262,34 +262,34 @@ class MagnetAddon {
     this.#logger.info(`Iniciando servidor en el puerto ${port}...`);
 
     const addonInterface = this.#addonBuilder.getInterface();
+    const app = express();
     const router = getRouter(addonInterface);
-    this.#setupAdditionalRoutes(router);
     
-    const serverOptions = {
-      port: port,
-      cacheMaxAge: this.#config.cache?.metadataCacheMaxAge || 3600,
-    };
+    // Montar router del addon y rutas estáticas en Express
+    app.use('/', router);
+    this.#setupAdditionalRoutes(app);
 
-    serveHTTP(addonInterface, serverOptions)
-      .then(({ url }) => {
-        this.#logger.info(`✅ Addon iniciado en: ${url}`);
-        this.#logger.info(`🔗 Manifiesto: ${url}`);
-        this.#logger.info(`🚀 Servidor optimizado con SDK nativo de Stremio`);
+    const server = app.listen(port, () => {
+      const localUrl = `http://localhost:${port}`;
+      this.#logger.info(`✅ Addon iniciado en: ${localUrl}`);
+      this.#logger.info(`🔗 Manifiesto: ${localUrl}/manifest.json`);
+      this.#logger.info(`🖼️  Archivos estáticos servidos en: ${localUrl}/static`);
 
-        // Establecer BASE_URL automáticamente si no está definida para evitar cuelgues por rutas relativas
-        if (!process.env.BASE_URL || !process.env.BASE_URL.trim()) {
-          process.env.BASE_URL = url;
-          this.#logger.info(`BASE_URL no estaba definida. Se configuró automáticamente a: ${process.env.BASE_URL}`);
-        }
-      })
-      .catch(error => {
-        this.#logger.error('❌ Error al iniciar el servidor:', {
-          error: error.message,
-          stack: error.stack,
-          code: error.code,
-        });
-        process.exit(1);
+      // Establecer BASE_URL automáticamente si no está definida para evitar cuelgues por rutas relativas
+      if (!process.env.BASE_URL || !process.env.BASE_URL.trim()) {
+        process.env.BASE_URL = localUrl;
+        this.#logger.info(`BASE_URL no estaba definida. Se configuró automáticamente a: ${process.env.BASE_URL}`);
+      }
+    });
+
+    server.on('error', (error) => {
+      this.#logger.error('❌ Error al iniciar el servidor:', {
+        error: error.message,
+        stack: error.stack,
+        code: error.code,
       });
+      process.exit(1);
+    });
   }
 
   /**
