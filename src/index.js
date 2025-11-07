@@ -9,7 +9,7 @@ import './config/loadEnv.js';
 import { addonBuilder, serveHTTP, getRouter } from 'stremio-addon-sdk';
 import express from 'express';
 import { existsSync } from 'fs';
-import { addonConfig, manifest } from './config/addonConfig.js';
+import { addonConfig, getManifest, populateTvGenreOptionsFromCsv } from './config/addonConfig.js';
 import { CascadingMagnetRepository } from './infrastructure/repositories/CascadingMagnetRepository.js';
 import { StreamHandler } from './application/handlers/StreamHandler.js';
 import { TvHandler } from './application/handlers/TvHandler.js';
@@ -55,14 +55,18 @@ class MagnetAddon {
     await this.#magnetRepository.initialize();
     this.#logger.info('Repositorio de magnets inicializado');
 
-    // 2. Crear Addon Builder
+    // 2. Preparar manifest con opciones de género dinámicas desde CSV (si disponible)
+    await populateTvGenreOptionsFromCsv();
+    const manifest = getManifest();
+
+    // 3. Crear Addon Builder
     this.#addonBuilder = new addonBuilder(manifest);
     this.#logger.info(`Addon: ${manifest.name} v${manifest.version}`);
 
-    // 3. Configurar Stream Handler
+    // 4. Configurar Stream Handler
     this.#streamHandler = new StreamHandler(this.#magnetRepository, this.#config, this.#logger);
 
-    // 4. Configurar handlers
+    // 5. Configurar handlers
     await this.#setupHandlers();
   }
 

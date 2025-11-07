@@ -5,6 +5,8 @@
 
 import './loadEnv.js';
 import { join, dirname } from 'path';
+import fs from 'fs';
+import csv from 'csv-parser';
 import { fileURLToPath } from 'url';
 import { CONSTANTS } from './constants.js';
 import { envString, envInt, envBool, envDurationMs } from '../infrastructure/utils/env.js';
@@ -352,4 +354,114 @@ function generateManifest() {
 }
 
 export const addonConfig = Object.freeze(config);
-export const manifest = Object.freeze(generateManifest());
+
+/**
+ * Normaliza una lista cruda de géneros en un array único y ordenado.
+ * @param {string[]} rawList
+ * @returns {string[]}
+ */
+function normalizeGenresList(rawList = []) {
+  const map = {
+    'tv premium': 'TV Premium',
+    'premium': 'TV Premium',
+    'tv local': 'TV Local',
+    'news': 'Noticias',
+    'sport': 'Deportes',
+    'sports': 'Deportes',
+    'kids': 'Infantil',
+    'documentales': 'Documentales',
+    'documentary': 'Documentales',
+    'lifestyle': 'Estilo de Vida'
+  };
+  const normalized = rawList
+    .filter(Boolean)
+    .flatMap(s => String(s).split(',').map(p => p.trim()).filter(Boolean))
+    .map(p => map[p.toLowerCase()] || p);
+  // Eliminar duplicados preservando orden
+  return Array.from(new Set(normalized));
+}
+
+/**
+ * Lee el CSV de TV y obtiene los géneros disponibles de forma dinámica.
+ * @param {string} tvCsvPath
+ * @returns {Promise<string[]>} géneros únicos y normalizados
+ */
+export async function computeAvailableGenresFromCsv(tvCsvPath) {
+  if (!tvCsvPath || !fs.existsSync(tvCsvPath)) return [];
+
+  return new Promise((resolve, reject) => {
+    const rawGenres = [];
+    try {
+      fs.createReadStream(tvCsvPath)
+        .pipe(csv())
+        .on('data', (data) => {
+          const g = data.genre || data['group-title'] || '';
+          if (g) rawGenres.push(g);
+        })
+        .on('end', () => {
+          const genres = normalizeGenresList(rawGenres);
+          resolve(genres);
+        })
+        .on('error', (err) => reject(err));
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+/**
+ * Inyecta las opciones de género dinámicas en el catálogo de TV del manifest config.
+ * Debe llamarse antes de generar el manifest.
+ * @param {string[]} genres
+ */
+export function setTvCatalogGenreOptions(genres = []) {
+  try {
+    const tvCatalog = config.addon.catalogs?.find(c => c.type === 'tv' && c.id === 'tv_catalog');
+    if (!tvCatalog) return;
+
+    // Actualizar la propiedad auxiliar 'genres' (no estándar, útil para referencia)
+    tvCatalog.genres = genres.length ? genres : tvCatalog.genres;
+
+    // Asegurar que extra incluya 'genre' con 'options'
+    if (!Array.isArray(tvCatalog.extra)) tvCatalog.extra = [];
+    let genreExtra = tvCatalog.extra.find(e => e.name === 'genre');
+    if (!genreExtra) {
+      genreExtra = { name: 'genre', isRequired: false };
+      tvCatalog.extra.push(genreExtra);
+    }
+    // Establecer opciones dinámicas
+    if (genres && genres.length) {
+      genreExtra.options = genres;
+      // Limitar a selección única (Stremio suele enviar un único string)
+      genreExtra.optionsLimit = 1;
+    }
+  } catch (error) {
+    // En caso de error, dejar el manifest tal cual
+    console.warn('[addonConfig] No se pudieron establecer opciones de género dinámicas:', error?.message || error);
+  }
+}
+
+/**
+ * Carga dinámicamente los géneros desde TV CSV y actualiza el config para el manifest.
+ * Debe ejecutarse antes de crear el addonBuilder.
+ * @returns {Promise<void>}
+ */
+export async function populateTvGenreOptionsFromCsv() {
+  try {
+    const csvPath = config.repository?.tvCsvPath;
+    const genres = await computeAvailableGenresFromCsv(csvPath);
+    setTvCatalogGenreOptions(genres);
+    // invalidar cache de manifest para reflejar cambios
+    manifestCache = null;
+    manifestCacheTimestamp = null;
+  } catch (error) {
+    console.warn('[addonConfig] Error computando géneros desde CSV:', error?.message || error);
+  }
+}
+
+/**
+ * Devuelve el manifest generado (con cache). Debe llamarse después de ajustar opciones dinámicas.
+ */
+export function getManifest() {
+  return Object.freeze(generateManifest());
+}
