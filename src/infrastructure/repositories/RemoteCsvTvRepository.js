@@ -37,14 +37,18 @@ export class RemoteCsvTvRepository {
           .pipe(csv())
           .on('data', (data) => {
             try {
+              const logoValue = data.logo || data['tvg-logo'];
+              const posterValue = data.poster || logoValue;
+              const backgroundValue = data.background || logoValue;
               const tv = new Tv({
                 id: data.id || Tv.generateId(data.name),
                 name: data.name,
                 streamUrl: data.stream_url,
-                poster: data.poster, // Usar poster en lugar de logo
-                group: data.genre,
+                poster: posterValue,
+                logo: logoValue,
+                group: data.genre || data['group-title'],
                 description: data.description,
-                background: data.background,
+                background: backgroundValue,
               });
               tvs.push(tv);
             } catch (error) {

@@ -53,9 +53,10 @@ export class CsvTvRepository {
               return;
             }
 
-            const posterValue = data.poster;
+            // Fallbacks: si no existen poster o background, usar el logo temporalmente
             const logoValue = data.logo || data['tvg-logo'];
-            const backgroundValue = data.background;
+            const posterValue = data.poster || logoValue;
+            const backgroundValue = data.background || logoValue;
 
             const tv = new Tv({
               id: data.id || Tv.generateId(data.name),

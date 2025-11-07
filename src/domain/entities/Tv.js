@@ -148,7 +148,8 @@ export class Tv {
       id: this.#id,
       type: 'tv',
       name: this.#name,
-      poster: this.poster || CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO,
+      // Si no hay póster, usar el logo del canal como fallback. Si tampoco hay logo, usar el logo por defecto.
+      poster: this.poster || this.logo || CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO,
       posterShape: 'landscape',
       genres: [this.#group],
       description: description
@@ -161,9 +162,12 @@ export class Tv {
    */
   toStremioMeta(typeOverride = 'tv') {
     const fallbackPoster = CONSTANTS.METADATA.TV_METADATA.DEFAULT_LOGO;
-    const poster = this.poster || fallbackPoster;
-    const logo = this.logo || poster;
-    const background = this.background || poster;
+    // Resolver primero el logo: si no hay logo, usar el póster; si tampoco hay póster, usar el logo por defecto.
+    const resolvedLogo = this.logo || this.poster || fallbackPoster;
+    // Si no hay póster, usar el logo temporalmente.
+    const poster = this.poster || resolvedLogo;
+    // Si no hay background, usar el logo temporalmente.
+    const background = this.background || resolvedLogo;
     const defaultVideoId = CONSTANTS.METADATA.TV_METADATA.DEFAULT_VIDEO_ID;
     const description = this.#description || `Transmisión en vivo del canal ${this.#name}. Categoría: ${this.#group}.`;
 
@@ -172,7 +176,7 @@ export class Tv {
       type: typeOverride || 'tv',
       name: this.#name,
       poster: poster,
-      logo: logo,
+      logo: resolvedLogo,
       background: background,
       genres: [this.#group],
       description: description,
