@@ -176,6 +176,8 @@ export class Tv {
       type: typeOverride || 'tv',
       name: this.#name,
       poster: poster,
+      // Sugerir al cliente el formato del poster para una mejor presentación en catálogo
+      posterShape: 'landscape',
       logo: resolvedLogo,
       background: background,
       genres: [this.#group],
