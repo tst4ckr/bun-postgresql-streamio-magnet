@@ -61,13 +61,15 @@ export class CsvTvRepository {
               id: data.id || Tv.generateId(data.name),
               name: data.name,
               streamUrl: data.stream_url,
-              poster: posterValue ? `poster/${posterValue}` : undefined,
-              logo: logoValue ? `logos/${logoValue}` : undefined,
+              // Pasar valores tal como vienen del CSV (pueden ser rutas relativas o URLs absolutas)
+              // La entidad Tv se encargará de normalizarlas y construir la URL final (BASE_URL + /static)
+              poster: posterValue || undefined,
+              logo: logoValue || undefined,
               group: data.genre || data['group-title'],
               tvgId: data['tvg-id'],
               tvgName: data['tvg-name'],
               description: data.description,
-              background: backgroundValue ? `background/${backgroundValue}` : undefined,
+              background: backgroundValue || undefined,
             });
             tvs.push(tv);
           } catch (error) {

@@ -124,7 +124,8 @@ export class Tv {
     }
 
     // Corrige el path si es necesario, por ejemplo, de 'logo/' a 'logos/'.
-    const correctedPath = path.replace('logo/', 'logos/');
+    // Solo reemplazar si está al inicio para evitar duplicados como 'logos/logo/...'
+    const correctedPath = path.replace(/^logo\//i, 'logos/');
 
     // Si BASE_URL está definida, construye una URL absoluta.
     if (process.env.BASE_URL) {
