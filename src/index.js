@@ -8,6 +8,7 @@ import './config/loadEnv.js';
 
 import { addonBuilder, serveHTTP, getRouter } from 'stremio-addon-sdk';
 import express from 'express';
+import axios from 'axios';
 import path from 'path';
 import { existsSync } from 'fs';
 import { addonConfig, getManifest, populateTvGenreOptionsFromCsv } from './config/addonConfig.js';
@@ -184,6 +185,109 @@ class MagnetAddon {
   const STATIC_DIR = process.env.STATIC_DIR || 'static';
   const STATIC_MOUNT_PATH = process.env.STATIC_MOUNT_PATH || '/static';
   app.use(STATIC_MOUNT_PATH, express.static(STATIC_DIR));
+
+    // Endpoint de descarga protegida por token para CSVs de datos
+    const DOWNLOAD_TOKEN = (process.env.DOWNLOAD_TOKEN || '').trim();
+    const REQUIRE_IP = String(process.env.DOWNLOAD_REQUIRE_IP_WHITELIST || '').trim().toLowerCase() === 'true';
+    const ipRouting = new IpRoutingService(this.#config.ipRouting.whitelist, this.#config.ipRouting.cacheTtlSeconds, this.#logger);
+    const getTokenFromReq = (req) => {
+      const q = (req.query?.token || '').toString().trim();
+      if (q) return q;
+      const auth = (req.headers['authorization'] || '').toString();
+      const m = auth.match(/^Bearer\s+(.+)$/i);
+      return m ? m[1].trim() : '';
+    };
+    const requireAuth = (req, res, next) => {
+      try {
+        const tok = getTokenFromReq(req);
+        const ip = RequestContext.getIp();
+        // Evaluar whitelist de IP si está habilitada
+        if (REQUIRE_IP) {
+          const allowed = ipRouting.isWhitelisted(ip);
+          if (!allowed) {
+            return res.status(403).json({ error: 'IP no autorizada para descargas' });
+          }
+        }
+        // Evaluar token si está configurado
+        if (DOWNLOAD_TOKEN) {
+          if (!tok || tok !== DOWNLOAD_TOKEN) {
+            return res.status(401).json({ error: 'Token inválido o ausente' });
+          }
+        } else {
+          // Si no hay token y tampoco se exige IP whitelist, bloquear por seguridad
+          if (!REQUIRE_IP) {
+            this.#logger.warn('Descargas deshabilitadas: ni token ni whitelist IP están configurados');
+            return res.status(403).json({ error: 'Descargas deshabilitadas: configurar DOWNLOAD_TOKEN o habilitar DOWNLOAD_REQUIRE_IP_WHITELIST' });
+          }
+        }
+        next();
+      } catch (e) {
+        return res.status(400).json({ error: 'Error validando token' });
+      }
+    };
+
+    // Mapa de recursos descargables
+    const buildDownloadMap = () => {
+      const cfg = this.#config?.repository || {};
+      const map = new Map();
+      // TV CSVs
+      if (cfg.tvCsvDefaultPath) map.set('tv.csv', cfg.tvCsvDefaultPath);
+      if (cfg.tvCsvWhitelistPath) map.set('tv_premium.csv', cfg.tvCsvWhitelistPath);
+      // Torrents CSVs
+      if (cfg.primaryCsvPath) map.set('magnets.csv', cfg.primaryCsvPath);
+      if (cfg.secondaryCsvPath) map.set('torrentio.csv', cfg.secondaryCsvPath);
+      if (cfg.animeCsvPath) map.set('anime.csv', cfg.animeCsvPath);
+      // english.csv: derivado del directorio de secondary (solo si es ruta local)
+      try {
+        if (cfg.secondaryCsvPath && !/^https?:\/\//i.test(cfg.secondaryCsvPath)) {
+          const dir = path.dirname(cfg.secondaryCsvPath);
+          map.set('english.csv', path.join(dir, 'english.csv'));
+        }
+      } catch (_) {}
+      return map;
+    };
+
+    app.get('/download/:name', requireAuth, async (req, res) => {
+      const name = (req.params?.name || '').toString();
+      const allowed = buildDownloadMap();
+      const target = allowed.get(name);
+      if (!target) {
+        return res.status(404).json({ error: 'Recurso no disponible para descarga' });
+      }
+      // Enviar como attachment
+      res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      // Detectar si es URL remota
+      const isHttp = /^https?:\/\//i.test(target);
+      if (isHttp) {
+        try {
+          const response = await axios.get(target, { responseType: 'stream' });
+          res.setHeader('Content-Type', response.headers['content-type'] || 'text/csv; charset=utf-8');
+          response.data.pipe(res);
+        } catch (err) {
+          this.#logger.error('Error descargando CSV remoto', { target, error: err?.message });
+          res.status(502).json({ error: 'No se pudo descargar el recurso remoto' });
+        }
+        return;
+      }
+      // Ruta local
+      try {
+        if (!existsSync(target)) {
+          return res.status(404).json({ error: 'Archivo no encontrado en servidor' });
+        }
+        res.type('text/csv');
+        res.sendFile(target, (err) => {
+          if (err) {
+            this.#logger.error('Error enviando archivo local', { target, error: err?.message });
+            if (!res.headersSent) res.status(500).json({ error: 'Error interno enviando archivo' });
+          }
+        });
+      } catch (e) {
+        this.#logger.error('Error procesando descarga local', { target, error: e?.message });
+        res.status(500).json({ error: 'Error interno' });
+      }
+    });
+
     this.#logger.info('Rutas adicionales configuradas');
   }
 
