@@ -15,6 +15,7 @@ import { CascadingMagnetRepository } from './infrastructure/repositories/Cascadi
 import { StreamHandler } from './application/handlers/StreamHandler.js';
 import { TvHandler } from './application/handlers/TvHandler.js';
 import { CsvTvRepository } from './infrastructure/repositories/CsvTvRepository.js';
+import { M3UTvRepository } from './infrastructure/repositories/M3UTvRepository.js';
 import { EnhancedLogger } from './infrastructure/utils/EnhancedLogger.js';
 
 /**
@@ -77,14 +78,18 @@ class MagnetAddon {
    */
   async #setupHandlers() {
     const csvPath = this.#config.repository.tvCsvPath;
+    const m3uUrl = this.#config.repository.m3uUrl;
 
     this.#setupStreamHandler();
 
+    // Preferir CSV si existe; si no, habilitar M3U (válido) si está configurado
     if (csvPath && existsSync(csvPath)) {
       this.#logger.info(`Usando TV_CSV_PATH: ${csvPath}`);
       await this.#setupTvHandlerFromCsv(csvPath);
+    } else if (m3uUrl && typeof m3uUrl === 'string' && m3uUrl.trim().length > 0) {
+      await this.#setupTvHandlerFromM3U(m3uUrl.trim());
     } else {
-      this.#logger.warn('TV deshabilitado: no se encontró TV_CSV_PATH o el archivo no existe.');
+      this.#logger.warn('TV deshabilitado: no se encontró TV_CSV_PATH ni M3U_URL válido.');
     }
 
     this.#setupCatalogHandler();
@@ -167,6 +172,30 @@ class MagnetAddon {
       this.#logger.info('TvHandler configurado con CsvTvRepository');
     } catch (error) {
       this.#logger.error('Error configurando TvHandler con CSV:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Configura TvHandler para canales de TV desde una fuente M3U.
+   * @private
+   * @param {string} m3uUrl - URL o ruta al archivo M3U
+   */
+  async #setupTvHandlerFromM3U(m3uUrl) {
+    try {
+      this.#logger.info(`Usando M3U_URL: ${m3uUrl}`);
+      const tvRepository = new M3UTvRepository(m3uUrl, this.#config, this.#logger);
+      // Cargar inicialmente para detectar errores tempranos y evitar "empty content"
+      const preloaded = await tvRepository.getAllTvs();
+      const count = preloaded?.length || 0;
+      if (count === 0) {
+        throw new Error('M3U_URL cargada pero sin canales válidos (#EXTINF sin URL de stream)');
+      }
+      this.#logger.info(`Cargados ${count} canales desde M3U_URL`);
+      this.#tvHandler = new TvHandler(tvRepository, this.#config, this.#logger);
+      this.#logger.info('TvHandler configurado con M3UTvRepository');
+    } catch (error) {
+      this.#logger.error('Error configurando TvHandler con M3U_URL:', error);
       throw error;
     }
   }

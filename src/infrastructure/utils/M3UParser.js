@@ -30,20 +30,32 @@ export class M3UParser {
       // Buscar líneas EXTINF que definen canales de TV
       if (line.startsWith('#EXTINF:')) {
         const tvInfo = this.#parseExtinfLine(line);
-        const nextLine = i + 1 < lines.length ? lines[i + 1].trim() : null;
-        
-        // La siguiente línea debe ser la URL del stream
-        if (nextLine && !nextLine.startsWith('#')) {
+        // Algunas listas M3U incluyen líneas intermedias (p.ej., #EXTVLCOPT) antes de la URL del stream.
+        // Avanzar hasta encontrar la primera línea no-comentario y usarla como URL.
+        let j = i + 1;
+        let streamLine = null;
+        while (j < lines.length) {
+          const candidate = lines[j].trim();
+          if (!candidate) { j++; continue; }
+          if (!candidate.startsWith('#')) {
+            streamLine = candidate;
+            break;
+          }
+          j++;
+        }
+
+        // La siguiente línea no-comentario debe ser la URL del stream
+        if (streamLine) {
           try {
             const tvData = {
               ...tvInfo,
-              streamUrl: nextLine,
+              streamUrl: streamLine,
               id: Tv.generateId(tvInfo.name)
             };
-            
+
             const tv = new Tv(tvData);
             tvs.push(tv);
-            i++; // Saltar la línea de URL ya procesada
+            i = j; // Saltar todas las líneas procesadas hasta la URL
           } catch (error) {
             // Continuar con el siguiente canal si hay error en uno específico
             console.warn(`Error creating tv from line ${i}: ${error.message}`);
