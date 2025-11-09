@@ -4,6 +4,7 @@
     "": {
       "name": "stremio-tv-iptv-addon",
       "dependencies": {
+        "axios": "^1.7.5",
         "csv-parser": "^3.2.0",
         "dotenv": "^17.2.1",
         "kitsu": "^11.1.0",

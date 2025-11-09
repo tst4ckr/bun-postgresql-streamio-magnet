@@ -15,6 +15,7 @@ import { CascadingMagnetRepository } from './infrastructure/repositories/Cascadi
 import { StreamHandler } from './application/handlers/StreamHandler.js';
 import { TvHandler } from './application/handlers/TvHandler.js';
 import { CsvTvRepository } from './infrastructure/repositories/CsvTvRepository.js';
+import { RemoteCsvTvRepository } from './infrastructure/repositories/RemoteCsvTvRepository.js';
 import { M3UTvRepository } from './infrastructure/repositories/M3UTvRepository.js';
 import { DynamicTvRepository } from './infrastructure/repositories/DynamicTvRepository.js';
 import { IpRoutingService } from './infrastructure/services/IpRoutingService.js';
@@ -94,21 +95,41 @@ class MagnetAddon {
     let m3uRepo = null;
     let m3uBackupRepo = null;
 
+    const isUrl = (v) => typeof v === 'string' && /^https?:\/\//i.test(v.trim());
+
+    // Inicializar repositorio CSV (whitelist) desde ruta local o URL
     try {
-      if (csvWhitelistPath && existsSync(csvWhitelistPath)) {
-        this.#logger.info(`CSV whitelist disponible: ${csvWhitelistPath}`);
-        whitelistRepo = new CsvTvRepository(csvWhitelistPath, this.#logger);
-        await whitelistRepo.init();
+      if (csvWhitelistPath) {
+        if (isUrl(csvWhitelistPath)) {
+          this.#logger.info(`CSV whitelist remoto: ${csvWhitelistPath}`);
+          whitelistRepo = new RemoteCsvTvRepository(csvWhitelistPath.trim(), this.#logger);
+          await whitelistRepo.init();
+        } else if (existsSync(csvWhitelistPath)) {
+          this.#logger.info(`CSV whitelist local: ${csvWhitelistPath}`);
+          whitelistRepo = new CsvTvRepository(csvWhitelistPath, this.#logger);
+          await whitelistRepo.init();
+        } else {
+          this.#logger.warn(`CSV whitelist no encontrado en ruta local: ${csvWhitelistPath}`);
+        }
       }
     } catch (err) {
       this.#logger.warn(`No se pudo inicializar CSV whitelist (${csvWhitelistPath}): ${err?.message || err}`);
     }
 
+    // Inicializar repositorio CSV (default) desde ruta local o URL
     try {
-      if (csvDefaultPath && existsSync(csvDefaultPath)) {
-        this.#logger.info(`CSV default disponible: ${csvDefaultPath}`);
-        defaultRepo = new CsvTvRepository(csvDefaultPath, this.#logger);
-        await defaultRepo.init();
+      if (csvDefaultPath) {
+        if (isUrl(csvDefaultPath)) {
+          this.#logger.info(`CSV default remoto: ${csvDefaultPath}`);
+          defaultRepo = new RemoteCsvTvRepository(csvDefaultPath.trim(), this.#logger);
+          await defaultRepo.init();
+        } else if (existsSync(csvDefaultPath)) {
+          this.#logger.info(`CSV default local: ${csvDefaultPath}`);
+          defaultRepo = new CsvTvRepository(csvDefaultPath, this.#logger);
+          await defaultRepo.init();
+        } else {
+          this.#logger.warn(`CSV default no encontrado en ruta local: ${csvDefaultPath}`);
+        }
       }
     } catch (err) {
       this.#logger.warn(`No se pudo inicializar CSV default: ${err?.message || err}`);

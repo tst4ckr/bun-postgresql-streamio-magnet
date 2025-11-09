@@ -7,6 +7,7 @@ import './loadEnv.js';
 import { join, dirname } from 'path';
 import fs from 'fs';
 import csv from 'csv-parser';
+import axios from 'axios';
 import { fileURLToPath } from 'url';
 import { CONSTANTS } from './constants.js';
 import { envString, envInt, envBool, envDurationMs } from '../infrastructure/utils/env.js';
@@ -403,8 +404,35 @@ function normalizeGenresList(rawList = []) {
  * @returns {Promise<string[]>} géneros únicos y normalizados
  */
 export async function computeAvailableGenresFromCsv(tvCsvPath) {
-  if (!tvCsvPath || !fs.existsSync(tvCsvPath)) return [];
+  if (!tvCsvPath) return [];
 
+  const isUrl = (v) => typeof v === 'string' && /^https?:\/\//i.test(v.trim());
+
+  // Leer desde URL remota
+  if (isUrl(tvCsvPath)) {
+    try {
+      const response = await axios.get(tvCsvPath.trim(), { responseType: 'stream' });
+      return new Promise((resolve, reject) => {
+        const rawGenres = [];
+        response.data
+          .pipe(csv())
+          .on('data', (data) => {
+            const g = data.genre || data['group-title'] || '';
+            if (g) rawGenres.push(g);
+          })
+          .on('end', () => {
+            resolve(normalizeGenresList(rawGenres));
+          })
+          .on('error', (err) => reject(err));
+      });
+    } catch (err) {
+      console.warn('[addonConfig] No se pudo leer géneros desde URL remota CSV:', err?.message || err);
+      return [];
+    }
+  }
+
+  // Leer desde archivo local
+  if (!fs.existsSync(tvCsvPath)) return [];
   return new Promise((resolve, reject) => {
     const rawGenres = [];
     try {
