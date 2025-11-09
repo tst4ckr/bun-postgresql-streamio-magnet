@@ -189,7 +189,12 @@ class MagnetAddon {
     // Endpoint de descarga protegida por token para CSVs de datos
     const DOWNLOAD_TOKEN = (process.env.DOWNLOAD_TOKEN || '').trim();
     const REQUIRE_IP = String(process.env.DOWNLOAD_REQUIRE_IP_WHITELIST || '').trim().toLowerCase() === 'true';
-    const ipRouting = new IpRoutingService(this.#config.ipRouting.whitelist, this.#config.ipRouting.cacheTtlSeconds, this.#logger);
+    // Whitelist específica para descargas (independiente de WHITELIST_IPS)
+    const DOWNLOAD_WHITELIST = (process.env.DOWNLOAD_WHITELIST_IPS || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    const ipRoutingDownloads = new IpRoutingService(DOWNLOAD_WHITELIST, this.#config.ipRouting.cacheTtlSeconds, this.#logger);
     const getTokenFromReq = (req) => {
       const q = (req.query?.token || '').toString().trim();
       if (q) return q;
@@ -203,7 +208,7 @@ class MagnetAddon {
         const ip = RequestContext.getIp();
         // Evaluar whitelist de IP si está habilitada
         if (REQUIRE_IP) {
-          const allowed = ipRouting.isWhitelisted(ip);
+          const allowed = ipRoutingDownloads.isWhitelisted(ip);
           if (!allowed) {
             return res.status(403).json({ error: 'IP no autorizada para descargas' });
           }
