@@ -247,8 +247,8 @@ class MagnetAddon {
       return map;
     };
 
-    app.get('/download/:name', requireAuth, async (req, res) => {
-      const name = (req.params?.name || '').toString();
+    // Helper para servir descarga por nombre concreto reutilizando la misma lógica
+    const serveDownloadByName = async (name, req, res) => {
       const allowed = buildDownloadMap();
       const target = allowed.get(name);
       if (!target) {
@@ -266,7 +266,7 @@ class MagnetAddon {
           response.data.pipe(res);
         } catch (err) {
           this.#logger.error('Error descargando CSV remoto', { target, error: err?.message });
-          res.status(502).json({ error: 'No se pudo descargar el recurso remoto' });
+          return res.status(502).json({ error: 'No se pudo descargar el recurso remoto' });
         }
         return;
       }
@@ -286,7 +286,36 @@ class MagnetAddon {
         this.#logger.error('Error procesando descarga local', { target, error: e?.message });
         res.status(500).json({ error: 'Error interno' });
       }
+    };
+
+    app.get('/download/:name', requireAuth, async (req, res) => {
+      const name = (req.params?.name || '').toString();
+      await serveDownloadByName(name, req, res);
     });
+
+    // Rutas alias configurables por entorno
+    const normalizeRoute = (val, fallback) => {
+      if (!val || typeof val !== 'string') return fallback;
+      let r = val.trim();
+      if (!r.startsWith('/')) r = '/' + r;
+      return r;
+    };
+
+    const routeConfig = {
+      tv: normalizeRoute(process.env.DOWNLOAD_ROUTE_TV, '/download/tv.csv'),
+      tvPremium: normalizeRoute(process.env.DOWNLOAD_ROUTE_TV_PREMIUM, '/download/tv_premium.csv'),
+      magnets: normalizeRoute(process.env.DOWNLOAD_ROUTE_MAGNETS, '/download/magnets.csv'),
+      torrentio: normalizeRoute(process.env.DOWNLOAD_ROUTE_TORRENTIO, '/download/torrentio.csv'),
+      english: normalizeRoute(process.env.DOWNLOAD_ROUTE_ENGLISH, '/download/english.csv'),
+      anime: normalizeRoute(process.env.DOWNLOAD_ROUTE_ANIME, '/download/anime.csv'),
+    };
+
+    app.get(routeConfig.tv, requireAuth, async (req, res) => serveDownloadByName('tv.csv', req, res));
+    app.get(routeConfig.tvPremium, requireAuth, async (req, res) => serveDownloadByName('tv_premium.csv', req, res));
+    app.get(routeConfig.magnets, requireAuth, async (req, res) => serveDownloadByName('magnets.csv', req, res));
+    app.get(routeConfig.torrentio, requireAuth, async (req, res) => serveDownloadByName('torrentio.csv', req, res));
+    app.get(routeConfig.english, requireAuth, async (req, res) => serveDownloadByName('english.csv', req, res));
+    app.get(routeConfig.anime, requireAuth, async (req, res) => serveDownloadByName('anime.csv', req, res));
 
     this.#logger.info('Rutas adicionales configuradas');
   }
