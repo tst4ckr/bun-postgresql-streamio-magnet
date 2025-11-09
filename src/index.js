@@ -16,6 +16,9 @@ import { StreamHandler } from './application/handlers/StreamHandler.js';
 import { TvHandler } from './application/handlers/TvHandler.js';
 import { CsvTvRepository } from './infrastructure/repositories/CsvTvRepository.js';
 import { M3UTvRepository } from './infrastructure/repositories/M3UTvRepository.js';
+import { DynamicTvRepository } from './infrastructure/repositories/DynamicTvRepository.js';
+import { IpRoutingService } from './infrastructure/services/IpRoutingService.js';
+import { RequestContext } from './infrastructure/utils/RequestContext.js';
 import { EnhancedLogger } from './infrastructure/utils/EnhancedLogger.js';
 
 /**
@@ -77,20 +80,75 @@ class MagnetAddon {
    * @private
    */
   async #setupHandlers() {
-    const csvPath = this.#config.repository.tvCsvPath;
+    const csvDefaultPath = this.#config.repository.tvCsvDefaultPath;
+    const csvWhitelistPath = this.#config.repository.tvCsvWhitelistPath;
     const m3uUrl = this.#config.repository.m3uUrl;
+    const m3uUrlBackup = this.#config.repository.m3uUrlBackup;
 
     this.#setupStreamHandler();
 
-    // Preferir CSV si existe; si no, habilitar M3U (válido) si está configurado
-    if (csvPath && existsSync(csvPath)) {
-      this.#logger.info(`Usando TV_CSV_PATH: ${csvPath}`);
-      await this.#setupTvHandlerFromCsv(csvPath);
-    } else if (m3uUrl && typeof m3uUrl === 'string' && m3uUrl.trim().length > 0) {
-      await this.#setupTvHandlerFromM3U(m3uUrl.trim());
-    } else {
-      this.#logger.warn('TV deshabilitado: no se encontró TV_CSV_PATH ni M3U_URL válido.');
+    // Cadena de respaldo: CSV whitelist/default → M3U primario → M3U backup
+    // Preparar repositorios y ruteo por IP
+    let whitelistRepo = null;
+    let defaultRepo = null;
+    let m3uRepo = null;
+    let m3uBackupRepo = null;
+
+    try {
+      if (csvWhitelistPath && existsSync(csvWhitelistPath)) {
+        this.#logger.info(`CSV whitelist disponible: ${csvWhitelistPath}`);
+        whitelistRepo = new CsvTvRepository(csvWhitelistPath, this.#logger);
+        await whitelistRepo.init();
+      }
+    } catch (err) {
+      this.#logger.warn(`No se pudo inicializar CSV whitelist (${csvWhitelistPath}): ${err?.message || err}`);
     }
+
+    try {
+      if (csvDefaultPath && existsSync(csvDefaultPath)) {
+        this.#logger.info(`CSV default disponible: ${csvDefaultPath}`);
+        defaultRepo = new CsvTvRepository(csvDefaultPath, this.#logger);
+        await defaultRepo.init();
+      }
+    } catch (err) {
+      this.#logger.warn(`No se pudo inicializar CSV default: ${err?.message || err}`);
+    }
+
+    // Preparar M3U primario y backup si no hay CSVs
+    const tryCreateM3URepo = async (url, label) => {
+      if (url && typeof url === 'string' && url.trim()) {
+        try {
+          const repo = new M3UTvRepository(url.trim(), this.#config, this.#logger);
+          const preloaded = await repo.getAllTvs();
+          const count = preloaded?.length || 0;
+          if (count === 0) throw new Error('M3U sin canales válidos');
+          this.#logger.info(`M3U (${label}) cargado: ${count} canales`);
+          return repo;
+        } catch (e) {
+          this.#logger.warn(`Error M3U (${label}): ${e?.message || e}`);
+        }
+      }
+      return null;
+    };
+
+    if (!defaultRepo && !whitelistRepo) {
+      m3uRepo = await tryCreateM3URepo(m3uUrl, 'M3U_URL');
+      if (!m3uRepo) {
+        m3uBackupRepo = await tryCreateM3URepo(m3uUrlBackup, 'M3U_URL_BACKUP');
+      }
+    }
+
+    const ipRouting = new IpRoutingService(this.#config.ipRouting.whitelist, this.#config.ipRouting.cacheTtlSeconds, this.#logger);
+    const dynamicRepo = new DynamicTvRepository({
+      whitelistRepo,
+      defaultRepo,
+      m3uRepo,
+      m3uBackupRepo,
+      assignmentCacheTtlSeconds: 120
+    }, ipRouting, this.#logger);
+
+    this.#tvHandler = new TvHandler(dynamicRepo, this.#config, this.#logger);
+    this.#logger.info('TvHandler configurado con DynamicTvRepository');
 
     this.#setupCatalogHandler();
     this.#setupMetaHandler();
@@ -297,8 +355,27 @@ class MagnetAddon {
 
     const addonInterface = this.#addonBuilder.getInterface();
     const app = express();
+    // Confiar en cabeceras de proxy para obtener IP real
+    app.set('trust proxy', true);
     const router = getRouter(addonInterface);
     
+    // Middleware global para capturar IP y establecer contexto
+    app.use((req, res, next) => {
+      try {
+        RequestContext.run(req, () => {
+          const ip = RequestContext.getIp();
+          this.#logger.info(`[IP Capture] Solicitud entrante desde IP='${ip || 'unknown'}'`, {
+            path: req.path,
+            method: req.method
+          });
+          next();
+        });
+      } catch (e) {
+        this.#logger.warn(`[IP Capture] Error determinando IP: ${e?.message || e}`);
+        next();
+      }
+    });
+
     // Ruta de landing segura en '/'
     app.get('/', (req, res) => {
       try {

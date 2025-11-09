@@ -134,13 +134,25 @@ const config = {
     primaryCsvPath: envString('PRIMARY_CSV_PATH', resolvePath('data/torrents/magnets.csv')),
     secondaryCsvPath: envString('SECONDARY_CSV_PATH', resolvePath('data/torrents/torrentio.csv')),
     animeCsvPath: envString('ANIME_CSV_PATH', resolvePath('data/torrents/anime.csv')),
-    tvCsvPath: envString('TV_CSV_PATH', resolvePath('data/tvs/tv.csv')), // Nueva línea
+    // CSV por defecto para clientes no autorizados
+    tvCsvDefaultPath: envString('TV_CSV_PATH_DEFAULT', resolvePath('data/tvs/tv.csv')),
+    // CSV para clientes autorizados según whitelist (opcional)
+    tvCsvWhitelistPath: envString('TV_CSV_PATH_WHITELIST', null),
     torrentioApiUrl: envString('TORRENTIO_API_URL', 'https://torrentio.strem.fun/'),
     timeout: envInt('CSV_TIMEOUT', CONSTANTS.TIME.DEFAULT_TIMEOUT),
     // Configuración específica para TV M3U
     m3uUrl: envString('M3U_URL', null),
+    // URL de respaldo para M3U (opcional)
+    m3uUrlBackup: envString('M3U_URL_BACKUP', null),
     m3uCacheTimeout: envDurationMs('M3U_CACHE_TIMEOUT', CONSTANTS.CACHE.TV_M3U_CACHE_TIMEOUT),
     maxTvChannels: envInt('MAX_TV_CHANNELS', CONSTANTS.LIMIT.MAX_TV_CHANNELS)
+  },
+  // Configuración de ruteo por IP
+  ipRouting: {
+    // Lista de IPs autorizadas (coma-separadas). Ej: "1.2.3.4,5.6.7.8"
+    whitelist: (process.env.WHITELIST_IPS || '').split(',').map(s => s.trim()).filter(Boolean),
+    // TTL del caché de verificación de IP (segundos)
+    cacheTtlSeconds: envInt('IP_CACHE_TTL_SECONDS', 300)
   },
   tor: {
     enabled: envBool('TOR_ENABLED', false), // Por defecto false, se activa explícitamente con TOR_ENABLED=true
@@ -481,8 +493,17 @@ export function setTvCatalogGenreOptions(genres = []) {
  */
 export async function populateTvGenreOptionsFromCsv() {
   try {
-    const csvPath = config.repository?.tvCsvPath;
-    const genres = await computeAvailableGenresFromCsv(csvPath);
+    const defaultPath = config.repository?.tvCsvDefaultPath;
+    const whitelistPath = config.repository?.tvCsvWhitelistPath;
+    let genres = await computeAvailableGenresFromCsv(defaultPath);
+    // Si el default no existe o no genera géneros, intentar con el whitelist
+    if ((!genres || genres.length === 0) && whitelistPath) {
+      const wlGenres = await computeAvailableGenresFromCsv(whitelistPath);
+      if (wlGenres && wlGenres.length) {
+        console.info('[addonConfig] Usando géneros desde TV_CSV_PATH_WHITELIST');
+        genres = wlGenres;
+      }
+    }
     setTvCatalogGenreOptions(genres);
     // invalidar cache de manifest para reflejar cambios
     manifestCache = null;
