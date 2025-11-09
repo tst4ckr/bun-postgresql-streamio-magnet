@@ -180,7 +180,10 @@ class MagnetAddon {
    * @private
    */
   #setupAdditionalRoutes(app) {
-    app.use('/static', express.static('static'));
+  // Configuración de rutas estáticas configurable
+  const STATIC_DIR = process.env.STATIC_DIR || 'static';
+  const STATIC_MOUNT_PATH = process.env.STATIC_MOUNT_PATH || '/static';
+  app.use(STATIC_MOUNT_PATH, express.static(STATIC_DIR));
     this.#logger.info('Rutas adicionales configuradas');
   }
 
@@ -408,7 +411,7 @@ class MagnetAddon {
           // CSP restrictiva para contenido estático básico
           'Content-Security-Policy': "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'"
         });
-        const filePath = path.join(process.cwd(), 'static', 'index.html');
+  const filePath = path.join(process.cwd(), process.env.STATIC_DIR || 'static', 'index.html');
         res.sendFile(filePath, (err) => {
           if (err) {
             // Fallback a una landing mínima si no existe index.html

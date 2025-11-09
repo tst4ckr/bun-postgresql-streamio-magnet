@@ -4,7 +4,7 @@
  */
 
 import './loadEnv.js';
-import { join, dirname } from 'path';
+import { join, dirname, isAbsolute } from 'path';
 import fs from 'fs';
 import csv from 'csv-parser';
 import axios from 'axios';
@@ -22,14 +22,24 @@ const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, '..', '..');
 
 // Función para resolver rutas según el entorno
-function resolvePath(relativePath) {
+function resolvePath(targetPath) {
+  if (!targetPath) return targetPath;
+  // Si ya es una ruta absoluta del sistema o una URL http/https, devolver tal cual
+  if (isAbsolute(targetPath) || /^https?:\/\//i.test(targetPath)) {
+    return targetPath;
+  }
   if (isContainer) {
     // En contenedor, usar rutas relativas desde /app
-    return join('/app', relativePath);
+    return join('/app', targetPath);
   }
   // En desarrollo local, usar rutas relativas desde el proyecto
-  return join(projectRoot, relativePath);
+  return join(projectRoot, targetPath);
 }
+
+// Directorios base configurables para datos CSV (torrents y TV)
+// Permiten cambiar el nombre y ubicación de las carpetas sin modificar el código.
+const DATA_TORRENTS_DIR = envString('DATA_TORRENTS_DIR', 'data/torrents');
+const DATA_TVS_DIR = envString('DATA_TVS_DIR', 'data/tvs');
 
 const config = {
   addon: {
@@ -132,11 +142,12 @@ const config = {
     }
   },
   repository: {
-    primaryCsvPath: envString('PRIMARY_CSV_PATH', resolvePath('data/torrents/magnets.csv')),
-    secondaryCsvPath: envString('SECONDARY_CSV_PATH', resolvePath('data/torrents/torrentio.csv')),
-    animeCsvPath: envString('ANIME_CSV_PATH', resolvePath('data/torrents/anime.csv')),
+    // Rutas base configurables para CSV de torrents
+    primaryCsvPath: envString('PRIMARY_CSV_PATH', resolvePath(join(DATA_TORRENTS_DIR, 'magnets.csv'))),
+    secondaryCsvPath: envString('SECONDARY_CSV_PATH', resolvePath(join(DATA_TORRENTS_DIR, 'torrentio.csv'))),
+    animeCsvPath: envString('ANIME_CSV_PATH', resolvePath(join(DATA_TORRENTS_DIR, 'anime.csv'))),
     // CSV por defecto para clientes no autorizados
-    tvCsvDefaultPath: envString('TV_CSV_PATH_DEFAULT', resolvePath('data/tvs/tv.csv')),
+    tvCsvDefaultPath: envString('TV_CSV_PATH_DEFAULT', resolvePath(join(DATA_TVS_DIR, 'tv.csv'))),
     // CSV para clientes autorizados según whitelist (opcional)
     tvCsvWhitelistPath: envString('TV_CSV_PATH_WHITELIST', null),
     torrentioApiUrl: envString('TORRENTIO_API_URL', 'https://torrentio.strem.fun/'),

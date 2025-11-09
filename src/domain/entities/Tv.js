@@ -9,7 +9,7 @@
  */
 import { CONSTANTS } from '../../config/constants.js';
 import { existsSync } from 'fs';
-import path from 'path';
+import pathModule from 'path';
 
 export class Tv {
   #id;
@@ -120,41 +120,48 @@ export class Tv {
    * @param {string | null} path - La ruta de la imagen.
    * @returns {string | null} La URL completa de la imagen o null.
    */
-  #resolveImageUrl(path) {
-    if (!path) {
+  #resolveImageUrl(imagePath) {
+    if (!imagePath) {
       return undefined;
     }
 
     // Si ya es una URL absoluta, devolverla tal cual
-    if (/^https?:\/\//i.test(path)) {
-      return path;
+    if (/^https?:\/\//i.test(imagePath)) {
+      return imagePath;
     }
 
-    // Corrige el path si es necesario, por ejemplo, de 'logo/' a 'logos/'.
+    // Directorios configurables para estáticos
+    const STATIC_DIR = process.env.STATIC_DIR || 'static';
+    const STATIC_MOUNT_PATH = process.env.STATIC_MOUNT_PATH || '/static';
+    const LOGOS_DIR_NAME = process.env.STATIC_LOGOS_DIR_NAME || 'logos';
+    const POSTER_DIR_NAME = process.env.STATIC_POSTER_DIR_NAME || 'poster';
+    const BACKGROUND_DIR_NAME = process.env.STATIC_BACKGROUND_DIR_NAME || 'background';
+
+    // Corrige el path si es necesario, por ejemplo, de 'logo/' a el directorio de logos configurado.
     // Solo reemplazar si está al inicio para evitar duplicados como 'logos/logo/...'
-    const correctedPath = path.replace(/^logo\//i, 'logos/');
+    const correctedPath = imagePath.replace(/^logo\//i, `${LOGOS_DIR_NAME}/`);
 
     // Validar que el archivo exista en /static; si no existe, usar logo por defecto
     try {
       const relPath = correctedPath.replace(/^\//, '');
-      const localStaticPath = path.join(process.cwd(), 'static', relPath);
+      const localStaticPath = pathModule.join(process.cwd(), STATIC_DIR, relPath);
       if (!existsSync(localStaticPath)) {
         // Intentar fallback entre carpetas 'logos' y 'poster' si existe el mismo archivo en la otra
         let altRelPath = null;
-        if (/^logos\//i.test(relPath)) {
-          altRelPath = relPath.replace(/^logos\//i, 'poster/');
-        } else if (/^poster\//i.test(relPath)) {
-          altRelPath = relPath.replace(/^poster\//i, 'logos/');
+        if (new RegExp(`^${LOGOS_DIR_NAME}\/`, 'i').test(relPath)) {
+          altRelPath = relPath.replace(new RegExp(`^${LOGOS_DIR_NAME}\/`, 'i'), `${POSTER_DIR_NAME}/`);
+        } else if (new RegExp(`^${POSTER_DIR_NAME}\/`, 'i').test(relPath)) {
+          altRelPath = relPath.replace(new RegExp(`^${POSTER_DIR_NAME}\/`, 'i'), `${LOGOS_DIR_NAME}/`);
         }
 
         if (altRelPath) {
-          const altLocalPath = path.join(process.cwd(), 'static', altRelPath);
+          const altLocalPath = pathModule.join(process.cwd(), STATIC_DIR, altRelPath);
           if (existsSync(altLocalPath)) {
             // Construir URL para el fallback encontrado
             if (process.env.BASE_URL) {
-              return `${process.env.BASE_URL}/static/${altRelPath}`;
+              return `${process.env.BASE_URL}${STATIC_MOUNT_PATH}/${altRelPath}`;
             }
-            return `/static/${altRelPath}`;
+            return `${STATIC_MOUNT_PATH}/${altRelPath}`;
           }
         }
 
@@ -167,11 +174,11 @@ export class Tv {
 
     // Si BASE_URL está definida, construye una URL absoluta.
     if (process.env.BASE_URL) {
-      return `${process.env.BASE_URL}/static/${correctedPath}`;
+      return `${process.env.BASE_URL}${STATIC_MOUNT_PATH}/${correctedPath}`;
     }
 
     // Si no, devuelve una ruta relativa para desarrollo o entornos sin proxy.
-    return `/static/${correctedPath}`;
+    return `${STATIC_MOUNT_PATH}/${correctedPath}`;
   }
 
   /**
