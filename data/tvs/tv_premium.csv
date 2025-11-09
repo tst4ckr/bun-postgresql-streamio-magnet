@@ -1,0 +1,6 @@
+id,name,stream_url,logo,genre,country,language,quality,type,is_active
+tv_hbo_hd,HBO,http://38.183.182.166:8000/play/a0vn/index.m3u8,logo/tv_hbo_hd.png,"TV Premium, General",Internacional,es,HD,tv,true
+tv_axn_hd,AXN,http://38.183.182.166:8000/play/a0vi/index.m3u8,logo/tv_axn_hd.png,"TV Premium, General",Internacional,es,HD,tv,true
+tv_sony_hd,Sony,http://38.183.182.166:8000/play/a0vg/index.m3u8,logo/tv_sony_hd.png,"TV Premium, General",Internacional,es,HD,tv,true
+tv_warner_hd,Warner Channel,http://200.12.41.194:8000/play/a06f/index.m3u8,logo/tv_warner.png,"TV Premium, General",Argentina,es,HD,tv,true
+tv_espn_4_hd,ESPN 4,http://200.12.41.194:8000/play/a064/index.m3u8,logo/tv_espn_4.png,"TV Premium, Deportes, General",España,es,HD,tv,true
