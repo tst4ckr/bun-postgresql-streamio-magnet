@@ -36,6 +36,15 @@ RUN chmod +x start.sh && chown -R appuser:appuser /app
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV CONTAINER_ENV=true
+# Alinear puerto de la app con el expuesto por el contenedor
+ENV PORT=7000
+
+# Rutas efectivas dentro del contenedor (filesystem)
+# Estas variables sobrescriben las de .env (dotenv no pisa variables ya definidas)
+ENV STATIC_DIR=/app/static
+ENV STATIC_MOUNT_PATH=/static
+ENV DATA_TORRENTS_DIR=/app/data/torrents
+ENV DATA_TVS_DIR=/app/data/tvs
 
 # Exponer puertos
 EXPOSE 7000
