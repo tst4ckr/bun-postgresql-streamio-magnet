@@ -10,6 +10,7 @@ import { addonBuilder, serveHTTP, getRouter } from 'stremio-addon-sdk';
 import express from 'express';
 import axios from 'axios';
 import path from 'path';
+import fs from 'fs';
 import { existsSync } from 'fs';
 import { addonConfig, getManifest, populateTvGenreOptionsFromCsv } from './config/addonConfig.js';
 import { CascadingMagnetRepository } from './infrastructure/repositories/CascadingMagnetRepository.js';
@@ -34,7 +35,10 @@ class MagnetAddon {
   #streamHandler;
   #tvHandler;
   #tvRepository;
-  #tvRefreshIntervalId;
+  #tvRefreshIntervalId; // { default?: NodeJS.Timer, whitelist?: NodeJS.Timer }
+  #tvCsvWatchers; // Map<label, fs.FSWatcher>
+  #ipRoutingService; // IpRoutingService used by DynamicTvRepository
+  #tvRepoRefs; // { whitelistRepo, defaultRepo, m3uRepo, m3uBackupRepo }
 
   constructor() {
     this.#config = addonConfig;
@@ -169,11 +173,22 @@ class MagnetAddon {
       assignmentCacheTtlSeconds: 120
     }, ipRouting, this.#logger);
 
-    this.#tvHandler = new TvHandler(dynamicRepo, this.#config, this.#logger);
+    // Guardar referencias para hot-reload y configurar handler
+    this.#ipRoutingService = ipRouting;
+    this.#tvRepoRefs = { whitelistRepo, defaultRepo, m3uRepo, m3uBackupRepo };
+    this.#tvRepository = dynamicRepo;
+    this.#tvHandler = new TvHandler(this.#tvRepository, this.#config, this.#logger);
     this.#logger.info('TvHandler configurado con DynamicTvRepository');
 
     this.#setupCatalogHandler();
     this.#setupMetaHandler();
+
+    // Configurar hot-reload de CSVs (locales o remotos)
+    try {
+      await this.#setupTvHotReload({ csvDefaultPath, csvWhitelistPath });
+    } catch (e) {
+      this.#logger.warn(`No se pudo configurar hot-reload para TV CSV: ${e?.message || e}`);
+    }
   }
 
   /**
@@ -493,6 +508,144 @@ class MagnetAddon {
     });
     
     this.#logger.info('MetaHandler configurado.');
+  }
+
+  /**
+   * Configura hot-reload para rutas CSV de TV.
+   * - Para rutas locales: fs.watch con debounce.
+   * - Para URLs remotas: intervalo configurable que fuerza recarga.
+   * También actualiza dinámicamente el repositorio y el TvHandler.
+   * @private
+   * @param {{ csvDefaultPath?: string, csvWhitelistPath?: string }} param0
+   */
+  async #setupTvHotReload({ csvDefaultPath, csvWhitelistPath } = {}) {
+    const isUrl = (v) => typeof v === 'string' && /^https?:\/\/\S+/i.test(v);
+    const debounceTimers = new Map(); // label -> timeoutId
+    this.#tvCsvWatchers = this.#tvCsvWatchers || new Map();
+    this.#tvRefreshIntervalId = this.#tvRefreshIntervalId || {};
+
+    const scheduleDebounced = (label, fn, delayMs = 750) => {
+      const prev = debounceTimers.get(label);
+      if (prev) clearTimeout(prev);
+      const id = setTimeout(async () => {
+        try {
+          await fn();
+        } catch (e) {
+          this.#logger.warn(`[Hot-Reload] Falló recarga (${label}): ${e?.message || e}`);
+        }
+      }, delayMs);
+      debounceTimers.set(label, id);
+    };
+
+    const rebuildDynamicAndHandler = (updatedRefs) => {
+      // Mezclar refs actualizadas
+      this.#tvRepoRefs = { ...this.#tvRepoRefs, ...updatedRefs };
+      const dynamicRepo = new DynamicTvRepository({
+        whitelistRepo: this.#tvRepoRefs.whitelistRepo,
+        defaultRepo: this.#tvRepoRefs.defaultRepo,
+        m3uRepo: this.#tvRepoRefs.m3uRepo,
+        m3uBackupRepo: this.#tvRepoRefs.m3uBackupRepo,
+        assignmentCacheTtlSeconds: 120
+      }, this.#ipRoutingService, this.#logger);
+      this.#tvRepository = dynamicRepo;
+      this.#tvHandler = new TvHandler(this.#tvRepository, this.#config, this.#logger);
+      this.#logger.info('[Hot-Reload] TvHandler reconstruido con repositorios actualizados');
+    };
+
+    const buildCsvRepo = async (pathLike, label) => {
+      if (isUrl(pathLike)) {
+        const repo = new RemoteCsvTvRepository(pathLike.trim(), this.#logger);
+        await repo.init();
+        this.#logger.info(`[Hot-Reload] CSV remoto (${label}) recargado`);
+        return repo;
+      }
+      if (!pathLike || !existsSync(pathLike)) {
+        this.#logger.warn(`[Hot-Reload] Ruta CSV (${label}) no existe: ${pathLike}`);
+        return null;
+      }
+      const repo = new CsvTvRepository(pathLike, this.#logger);
+      await repo.init();
+      this.#logger.info(`[Hot-Reload] CSV local (${label}) recargado`);
+      return repo;
+    };
+
+    // Configurar watcher/interval para default CSV
+    if (csvDefaultPath) {
+      if (isUrl(csvDefaultPath)) {
+        const seconds = Math.max(15, Number(process.env.TV_CSV_REFRESH_SECONDS || 60));
+        this.#tvRefreshIntervalId.default = setInterval(async () => {
+          scheduleDebounced('default', async () => {
+            const repo = await buildCsvRepo(csvDefaultPath, 'default');
+            if (repo) rebuildDynamicAndHandler({ defaultRepo: repo });
+            try { await populateTvGenreOptionsFromCsv(); } catch (_) {}
+          });
+        }, seconds * 1000);
+        this.#logger.info(`[Hot-Reload] Intervalo de refresco CSV default (remoto) cada ${seconds}s`);
+      } else if (existsSync(csvDefaultPath)) {
+        try {
+          const watcher = fs.watch(csvDefaultPath, { persistent: false }, (eventType) => {
+            if (eventType === 'change' || eventType === 'rename') {
+              scheduleDebounced('default', async () => {
+                const repo = await buildCsvRepo(csvDefaultPath, 'default');
+                if (repo) rebuildDynamicAndHandler({ defaultRepo: repo });
+                try { await populateTvGenreOptionsFromCsv(); } catch (_) {}
+              });
+            }
+          });
+          this.#tvCsvWatchers.set('default', watcher);
+          this.#logger.info('[Hot-Reload] fs.watch configurado para CSV default');
+        } catch (e) {
+          this.#logger.warn(`[Hot-Reload] No se pudo configurar fs.watch para default: ${e?.message || e}`);
+        }
+      }
+    }
+
+    // Configurar watcher/interval para whitelist CSV
+    if (csvWhitelistPath) {
+      if (isUrl(csvWhitelistPath)) {
+        const seconds = Math.max(15, Number(process.env.TV_CSV_REFRESH_SECONDS || 60));
+        this.#tvRefreshIntervalId.whitelist = setInterval(async () => {
+          scheduleDebounced('whitelist', async () => {
+            const repo = await buildCsvRepo(csvWhitelistPath, 'whitelist');
+            if (repo) rebuildDynamicAndHandler({ whitelistRepo: repo });
+            try { await populateTvGenreOptionsFromCsv(); } catch (_) {}
+          });
+        }, seconds * 1000);
+        this.#logger.info(`[Hot-Reload] Intervalo de refresco CSV whitelist (remoto) cada ${seconds}s`);
+      } else if (existsSync(csvWhitelistPath)) {
+        try {
+          const watcher = fs.watch(csvWhitelistPath, { persistent: false }, (eventType) => {
+            if (eventType === 'change' || eventType === 'rename') {
+              scheduleDebounced('whitelist', async () => {
+                const repo = await buildCsvRepo(csvWhitelistPath, 'whitelist');
+                if (repo) rebuildDynamicAndHandler({ whitelistRepo: repo });
+                try { await populateTvGenreOptionsFromCsv(); } catch (_) {}
+              });
+            }
+          });
+          this.#tvCsvWatchers.set('whitelist', watcher);
+          this.#logger.info('[Hot-Reload] fs.watch configurado para CSV whitelist');
+        } catch (e) {
+          this.#logger.warn(`[Hot-Reload] No se pudo configurar fs.watch para whitelist: ${e?.message || e}`);
+        }
+      }
+    }
+
+    // Cleanup en señales de proceso
+    const cleanup = () => {
+      try {
+        if (this.#tvRefreshIntervalId?.default) clearInterval(this.#tvRefreshIntervalId.default);
+        if (this.#tvRefreshIntervalId?.whitelist) clearInterval(this.#tvRefreshIntervalId.whitelist);
+      } catch (_) {}
+      try {
+        for (const [label, watcher] of (this.#tvCsvWatchers || new Map()).entries()) {
+          try { watcher.close(); } catch (_) {}
+          this.#logger.info(`[Hot-Reload] watcher '${label}' cerrado`);
+        }
+      } catch (_) {}
+    };
+    process.once('SIGINT', cleanup);
+    process.once('SIGTERM', cleanup);
   }
   
   /**
