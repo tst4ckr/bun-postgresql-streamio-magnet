@@ -20,6 +20,7 @@ import M3UChannelService from '../../application/M3UChannelService.js';
 import ChannelNameCleaningService from '../../domain/services/ChannelNameCleaningService.js';
 import LogoGenerationService from '../../services/LogoGenerationService.js';
 import GenreDetectionService from '../../services/GenreDetectionService.js';
+import ArtworkGenerationService from '../../services/ArtworkGenerationService.js';
 import { getM3UOutputPath } from '../../domain/services/ValidatedChannelsCsvService_tools.js';
 import { sanitizeTitle, isValidChannel, generateExtInf } from '../../infrastructure/services/M3UGeneratorService_tools.js';
 import { promises as fs } from 'fs';
@@ -273,7 +274,8 @@ export class IPTVProcessor {
         const services = {
             nameCleaningService: new ChannelNameCleaningService(),
             genreDetectionService: new GenreDetectionService(),
-            logoGenerationService: new LogoGenerationService()
+            logoGenerationService: new LogoGenerationService(),
+            artworkGenerationService: new ArtworkGenerationService()
         };
         
         const enhancedChannels = await this._processInChunks(validatedChannels, services);
@@ -630,8 +632,10 @@ export class IPTVProcessor {
             console.log(`   📦 Procesando ${channels.length} canales en ${chunks.length} chunks de ${CHUNK_SIZE}`);
         }
         
-        // Asegurar directorio de logos
+        // Asegurar directorios de assets
         await logoGenerationService.ensureLogoDirectory();
+        await services.artworkGenerationService.ensureBackgroundDirectory();
+        await services.artworkGenerationService.ensurePosterDirectory();
         
         // Procesar chunks en paralelo
         const processedChunks = await Promise.all(
@@ -657,11 +661,28 @@ export class IPTVProcessor {
                 
                 const logoResults = await logoGenerationService.generateMultipleLogos(channelsForLogos);
                 
-                // 4. Integración de logos
+                // 4. Generación de artwork (background y poster)
+                const bgResults = await services.artworkGenerationService.generateMultipleBackgrounds(channelsForLogos, { concurrency: 4 });
+                // Elegimos poster cuadrado por defecto; opcionalmente se puede cambiar a 'poster'
+                const posterResults = await services.artworkGenerationService.generateMultiplePosters(channelsForLogos, { concurrency: 4, shape: 'square' });
+
+                // 5. Integración de logos/background/poster
                 const logoMap = new Map();
                 logoResults.forEach(result => {
                     if (result.success && result.logoPath) {
                         logoMap.set(result.channelId, result.logoPath);
+                    }
+                });
+                const bgMap = new Map();
+                bgResults.forEach(result => {
+                    if (result.success && result.backgroundPath) {
+                        bgMap.set(result.channelId, result.backgroundPath);
+                    }
+                });
+                const posterMap = new Map();
+                posterResults.forEach(result => {
+                    if (result.success && result.posterPath) {
+                        posterMap.set(result.channelId, result.posterPath);
                     }
                 });
                 
@@ -671,6 +692,16 @@ export class IPTVProcessor {
                         const relativePath = path.relative(process.cwd(), logoPath).replace(/\\/g, '/');
                         channel.logo = relativePath;
                     }
+                    const bgPath = bgMap.get(channel.id);
+                    if (bgPath) {
+                        const relBg = path.relative(process.cwd(), bgPath).replace(/\\/g, '/');
+                        channel.background = relBg;
+                    }
+                    const posterPath = posterMap.get(channel.id);
+                    if (posterPath) {
+                        const relPoster = path.relative(process.cwd(), posterPath).replace(/\\/g, '/');
+                        channel.poster = relPoster;
+                    }
                 });
                 
                 return {
@@ -679,6 +710,8 @@ export class IPTVProcessor {
                         chunkIndex,
                         processed: processedChunk.length,
                         logosGenerated: logoResults.filter(r => r.success).length,
+                        backgroundsGenerated: bgResults.filter(r => r.success).length,
+                        postersGenerated: posterResults.filter(r => r.success).length,
                         genreStats: genreResults.stats
                     }
                 };
@@ -690,11 +723,15 @@ export class IPTVProcessor {
         
         // Estadísticas consolidadas
         const totalLogosGenerated = processedChunks.reduce((sum, chunk) => sum + chunk.stats.logosGenerated, 0);
+        const totalBackgroundsGenerated = processedChunks.reduce((sum, chunk) => sum + (chunk.stats.backgroundsGenerated || 0), 0);
+        const totalPostersGenerated = processedChunks.reduce((sum, chunk) => sum + (chunk.stats.postersGenerated || 0), 0);
         const cleaningMetrics = nameCleaningService.getMetrics();
         
         if (this.options.enableLogging) {
             console.log(`   ✅ Limpieza: ${cleaningMetrics.totalCleaned}/${cleaningMetrics.totalProcessed} nombres (${cleaningMetrics.cleaningRate}%)`);
             console.log(`   ✅ Logos: ${totalLogosGenerated}/${allProcessedChannels.length} generados`);
+            console.log(`   ✅ Backgrounds: ${totalBackgroundsGenerated}/${allProcessedChannels.length} generados`);
+            console.log(`   ✅ Posters: ${totalPostersGenerated}/${allProcessedChannels.length} generados`);
         }
         
         return allProcessedChannels;

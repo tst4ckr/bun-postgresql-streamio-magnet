@@ -38,6 +38,7 @@ import ChannelNameCleaningService from '../../domain/services/ChannelNameCleanin
 import { BannedChannelsFilterService } from '../../domain/services/BannedChannelsFilterService.js';
 import M3UChannelService from '../../application/M3UChannelService.js';
 import LogoGenerationService from '../../services/LogoGenerationService.js';
+import ArtworkGenerationService from '../../services/ArtworkGenerationService.js';
 import GenreDetectionService from '../../services/GenreDetectionService.js';
 
 /**
@@ -294,6 +295,15 @@ export function registerServices(container, config) {
   // Servicio de generación de logos
   container.register('logoGenerationService', (deps, serviceConfig, logger) => {
     return new LogoGenerationService();
+  }, {
+    dependencies: [],
+    singleton: true,
+    config: {}
+  });
+
+  // Servicio de generación de artwork (backgrounds y posters)
+  container.register('artworkGenerationService', (deps, serviceConfig, logger) => {
+    return new ArtworkGenerationService();
   }, {
     dependencies: [],
     singleton: true,
