@@ -686,21 +686,23 @@ export class IPTVProcessor {
                     }
                 });
                 
+                // Normalizar rutas a esquema relativo bajo /static para el servidor del addon
+                // Guardamos solo 'logos/...', 'background/...', 'poster/...'
                 processedChunk.forEach(channel => {
                     const logoPath = logoMap.get(channel.id);
                     if (logoPath) {
-                        const relativePath = path.relative(process.cwd(), logoPath).replace(/\\/g, '/');
-                        channel.logo = relativePath;
+                        const fileName = path.basename(logoPath);
+                        channel.logo = `logos/${fileName}`;
                     }
                     const bgPath = bgMap.get(channel.id);
                     if (bgPath) {
-                        const relBg = path.relative(process.cwd(), bgPath).replace(/\\/g, '/');
-                        channel.background = relBg;
+                        const fileName = path.basename(bgPath);
+                        channel.background = `background/${fileName}`;
                     }
                     const posterPath = posterMap.get(channel.id);
                     if (posterPath) {
-                        const relPoster = path.relative(process.cwd(), posterPath).replace(/\\/g, '/');
-                        channel.poster = relPoster;
+                        const fileName = path.basename(posterPath);
+                        channel.poster = `poster/${fileName}`;
                     }
                 });
                 
