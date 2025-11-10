@@ -197,73 +197,69 @@ fi
 TV_PID=$!
 
 # ===============================
-# 4) Esperar a que se genere el CSV (con timeout)
+# 4) Esperar a que se genere el CSV (bloqueante hasta éxito)
 # ===============================
-# Espera robusta: mayor timeout por defecto y verificar que el archivo no esté vacío
-WAIT_FOR_TV_SECONDS="${WAIT_FOR_TV_SECONDS:-180}"
-COUNT=0
-echo "Esperando generación de CSV en: $OUTPUT_CSV_PATH (timeout=${WAIT_FOR_TV_SECONDS}s)..."
-while [ ! -s "$OUTPUT_CSV_PATH" ] && [ "$COUNT" -lt "$WAIT_FOR_TV_SECONDS" ]; do
-  COUNT=$((COUNT + 1))
-  # Si el proceso de TV terminó y no hay archivo, avisar
+echo "Esperando generación COMPLETA de CSV en: $OUTPUT_CSV_PATH (sin timeout)..."
+CSV_WAIT_COUNT=0
+while [ ! -s "$OUTPUT_CSV_PATH" ]; do
+  # Si el proceso de TV terminó y no hay archivo, mostrar últimos logs y abortar
   if ! kill -0 "$TV_PID" 2>/dev/null; then
     echo ""
-    echo "Aviso: el proceso de la librería IPTV (PID $TV_PID) terminó antes de generar el CSV."
+    echo "Error: el proceso de la librería IPTV (PID $TV_PID) terminó antes de generar el CSV."
     echo "Últimas líneas de log de la librería IPTV:"
-    tail -n 50 "$TV_LOG_FILE" 2>/dev/null || true
-    break
+    tail -n 100 "$TV_LOG_FILE" 2>/dev/null || true
+    exit 1
   fi
-  # Progreso simple
-  if [ $((COUNT % 10)) -eq 0 ]; then
-    echo "  ... ${COUNT}s"
+  CSV_WAIT_COUNT=$((CSV_WAIT_COUNT + 1))
+  if [ $((CSV_WAIT_COUNT % 10)) -eq 0 ]; then
+    echo "  ... ${CSV_WAIT_COUNT}s"
   else
     printf "."
   fi
   sleep 1
 done
-echo ""
+echo "\nCSV de TV generado y no vacío: $OUTPUT_CSV_PATH"
 
-if [ -s "$OUTPUT_CSV_PATH" ]; then
-  echo "CSV de TV generado y no vacío: $OUTPUT_CSV_PATH"
-else
-  if [ -f "$OUTPUT_CSV_PATH" ]; then
-    echo "Aviso: el CSV existe pero está vacío: $OUTPUT_CSV_PATH"
-  else
-    echo "Aviso: no se generó CSV dentro de ${WAIT_FOR_TV_SECONDS}s (se continuará igualmente)."
-  fi
-fi
-
-# Esperar también por M3U si se está generando localmente
-WAIT_FOR_M3U_SECONDS="${WAIT_FOR_M3U_SECONDS:-$WAIT_FOR_TV_SECONDS}"
+# Esperar también por M3U (bloqueante hasta éxito)
 M3U_COUNT=0
 if [ -n "$OUTPUT_M3U_PATH" ]; then
-  echo "Esperando generación de M3U en: $OUTPUT_M3U_PATH (timeout=${WAIT_FOR_M3U_SECONDS}s)..."
-  while [ ! -s "$OUTPUT_M3U_PATH" ] && [ "$M3U_COUNT" -lt "$WAIT_FOR_M3U_SECONDS" ]; do
-    M3U_COUNT=$((M3U_COUNT + 1))
+  echo "Esperando generación COMPLETA de M3U en: $OUTPUT_M3U_PATH (sin timeout)..."
+  while [ ! -s "$OUTPUT_M3U_PATH" ]; do
     if ! kill -0 "$TV_PID" 2>/dev/null; then
       echo ""
-      echo "Aviso: el proceso de la librería IPTV (PID $TV_PID) terminó antes de generar el M3U."
+      echo "Error: el proceso de la librería IPTV (PID $TV_PID) terminó antes de generar el M3U."
       echo "Últimas líneas de log de la librería IPTV:"
-      tail -n 50 "$TV_LOG_FILE" 2>/dev/null || true
-      break
+      tail -n 100 "$TV_LOG_FILE" 2>/dev/null || true
+      exit 1
     fi
     if [ $((M3U_COUNT % 10)) -eq 0 ]; then
       echo "  ... ${M3U_COUNT}s"
     else
       printf "."
     fi
+    M3U_COUNT=$((M3U_COUNT + 1))
     sleep 1
   done
-  echo ""
-  if [ -s "$OUTPUT_M3U_PATH" ]; then
-    echo "M3U generado y no vacío: $OUTPUT_M3U_PATH"
-  else
-    if [ -f "$OUTPUT_M3U_PATH" ]; then
-      echo "Aviso: el M3U existe pero está vacío: $OUTPUT_M3U_PATH"
-    else
-      echo "Aviso: no se generó M3U dentro de ${WAIT_FOR_M3U_SECONDS}s (se continuará igualmente)."
-    fi
-  fi
+  echo "\nM3U generado y no vacío: $OUTPUT_M3U_PATH"
+fi
+
+# ===============================
+# 4.1) Programar regeneración en segundo plano cada 24 horas
+# ===============================
+REGENERATE_INTERVAL_SECONDS="${REGENERATE_INTERVAL_SECONDS:-86400}"
+echo "Programando regeneración de CSV/M3U cada ${REGENERATE_INTERVAL_SECONDS}s en segundo plano..."
+if [ -z "$WINDOWS_DEV" ]; then
+  gosu appuser sh -lc "while true; do \
+    sleep ${REGENERATE_INTERVAL_SECONDS}; \
+    echo \"[\$(date -Iseconds)] Ejecutando regeneración de TV (background)\" >> ../data/tvs/tv-generator.log; \
+    ADDON_ID=org.stremio.tv-iptv-addon cd tv && bun run start 2>&1 | tee -a ../data/tvs/tv-generator.log; \
+  done" &
+else
+  sh -lc "while true; do \
+    sleep ${REGENERATE_INTERVAL_SECONDS}; \
+    echo \"[\$(date -Iseconds)] Ejecutando regeneración de TV (background)\" >> \"$PROJECT_DIR/data/tvs/tv-generator.log\"; \
+    ADDON_ID=org.stremio.tv-iptv-addon cd tv && bun run start 2>&1 | tee -a \"$PROJECT_DIR/data/tvs/tv-generator.log\"; \
+  done" &
 fi
 
 # ===============================
