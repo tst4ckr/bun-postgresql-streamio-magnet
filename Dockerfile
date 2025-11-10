@@ -3,7 +3,7 @@ FROM oven/bun:debian
 
 # Instalar Tor, gosu y dependencias en una sola capa
 RUN apt-get update && \
-    apt-get install -y tor gosu netcat-openbsd && \
+    apt-get install -y tor gosu netcat-openbsd libvips && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -31,6 +31,9 @@ COPY --chown=appuser:appuser . .
 
 # Asegurar permisos y dar permisos de ejecución al script de inicio
 RUN chmod +x start.sh && chown -R appuser:appuser /app
+
+# Instalar dependencias de la librería TV
+RUN cd tv && bun install --production
 
 # Variables de entorno
 ENV NODE_ENV=production
