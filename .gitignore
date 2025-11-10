@@ -58,3 +58,11 @@ build/
 # ===================================
 coverage/
 .nyc_output/
+
+# ===================================
+# Assets generados / estáticos del addon
+# ===================================
+# Ignorar contenidos generados automáticamente para evitar commits de imágenes
+static/background/**
+static/logos/**
+static/poster/**
