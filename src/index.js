@@ -201,6 +201,130 @@ class MagnetAddon {
   const STATIC_MOUNT_PATH = process.env.STATIC_MOUNT_PATH || '/static';
   app.use(STATIC_MOUNT_PATH, express.static(STATIC_DIR));
 
+    // =============================
+    // Endpoints dinámicos de assets
+    // =============================
+    const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg']);
+
+    const resolveDir = (envPathFallback) => {
+      // Si la ruta de entorno existe, usarla; si es relativa, resolver desde cwd
+      try {
+        const p = (envPathFallback || '').trim();
+        if (!p) return null;
+        return path.isAbsolute(p) ? p : path.join(process.cwd(), p);
+      } catch (_) {
+        return null;
+      }
+    };
+
+    // Directorios de assets (preferimos las rutas de entorno definidas por start.sh)
+    const LOGOS_DIR = resolveDir(process.env.LOGO_OUTPUT_DIR) || path.join(process.cwd(), STATIC_DIR, 'logos');
+    const BACKGROUND_DIR = resolveDir(process.env.BACKGROUND_OUTPUT_DIR) || path.join(process.cwd(), STATIC_DIR, 'background');
+    const POSTER_DIR = resolveDir(process.env.POSTER_OUTPUT_DIR) || path.join(process.cwd(), STATIC_DIR, 'poster');
+
+    const getDirByType = (type) => {
+      switch (String(type).toLowerCase()) {
+        case 'logos': return LOGOS_DIR;
+        case 'background':
+        case 'backgrounds': return BACKGROUND_DIR;
+        case 'poster':
+        case 'posters': return POSTER_DIR;
+        default: return null;
+      }
+    };
+
+    const buildUrl = (type, filename) => {
+      // Presentamos las URLs bajo el montaje estático
+      const base = STATIC_MOUNT_PATH.endsWith('/') ? STATIC_MOUNT_PATH.slice(0, -1) : STATIC_MOUNT_PATH;
+      const sub = type === 'logos' ? 'logos' : (type.startsWith('background') ? 'background' : 'poster');
+      return `${base}/${sub}/${encodeURIComponent(filename)}`;
+    };
+
+    const listFiles = async (dir, { extFilter, page = 1, pageSize = 100 }) => {
+      // Devolver listado con metadatos básicos; sin hardcodear cantidades
+      if (!dir) return { total: 0, items: [] };
+      try {
+        const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+        let files = entries.filter(e => e.isFile());
+        if (extFilter) {
+          const allowed = Array.isArray(extFilter) ? extFilter : [extFilter];
+          const allowedSet = new Set(allowed.map(x => String(x).toLowerCase()));
+          files = files.filter(e => allowedSet.has(path.extname(e.name).toLowerCase()));
+        } else {
+          files = files.filter(e => IMAGE_EXTS.has(path.extname(e.name).toLowerCase()));
+        }
+        const total = files.length;
+        // Paginación
+        const start = Math.max(0, (Number(page) - 1) * Number(pageSize));
+        const end = Math.min(total, start + Number(pageSize));
+        const slice = files.slice(start, end);
+        const items = await Promise.all(slice.map(async (e) => {
+          const fullPath = path.join(dir, e.name);
+          let stat;
+          try { stat = await fs.promises.stat(fullPath); } catch (_) { stat = null; }
+          return {
+            name: e.name,
+            size: stat?.size ?? null,
+            mtime: stat?.mtime?.toISOString?.() ?? null,
+            ext: path.extname(e.name).toLowerCase()
+          };
+        }));
+        return { total, items };
+      } catch (err) {
+        this.#logger.warn('No se pudo listar archivos', { dir, error: err?.message });
+        return { total: 0, items: [] };
+      }
+    };
+
+    // GET /assets → devuelve listas para logos/background/poster
+    app.get('/assets', async (req, res) => {
+      try {
+        const page = Number(req.query.page || 1);
+        const pageSize = Number(req.query.pageSize || 100);
+        const ext = req.query.ext;
+        const extFilter = ext ? String(ext).split(',').map(e => `.${e.trim().toLowerCase()}`) : null;
+        const [logos, background, poster] = await Promise.all([
+          listFiles(LOGOS_DIR, { extFilter, page, pageSize }),
+          listFiles(BACKGROUND_DIR, { extFilter, page, pageSize }),
+          listFiles(POSTER_DIR, { extFilter, page, pageSize })
+        ]);
+        const withUrls = (type, list) => ({
+          total: list.total,
+          items: list.items.map(it => ({ ...it, url: buildUrl(type, it.name) }))
+        });
+        res.json({
+          logos: withUrls('logos', logos),
+          background: withUrls('background', background),
+          poster: withUrls('poster', poster)
+        });
+      } catch (e) {
+        this.#logger.error('Error en /assets', { error: e?.message });
+        res.status(500).json({ error: 'No se pudieron listar los assets' });
+      }
+    });
+
+    // GET /assets/:type → lista solo un tipo
+    app.get('/assets/:type', async (req, res) => {
+      try {
+        const type = String(req.params.type || '').toLowerCase();
+        const dir = getDirByType(type);
+        if (!dir) return res.status(404).json({ error: 'Tipo de asset no reconocido' });
+        const page = Number(req.query.page || 1);
+        const pageSize = Number(req.query.pageSize || 100);
+        const ext = req.query.ext;
+        const extFilter = ext ? String(ext).split(',').map(e => `.${e.trim().toLowerCase()}`) : null;
+        const list = await listFiles(dir, { extFilter, page, pageSize });
+        res.json({
+          type,
+          total: list.total,
+          items: list.items.map(it => ({ ...it, url: buildUrl(type, it.name) }))
+        });
+      } catch (e) {
+        this.#logger.error('Error en /assets/:type', { error: e?.message });
+        res.status(500).json({ error: 'No se pudieron listar los assets' });
+      }
+    });
+
     // Endpoint de descarga protegida por token para CSVs de datos
     const DOWNLOAD_TOKEN = (process.env.DOWNLOAD_TOKEN || '').trim();
     const REQUIRE_IP = String(process.env.DOWNLOAD_REQUIRE_IP_WHITELIST || '').trim().toLowerCase() === 'true';
