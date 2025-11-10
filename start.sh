@@ -47,21 +47,18 @@ fi
 if [ -z "$WINDOWS_DEV" ]; then
   # En contenedor, marcar flag para configuración del addon
   export CONTAINER_ENV=true
-  if [ "${TOR_ENABLED:-false}" = "true" ]; then
-    echo "Iniciando Tor..."
-    gosu debian-tor /usr/bin/tor -f /etc/tor/torrc &
-    TOR_PID=$!
+  export TOR_ENABLED=true
+  echo "Iniciando Tor (forzado en contenedor)..."
+  gosu debian-tor /usr/bin/tor -f /etc/tor/torrc &
+  TOR_PID=$!
 
-    echo "Esperando a que Tor se inicie..."
-    sleep 5
-    if ! kill -0 "$TOR_PID" 2>/dev/null; then
-      echo "Error: Tor no se pudo iniciar correctamente" >&2
-      exit 1
-    fi
-    echo "Tor iniciado correctamente."
-  else
-    echo "TOR_ENABLED!=true, se omite inicio de Tor."
+  echo "Esperando a que Tor se inicie..."
+  sleep 5
+  if ! kill -0 "$TOR_PID" 2>/dev/null; then
+    echo "Error: Tor no se pudo iniciar correctamente" >&2
+    exit 1
   fi
+  echo "Tor iniciado correctamente."
 else
   echo "Modo desarrollo Windows (WINDOWS_DEV=1): se omite inicio de Tor."
 fi

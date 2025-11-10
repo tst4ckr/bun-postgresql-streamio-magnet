@@ -38,7 +38,7 @@ ENV HOST=0.0.0.0
 ENV CONTAINER_ENV=true
 # Alinear puerto de la app con el expuesto por el contenedor
 ENV PORT=7000
-ENV TOR_ENABLED=false
+ENV TOR_ENABLED=true
 
 # Rutas efectivas dentro del contenedor (filesystem)
 # Estas variables sobrescriben las de .env (dotenv no pisa variables ya definidas)
@@ -53,8 +53,8 @@ EXPOSE 7000
 # Comando de arranque (ejecutar como root para permitir gosu)
 CMD ["./start.sh"]
 
-# Healthcheck condicional: solo si TOR_ENABLED=true
+# Healthcheck: verificar siempre que Tor esté activo en el contenedor
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD sh -c 'if [ "${TOR_ENABLED}" = "true" ]; then nc -z 127.0.0.1 9050 || exit 1; else exit 0; fi'
+    CMD sh -c 'nc -z 127.0.0.1 9050 || exit 1'
 
 
