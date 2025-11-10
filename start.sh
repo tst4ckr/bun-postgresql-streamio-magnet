@@ -86,11 +86,21 @@ else
 fi
 export OUTPUT_CSV_PATH OUTPUT_M3U_PATH CHANNELS_FILE PER_CHANNEL_M3U8_DIR
 
+# Directorios de assets (logos, backgrounds, posters) en el proyecto
+# Usar rutas ABSOLUTAS basadas en el directorio del proyecto para evitar ambigüedades de cwd
+LOGO_OUTPUT_DIR="${LOGO_OUTPUT_DIR:-$PROJECT_DIR/static/logos}"
+BACKGROUND_OUTPUT_DIR="${BACKGROUND_OUTPUT_DIR:-$PROJECT_DIR/static/background}"
+POSTER_OUTPUT_DIR="${POSTER_OUTPUT_DIR:-$PROJECT_DIR/static/poster}"
+export LOGO_OUTPUT_DIR BACKGROUND_OUTPUT_DIR POSTER_OUTPUT_DIR
+
 # Asegurar directorios de salida existen
 mkdir -p "$(dirname "$OUTPUT_CSV_PATH")" || true
 mkdir -p "$(dirname "$OUTPUT_M3U_PATH")" || true
 mkdir -p "$PER_CHANNEL_M3U8_DIR" || true
 mkdir -p "$(dirname "$CHANNELS_FILE")" || true
+mkdir -p "$LOGO_OUTPUT_DIR" || true
+mkdir -p "$BACKGROUND_OUTPUT_DIR" || true
+mkdir -p "$POSTER_OUTPUT_DIR" || true
 
 # Si no se define M3U_URL, usar el M3U generado internamente
 export M3U_URL="${M3U_URL:-$OUTPUT_M3U_PATH}"
@@ -127,11 +137,17 @@ if [ -f "$CONFIG_FILE" ]; then
   update_conf_line "VALIDATED_CHANNELS_CSV" "$OUTPUT_CSV_PATH"
   update_conf_line "PER_CHANNEL_M3U8_DIR" "$PER_CHANNEL_M3U8_DIR"
   update_conf_line "CHANNELS_FILE" "$CHANNELS_FILE"
+  update_conf_line "LOGO_OUTPUT_DIR" "$LOGO_OUTPUT_DIR"
+  update_conf_line "BACKGROUND_OUTPUT_DIR" "$BACKGROUND_OUTPUT_DIR"
+  update_conf_line "POSTER_OUTPUT_DIR" "$POSTER_OUTPUT_DIR"
 
   # Extraer valores clave desde app.conf
   APP_VALIDATED_CSV=$(grep -E '^VALIDATED_CHANNELS_CSV=' "$CONFIG_FILE" | tail -n1 | cut -d'=' -f2)
   APP_CHANNELS_FILE=$(grep -E '^CHANNELS_FILE=' "$CONFIG_FILE" | tail -n1 | cut -d'=' -f2)
   APP_M3U8_DIR=$(grep -E '^PER_CHANNEL_M3U8_DIR=' "$CONFIG_FILE" | tail -n1 | cut -d'=' -f2)
+  APP_LOGO_DIR=$(grep -E '^LOGO_OUTPUT_DIR=' "$CONFIG_FILE" | tail -n1 | cut -d'=' -f2)
+  APP_BG_DIR=$(grep -E '^BACKGROUND_OUTPUT_DIR=' "$CONFIG_FILE" | tail -n1 | cut -d'=' -f2)
+  APP_POSTER_DIR=$(grep -E '^POSTER_OUTPUT_DIR=' "$CONFIG_FILE" | tail -n1 | cut -d'=' -f2)
   # Resolver rutas relativas de app.conf respecto a TV_DIR
   case "$APP_VALIDATED_CSV" in
     http*|file://*|/*|[A-Za-z]:\\*) RESOLVED_APP_VALIDATED="$APP_VALIDATED_CSV" ;;
@@ -145,11 +161,26 @@ if [ -f "$CONFIG_FILE" ]; then
     http*|file://*|/*|[A-Za-z]:\\*) RESOLVED_APP_M3U8_DIR="$APP_M3U8_DIR" ;;
     *) RESOLVED_APP_M3U8_DIR="$TV_DIR/${APP_M3U8_DIR}" ;;
   esac
+  case "$APP_LOGO_DIR" in
+    http*|file://*|/*|[A-Za-z]:\\*) RESOLVED_APP_LOGO_DIR="$APP_LOGO_DIR" ;;
+    *) RESOLVED_APP_LOGO_DIR="$TV_DIR/${APP_LOGO_DIR}" ;;
+  esac
+  case "$APP_BG_DIR" in
+    http*|file://*|/*|[A-Za-z]:\\*) RESOLVED_APP_BG_DIR="$APP_BG_DIR" ;;
+    *) RESOLVED_APP_BG_DIR="$TV_DIR/${APP_BG_DIR}" ;;
+  esac
+  case "$APP_POSTER_DIR" in
+    http*|file://*|/*|[A-Za-z]:\\*) RESOLVED_APP_POSTER_DIR="$APP_POSTER_DIR" ;;
+    *) RESOLVED_APP_POSTER_DIR="$TV_DIR/${APP_POSTER_DIR}" ;;
+  esac
 
   echo "Compatibilidad .env/app.conf:"
   echo "  app.conf VALIDATED_CHANNELS_CSV=$APP_VALIDATED_CSV -> $RESOLVED_APP_VALIDATED"
   echo "  app.conf CHANNELS_FILE=$APP_CHANNELS_FILE -> $RESOLVED_APP_CHANNELS"
   echo "  app.conf PER_CHANNEL_M3U8_DIR=$APP_M3U8_DIR -> $RESOLVED_APP_M3U8_DIR"
+  echo "  app.conf LOGO_OUTPUT_DIR=$APP_LOGO_DIR -> $RESOLVED_APP_LOGO_DIR"
+  echo "  app.conf BACKGROUND_OUTPUT_DIR=$APP_BG_DIR -> $RESOLVED_APP_BG_DIR"
+  echo "  app.conf POSTER_OUTPUT_DIR=$APP_POSTER_DIR -> $RESOLVED_APP_POSTER_DIR"
   # Comprobar alineación
   if [ "$RESOLVED_APP_VALIDATED" != "$OUTPUT_CSV_PATH" ]; then
     echo "Aviso: OUTPUT_CSV_PATH ($OUTPUT_CSV_PATH) no coincide con VALIDATED_CHANNELS_CSV de app.conf ($RESOLVED_APP_VALIDATED). Se usará OUTPUT_CSV_PATH para generación."
@@ -159,6 +190,15 @@ if [ -f "$CONFIG_FILE" ]; then
   fi
   if [ "$RESOLVED_APP_M3U8_DIR" != "$PER_CHANNEL_M3U8_DIR" ]; then
     echo "Aviso: PER_CHANNEL_M3U8_DIR ($PER_CHANNEL_M3U8_DIR) no coincide con app.conf ($RESOLVED_APP_M3U8_DIR). Se usará PER_CHANNEL_M3U8_DIR del entorno."
+  fi
+  if [ "$RESOLVED_APP_LOGO_DIR" != "$LOGO_OUTPUT_DIR" ]; then
+    echo "Aviso: LOGO_OUTPUT_DIR ($LOGO_OUTPUT_DIR) no coincide con app.conf ($RESOLVED_APP_LOGO_DIR). Se usará LOGO_OUTPUT_DIR del entorno."
+  fi
+  if [ "$RESOLVED_APP_BG_DIR" != "$BACKGROUND_OUTPUT_DIR" ]; then
+    echo "Aviso: BACKGROUND_OUTPUT_DIR ($BACKGROUND_OUTPUT_DIR) no coincide con app.conf ($RESOLVED_APP_BG_DIR). Se usará BACKGROUND_OUTPUT_DIR del entorno."
+  fi
+  if [ "$RESOLVED_APP_POSTER_DIR" != "$POSTER_OUTPUT_DIR" ]; then
+    echo "Aviso: POSTER_OUTPUT_DIR ($POSTER_OUTPUT_DIR) no coincide con app.conf ($RESOLVED_APP_POSTER_DIR). Se usará POSTER_OUTPUT_DIR del entorno."
   fi
 fi
 

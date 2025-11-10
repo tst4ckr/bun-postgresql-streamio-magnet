@@ -15,7 +15,15 @@ import sharp from 'sharp';
 class LogoGenerationTools {
     constructor() {
         this.targetSize = 256;
-        this.logoDirectory = path.join(process.cwd(), 'logo');
+        // Permitir configurar el directorio de salida de logos vía variable de entorno
+        const envLogoDir = process.env.LOGO_OUTPUT_DIR;
+        if (envLogoDir && envLogoDir.trim()) {
+            this.logoDirectory = path.isAbsolute(envLogoDir)
+                ? envLogoDir
+                : path.resolve(process.cwd(), envLogoDir);
+        } else {
+            this.logoDirectory = path.join(process.cwd(), 'logo');
+        }
     }
 
     /**

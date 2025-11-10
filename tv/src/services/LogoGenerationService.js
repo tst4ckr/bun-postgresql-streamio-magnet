@@ -17,7 +17,17 @@ import LogoGenerationTools from './LogoGenerationService_tools.js';
 
 class LogoGenerationService {
     constructor() {
-        this.logoDirectory = path.join(process.cwd(), 'logo');
+        // Permitir configurar el directorio de salida de logos vía variable de entorno
+        // Si no se establece, usar el directorio local "logo" por defecto
+        const envLogoDir = process.env.LOGO_OUTPUT_DIR;
+        if (envLogoDir && envLogoDir.trim()) {
+            // Usar tal cual si es absoluta; si es relativa, resolver desde cwd
+            this.logoDirectory = path.isAbsolute(envLogoDir)
+                ? envLogoDir
+                : path.resolve(process.cwd(), envLogoDir);
+        } else {
+            this.logoDirectory = path.join(process.cwd(), 'logo');
+        }
         this.defaultBackgroundColor = '#2d2d2d'; // Gris oscuro
         this.defaultTextColor = '#ffffff'; // Blanco para contraste
         this.logoSize = 256;
