@@ -2,6 +2,46 @@
 set -e
 
 # ===============================
+# 0) Cargar variables desde .env (solo en desarrollo Windows)
+# ===============================
+PROJECT_DIR=$(cd "$(dirname "$0")" && pwd)
+ENV_FILE="$PROJECT_DIR/.env"
+if [ -n "$WINDOWS_DEV" ]; then
+  if [ -f "$ENV_FILE" ]; then
+    echo "Cargando variables desde .env (WINDOWS_DEV=1): $ENV_FILE"
+    # Exportar automáticamente las variables definidas en .env
+    set -a
+    . "$ENV_FILE"
+    set +a
+  else
+    echo "Aviso: no se encontró .env en $ENV_FILE (WINDOWS_DEV=1). Se continuarán con variables de entorno actuales."
+  fi
+else
+  echo "Modo contenedor/producción: se omite carga de .env desde start.sh para priorizar variables del contenedor y runtime."
+fi
+
+# Archivo de configuración de la librería TV
+CONFIG_FILE="${CONFIG_FILE:-tv/config/app.conf}"
+if [ -f "$CONFIG_FILE" ]; then
+  echo "Usando app.conf: $CONFIG_FILE"
+else
+  echo "Aviso: no se encontró app.conf en $CONFIG_FILE"
+fi
+
+# Validación mínima de variables críticas del addon
+REQUIRED_ENV_VARS="NODE_ENV PORT BASE_URL DATA_TVS_DIR DATA_TORRENTS_DIR"
+MISSING_VARS=""
+for v in $REQUIRED_ENV_VARS; do
+  eval "val=\${$v}"
+  if [ -z "$val" ]; then
+    MISSING_VARS="$MISSING_VARS $v"
+  fi
+done
+if [ -n "$MISSING_VARS" ]; then
+  echo "Aviso: faltan variables críticas en .env o entorno:$MISSING_VARS"
+fi
+
+# ===============================
 # 1) Iniciar Tor (solo en contenedor y si TOR_ENABLED=true)
 # ===============================
 if [ -z "$WINDOWS_DEV" ]; then
@@ -31,17 +71,21 @@ fi
 # ===============================
 if [ -z "$WINDOWS_DEV" ]; then
   # Entorno de producción/contendor: rutas bajo /app (respetando estructura interna de tv/)
-  OUTPUT_CSV_PATH="${OUTPUT_CSV_PATH:-/app/tv/data/tv.csv}"
-  OUTPUT_M3U_PATH="${OUTPUT_M3U_PATH:-/app/tv/data/channels.m3u}"
-  CHANNELS_FILE="${CHANNELS_FILE:-/app/tv/data/channels.csv}"
-  PER_CHANNEL_M3U8_DIR="${PER_CHANNEL_M3U8_DIR:-/app/tv/data/m3u8}"
+  TV_DIR="/app/tv"
+  # Guardar salidas dentro de /app/data para que el addon las publique
+  OUTPUT_CSV_PATH="${OUTPUT_CSV_PATH:-/app/data/tvs/tv.csv}"
+  OUTPUT_M3U_PATH="${OUTPUT_M3U_PATH:-/app/data/tvs/channels.m3u}"
+  CHANNELS_FILE="${CHANNELS_FILE:-/app/data/tvs/channels.csv}"
+  PER_CHANNEL_M3U8_DIR="${PER_CHANNEL_M3U8_DIR:-/app/data/m3u8}"
 else
   # Desarrollo local en Windows: rutas ABSOLUTAS derivadas del directorio del proyecto (respetando tv/data)
   SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-  OUTPUT_CSV_PATH="${OUTPUT_CSV_PATH:-$SCRIPT_DIR/tv/data/tv.csv}"
-  OUTPUT_M3U_PATH="${OUTPUT_M3U_PATH:-$SCRIPT_DIR/tv/data/channels.m3u}"
-  CHANNELS_FILE="${CHANNELS_FILE:-$SCRIPT_DIR/tv/data/channels.csv}"
-  PER_CHANNEL_M3U8_DIR="${PER_CHANNEL_M3U8_DIR:-$SCRIPT_DIR/tv/data/m3u8}"
+  TV_DIR="$SCRIPT_DIR/tv"
+  # Guardar salidas dentro de ./data para que el addon las publique
+  OUTPUT_CSV_PATH="${OUTPUT_CSV_PATH:-$SCRIPT_DIR/data/tvs/tv.csv}"
+  OUTPUT_M3U_PATH="${OUTPUT_M3U_PATH:-$SCRIPT_DIR/data/tvs/channels.m3u}"
+  CHANNELS_FILE="${CHANNELS_FILE:-$SCRIPT_DIR/data/tvs/channels.csv}"
+  PER_CHANNEL_M3U8_DIR="${PER_CHANNEL_M3U8_DIR:-$SCRIPT_DIR/data/m3u8}"
 fi
 export OUTPUT_CSV_PATH OUTPUT_M3U_PATH CHANNELS_FILE PER_CHANNEL_M3U8_DIR
 
@@ -49,6 +93,7 @@ export OUTPUT_CSV_PATH OUTPUT_M3U_PATH CHANNELS_FILE PER_CHANNEL_M3U8_DIR
 mkdir -p "$(dirname "$OUTPUT_CSV_PATH")" || true
 mkdir -p "$(dirname "$OUTPUT_M3U_PATH")" || true
 mkdir -p "$PER_CHANNEL_M3U8_DIR" || true
+mkdir -p "$(dirname "$CHANNELS_FILE")" || true
 
 # Si no se define M3U_URL, usar el M3U generado internamente
 export M3U_URL="${M3U_URL:-$OUTPUT_M3U_PATH}"
@@ -63,6 +108,70 @@ echo "  CHANNELS_FILE=$CHANNELS_FILE"
 echo "  PER_CHANNEL_M3U8_DIR=$PER_CHANNEL_M3U8_DIR"
 echo "  TV_CSV_PATH_DEFAULT=$TV_CSV_PATH_DEFAULT"
 echo "  M3U_URL=$M3U_URL"
+
+# ===============================
+# 2.1) Validación de compatibilidad .env <-> app.conf
+# ===============================
+if [ -f "$CONFIG_FILE" ]; then
+  # Sincronizar app.conf con las rutas de salida deseadas para publicación web
+  # (si existe una clave, la actualizamos para evitar que la librería use defaults internos)
+  update_conf_line() {
+    KEY="$1"; VAL="$2"
+    if [ -n "$VAL" ]; then
+      ESC_VAL=$(printf '%s' "$VAL" | sed 's/[\\\/&]/\\&/g')
+      if grep -q "^${KEY}=" "$CONFIG_FILE"; then
+        sed -i "s|^${KEY}=.*|${KEY}=${ESC_VAL}|" "$CONFIG_FILE" || true
+      else
+        # Si la clave no existe, la añadimos al final
+        printf "\n%s=%s\n" "$KEY" "$VAL" >> "$CONFIG_FILE"
+      fi
+    fi
+  }
+  update_conf_line "VALIDATED_CHANNELS_CSV" "$OUTPUT_CSV_PATH"
+  update_conf_line "PER_CHANNEL_M3U8_DIR" "$PER_CHANNEL_M3U8_DIR"
+  update_conf_line "CHANNELS_FILE" "$CHANNELS_FILE"
+
+  # Extraer valores clave desde app.conf
+  APP_VALIDATED_CSV=$(grep -E '^VALIDATED_CHANNELS_CSV=' "$CONFIG_FILE" | tail -n1 | cut -d'=' -f2)
+  APP_CHANNELS_FILE=$(grep -E '^CHANNELS_FILE=' "$CONFIG_FILE" | tail -n1 | cut -d'=' -f2)
+  APP_M3U8_DIR=$(grep -E '^PER_CHANNEL_M3U8_DIR=' "$CONFIG_FILE" | tail -n1 | cut -d'=' -f2)
+  # Resolver rutas relativas de app.conf respecto a TV_DIR
+  case "$APP_VALIDATED_CSV" in
+    http*|file://*|/*|[A-Za-z]:\\*) RESOLVED_APP_VALIDATED="$APP_VALIDATED_CSV" ;;
+    *) RESOLVED_APP_VALIDATED="$TV_DIR/${APP_VALIDATED_CSV}" ;;
+  esac
+  case "$APP_CHANNELS_FILE" in
+    http*|file://*|/*|[A-Za-z]:\\*) RESOLVED_APP_CHANNELS="$APP_CHANNELS_FILE" ;;
+    *) RESOLVED_APP_CHANNELS="$TV_DIR/${APP_CHANNELS_FILE}" ;;
+  esac
+  case "$APP_M3U8_DIR" in
+    http*|file://*|/*|[A-Za-z]:\\*) RESOLVED_APP_M3U8_DIR="$APP_M3U8_DIR" ;;
+    *) RESOLVED_APP_M3U8_DIR="$TV_DIR/${APP_M3U8_DIR}" ;;
+  esac
+
+  echo "Compatibilidad .env/app.conf:"
+  echo "  app.conf VALIDATED_CHANNELS_CSV=$APP_VALIDATED_CSV -> $RESOLVED_APP_VALIDATED"
+  echo "  app.conf CHANNELS_FILE=$APP_CHANNELS_FILE -> $RESOLVED_APP_CHANNELS"
+  echo "  app.conf PER_CHANNEL_M3U8_DIR=$APP_M3U8_DIR -> $RESOLVED_APP_M3U8_DIR"
+  # Comprobar alineación
+  if [ "$RESOLVED_APP_VALIDATED" != "$OUTPUT_CSV_PATH" ]; then
+    echo "Aviso: OUTPUT_CSV_PATH ($OUTPUT_CSV_PATH) no coincide con VALIDATED_CHANNELS_CSV de app.conf ($RESOLVED_APP_VALIDATED). Se usará OUTPUT_CSV_PATH para generación."
+  fi
+  if [ "$RESOLVED_APP_CHANNELS" != "$CHANNELS_FILE" ]; then
+    echo "Aviso: CHANNELS_FILE ($CHANNELS_FILE) no coincide con app.conf ($RESOLVED_APP_CHANNELS). Se usará CHANNELS_FILE del entorno."
+  fi
+  if [ "$RESOLVED_APP_M3U8_DIR" != "$PER_CHANNEL_M3U8_DIR" ]; then
+    echo "Aviso: PER_CHANNEL_M3U8_DIR ($PER_CHANNEL_M3U8_DIR) no coincide con app.conf ($RESOLVED_APP_M3U8_DIR). Se usará PER_CHANNEL_M3U8_DIR del entorno."
+  fi
+fi
+
+# ===============================
+# 2.2) Semilla de CHANNELS_FILE si falta (copiar desde tv/data/channels.csv)
+# ===============================
+if [ ! -f "$CHANNELS_FILE" ] && [ -f "$TV_DIR/data/channels.csv" ]; then
+  echo "Sembrando CHANNELS_FILE en $CHANNELS_FILE desde $TV_DIR/data/channels.csv"
+  cp "$TV_DIR/data/channels.csv" "$CHANNELS_FILE" || true
+fi
 
 # ===============================
 # 3) Iniciar librería IPTV para generar CSV/M3U
