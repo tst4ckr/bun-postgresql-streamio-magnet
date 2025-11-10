@@ -177,10 +177,19 @@ fi
 # 3) Iniciar librería IPTV para generar CSV/M3U
 # ===============================
 echo "Iniciando librería IPTV (generación de CSV/M3U) en segundo plano..."
+# Verificar que Bun esté disponible
+if ! command -v bun >/dev/null 2>&1; then
+  echo "Error: Bun no está instalado o no está en PATH. Instálalo y vuelve a intentar (https://bun.sh)." >&2
+  exit 1
+fi
+
+TV_LOG_FILE="${TV_LOG_FILE:-$PROJECT_DIR/data/tvs/tv-generator.log}"
+mkdir -p "$(dirname "$TV_LOG_FILE")" || true
+echo "Logs de la librería IPTV: $TV_LOG_FILE"
 if [ -z "$WINDOWS_DEV" ]; then
-  gosu appuser sh -lc 'cd tv && bun run start' &
+  gosu appuser sh -lc 'cd tv && bun run start 2>&1 | tee -a ../data/tvs/tv-generator.log' &
 else
-  sh -lc 'cd tv && bun run start' &
+  sh -lc 'cd tv && bun run start 2>&1 | tee -a "$PROJECT_DIR/data/tvs/tv-generator.log"' &
 fi
 TV_PID=$!
 
@@ -197,6 +206,8 @@ while [ ! -s "$OUTPUT_CSV_PATH" ] && [ "$COUNT" -lt "$WAIT_FOR_TV_SECONDS" ]; do
   if ! kill -0 "$TV_PID" 2>/dev/null; then
     echo ""
     echo "Aviso: el proceso de la librería IPTV (PID $TV_PID) terminó antes de generar el CSV."
+    echo "Últimas líneas de log de la librería IPTV:"
+    tail -n 50 "$TV_LOG_FILE" 2>/dev/null || true
     break
   fi
   # Progreso simple
@@ -229,6 +240,8 @@ if [ -n "$OUTPUT_M3U_PATH" ]; then
     if ! kill -0 "$TV_PID" 2>/dev/null; then
       echo ""
       echo "Aviso: el proceso de la librería IPTV (PID $TV_PID) terminó antes de generar el M3U."
+      echo "Últimas líneas de log de la librería IPTV:"
+      tail -n 50 "$TV_LOG_FILE" 2>/dev/null || true
       break
     fi
     if [ $((M3U_COUNT % 10)) -eq 0 ]; then
