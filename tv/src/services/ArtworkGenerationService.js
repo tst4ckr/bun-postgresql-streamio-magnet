@@ -51,6 +51,10 @@ class ArtworkGenerationService {
     };
 
     this.tools = new ArtworkGenerationTools();
+
+    // Control de limpieza previa de directorios de salida
+    // Por defecto: limpiar antes de generar para evitar duplicados/acumulación
+    this.shouldCleanOutputDirs = String(process.env.CLEAN_OUTPUT_DIRS || 'true').toLowerCase() !== 'false';
   }
 
   /**
@@ -148,7 +152,12 @@ class ArtworkGenerationService {
    */
   async generateMultipleBackgrounds(channels, options = {}) {
     const { concurrency = 4 } = options;
-    await this.ensureBackgroundDirectory();
+    // Limpiar el directorio si está habilitado
+    if (this.shouldCleanOutputDirs) {
+      await this.resetBackgroundDirectory();
+    } else {
+      await this.ensureBackgroundDirectory();
+    }
     const results = [];
     for (let i = 0; i < channels.length; i += concurrency) {
       const batch = channels.slice(i, i + concurrency);
@@ -174,7 +183,12 @@ class ArtworkGenerationService {
    */
   async generateMultiplePosters(channels, options = {}) {
     const { concurrency = 4, shape = 'square' } = options;
-    await this.ensurePosterDirectory();
+    // Limpiar el directorio si está habilitado
+    if (this.shouldCleanOutputDirs) {
+      await this.resetPosterDirectory();
+    } else {
+      await this.ensurePosterDirectory();
+    }
     const results = [];
     for (let i = 0; i < channels.length; i += concurrency) {
       const batch = channels.slice(i, i + concurrency);
@@ -351,6 +365,28 @@ class ArtworkGenerationService {
   async ensurePosterDirectory() {
     try { await fs.access(this.posterDirectory); }
     catch { await fs.mkdir(this.posterDirectory, { recursive: true }); console.log(`📁 Directorio de posters creado: ${this.posterDirectory}`); }
+  }
+
+  /**
+   * Elimina por completo el contenido del directorio de backgrounds y lo recrea.
+   */
+  async resetBackgroundDirectory() {
+    try {
+      await fs.rm(this.backgroundDirectory, { recursive: true, force: true });
+    } catch {}
+    await fs.mkdir(this.backgroundDirectory, { recursive: true });
+    console.log(`🧹 Directorio de backgrounds limpiado: ${this.backgroundDirectory}`);
+  }
+
+  /**
+   * Elimina por completo el contenido del directorio de posters y lo recrea.
+   */
+  async resetPosterDirectory() {
+    try {
+      await fs.rm(this.posterDirectory, { recursive: true, force: true });
+    } catch {}
+    await fs.mkdir(this.posterDirectory, { recursive: true });
+    console.log(`🧹 Directorio de posters limpiado: ${this.posterDirectory}`);
   }
 }
 

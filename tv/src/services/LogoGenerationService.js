@@ -32,6 +32,10 @@ class LogoGenerationService {
         this.defaultTextColor = '#ffffff'; // Blanco para contraste
         this.logoSize = 256;
         this.tools = new LogoGenerationTools();
+
+        // Control de limpieza previa del directorio de logos
+        // Por defecto: limpiar antes de generar para evitar duplicados/acumulación
+        this.shouldCleanOutputDir = String(process.env.CLEAN_OUTPUT_DIRS || 'true').toLowerCase() !== 'false';
     }
 
     /**
@@ -384,6 +388,12 @@ class LogoGenerationService {
         }
         
         const results = [];
+        // Limpiar directorio de salida si corresponde
+        if (this.shouldCleanOutputDir) {
+            await this.resetLogoDirectory();
+        } else {
+            await this.ensureLogoDirectory();
+        }
         const startTime = Date.now();
         
         console.log(`\n🎨 Generando logos para ${channels.length} canales (concurrencia: ${concurrency})...`);
@@ -500,6 +510,17 @@ class LogoGenerationService {
             await fs.mkdir(this.logoDirectory, { recursive: true });
             console.log(`📁 Directorio de logos creado: ${this.logoDirectory}`);
         }
+    }
+
+    /**
+     * Elimina por completo el contenido del directorio de logos y lo recrea.
+     */
+    async resetLogoDirectory() {
+        try {
+            await fs.rm(this.logoDirectory, { recursive: true, force: true });
+        } catch {}
+        await fs.mkdir(this.logoDirectory, { recursive: true });
+        console.log(`🧹 Directorio de logos limpiado: ${this.logoDirectory}`);
     }
 }
 
