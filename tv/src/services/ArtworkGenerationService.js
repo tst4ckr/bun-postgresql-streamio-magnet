@@ -16,6 +16,10 @@ import fs from 'fs/promises';
 import path from 'path';
 import ArtworkGenerationTools from './ArtworkGenerationService_tools.js';
 import { EnvLoader } from '../infrastructure/config/EnvLoader.js';
+// Flags a nivel de módulo para evitar limpiar directorios múltiples veces
+// cuando se crean varias instancias del servicio en paralelo.
+let BACKGROUND_DIR_INITIALIZED = false;
+let POSTER_DIR_INITIALIZED = false;
 
 class ArtworkGenerationService {
   constructor() {
@@ -55,9 +59,7 @@ class ArtworkGenerationService {
     // Control de limpieza previa de directorios de salida
     // Por defecto: limpiar antes de generar para evitar duplicados/acumulación
     this.shouldCleanOutputDirs = String(process.env.CLEAN_OUTPUT_DIRS || 'true').toLowerCase() !== 'false';
-    // Evitar limpiar múltiples veces cuando se procesan chunks en paralelo
-    this._bgDirInitialized = false;
-    this._posterDirInitialized = false;
+    // Las banderas de inicialización se gestionan a nivel de módulo
   }
 
   /**
@@ -155,10 +157,11 @@ class ArtworkGenerationService {
    */
   async generateMultipleBackgrounds(channels, options = {}) {
     const { concurrency = 4 } = options;
-    // Limpiar el directorio SOLO una vez por sesión, para evitar carreras entre chunks paralelos
-    if (this.shouldCleanOutputDirs && !this._bgDirInitialized) {
+    // Limpiar el directorio SOLO una vez por sesión, a nivel de módulo,
+    // para evitar condiciones de carrera entre múltiples instancias/chunks.
+    if (this.shouldCleanOutputDirs && !BACKGROUND_DIR_INITIALIZED) {
       await this.resetBackgroundDirectory();
-      this._bgDirInitialized = true;
+      BACKGROUND_DIR_INITIALIZED = true;
     } else {
       await this.ensureBackgroundDirectory();
     }
@@ -187,10 +190,11 @@ class ArtworkGenerationService {
    */
   async generateMultiplePosters(channels, options = {}) {
     const { concurrency = 4, shape = 'square' } = options;
-    // Limpiar el directorio SOLO una vez por sesión, para evitar carreras entre chunks paralelos
-    if (this.shouldCleanOutputDirs && !this._posterDirInitialized) {
+    // Limpiar el directorio SOLO una vez por sesión, a nivel de módulo,
+    // para evitar condiciones de carrera entre múltiples instancias/chunks.
+    if (this.shouldCleanOutputDirs && !POSTER_DIR_INITIALIZED) {
       await this.resetPosterDirectory();
-      this._posterDirInitialized = true;
+      POSTER_DIR_INITIALIZED = true;
     } else {
       await this.ensurePosterDirectory();
     }

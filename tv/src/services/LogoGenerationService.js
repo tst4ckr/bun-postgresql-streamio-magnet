@@ -14,6 +14,8 @@
 import fs from 'fs/promises';
 import path from 'path';
 import LogoGenerationTools from './LogoGenerationService_tools.js';
+// Flag a nivel de módulo para evitar limpiar directorio de logos múltiples veces
+let LOGO_DIR_INITIALIZED = false;
 
 class LogoGenerationService {
     constructor() {
@@ -36,8 +38,7 @@ class LogoGenerationService {
         // Control de limpieza previa del directorio de logos
         // Por defecto: limpiar antes de generar para evitar duplicados/acumulación
         this.shouldCleanOutputDir = String(process.env.CLEAN_OUTPUT_DIRS || 'true').toLowerCase() !== 'false';
-        // Evitar limpiar múltiples veces cuando se procesan chunks en paralelo
-        this._logoDirInitialized = false;
+        // La inicialización se gestiona a nivel de módulo para evitar limpiezas concurrentes
     }
 
     /**
@@ -390,10 +391,10 @@ class LogoGenerationService {
         }
         
         const results = [];
-        // Limpiar directorio de salida SOLO una vez por sesión para evitar condiciones de carrera entre chunks paralelos
-        if (this.shouldCleanOutputDir && !this._logoDirInitialized) {
+        // Limpiar directorio de salida SOLO una vez por sesión a nivel de módulo
+        if (this.shouldCleanOutputDir && !LOGO_DIR_INITIALIZED) {
             await this.resetLogoDirectory();
-            this._logoDirInitialized = true;
+            LOGO_DIR_INITIALIZED = true;
         } else {
             await this.ensureLogoDirectory();
         }
