@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_mtv_hits.png" tvg-id="tv_mtv_hits", MTV Hits
+#EXTINF:-1 tvg-logo="logos/tv_mtv_hits.png" tvg-id="tv_mtv_hits", MTV Hits
 http://200.12.41.194:8000/play/a05f/index.m3u8

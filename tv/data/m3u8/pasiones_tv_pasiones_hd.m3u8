@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_pasiones_hd.png" tvg-id="tv_pasiones_hd", Pasiones
+#EXTINF:-1 tvg-logo="logos/tv_pasiones_hd.png" tvg-id="tv_pasiones_hd", Pasiones
 http://38.183.182.166:8000/play/a0za/index.m3u8

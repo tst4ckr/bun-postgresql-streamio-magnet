@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_kanal_d_drama.png" tvg-id="tv_kanal_d_drama", Kanal D Drama
+#EXTINF:-1 tvg-logo="logos/tv_kanal_d_drama.png" tvg-id="tv_kanal_d_drama", Kanal D Drama
 http://38.250.127.17:9800/play/a076/index.m3u8

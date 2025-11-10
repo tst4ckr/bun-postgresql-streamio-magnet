@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_nick_jr_east_720p.png" tvg-id="tv_nick_jr_east_720p", Nick Jr. East
+#EXTINF:-1 tvg-logo="logos/tv_nick_jr_east_720p.png" tvg-id="tv_nick_jr_east_720p", Nick Jr. East
 http://fl41.moveonjoy.com/nick_jr/index.m3u8

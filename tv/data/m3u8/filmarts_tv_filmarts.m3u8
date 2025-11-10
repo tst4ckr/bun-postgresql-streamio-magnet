@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_filmarts.png" tvg-id="tv_filmarts", FilmArts
+#EXTINF:-1 tvg-logo="logos/tv_filmarts.png" tvg-id="tv_filmarts", FilmArts
 http://38.183.182.166:8000/play/a0ry/index.m3u8

@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_mtv_sim_hd.png" tvg-id="tv_mtv_sim_hd", MTV SIM
+#EXTINF:-1 tvg-logo="logos/tv_mtv_sim_hd.png" tvg-id="tv_mtv_sim_hd", MTV SIM
 http://200.12.41.194:8000/play/a0hz/index.m3u8

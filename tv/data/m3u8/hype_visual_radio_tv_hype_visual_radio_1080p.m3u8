@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_hype_visual_radio_1080p.png" tvg-id="tv_hype_visual_radio_1080p", Hype Visual Radio
+#EXTINF:-1 tvg-logo="logos/tv_hype_visual_radio_1080p.png" tvg-id="tv_hype_visual_radio_1080p", Hype Visual Radio
 http://streammix.alsolnet.com/hyperadio/live/playlist.m3u8

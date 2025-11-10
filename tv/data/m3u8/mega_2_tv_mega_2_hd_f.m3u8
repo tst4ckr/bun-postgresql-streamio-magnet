@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_mega_2_hd_f.png" tvg-id="tv_mega_2_hd_f", MEGA 2
+#EXTINF:-1 tvg-logo="logos/tv_mega_2_hd_f.png" tvg-id="tv_mega_2_hd_f", MEGA 2
 http://38.250.127.17:9800/play/a0ai/index.m3u8

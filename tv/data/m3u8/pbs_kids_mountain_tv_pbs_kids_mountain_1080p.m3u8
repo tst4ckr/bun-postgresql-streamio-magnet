@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_pbs_kids_mountain_1080p.png" tvg-id="tv_pbs_kids_mountain_1080p", PBS Kids Mountain
+#EXTINF:-1 tvg-logo="logos/tv_pbs_kids_mountain_1080p.png" tvg-id="tv_pbs_kids_mountain_1080p", PBS Kids Mountain
 http://livestream.pbskids.org/out/v1/3fe3030a2c8045a3932f4289d9eba3e6/mst.m3u8

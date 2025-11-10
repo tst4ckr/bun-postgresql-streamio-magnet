@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_moradatv.png" tvg-id="tv_moradatv", MORADATV
+#EXTINF:-1 tvg-logo="logos/tv_moradatv.png" tvg-id="tv_moradatv", MORADATV
 http://148.72.155.144:8000/play/a03m/index.m3u8

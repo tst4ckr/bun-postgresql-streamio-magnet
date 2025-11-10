@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_hbo_signature.png" tvg-id="tv_hbo_signature", HBO Signature
+#EXTINF:-1 tvg-logo="logos/tv_hbo_signature.png" tvg-id="tv_hbo_signature", HBO Signature
 http://38.183.182.166:8000/play/a0t1/index.m3u8

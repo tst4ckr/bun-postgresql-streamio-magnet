@@ -49,6 +49,8 @@ class LogoGenerationService {
      */
     async generateChannelLogo(channelName, channelId) {
         try {
+            // Asegurar directorio de salida por seguridad
+            await this.ensureLogoDirectory();
             // Limpiar y preparar el texto del logo
             const logoText = this.prepareLogoText(channelName);
             

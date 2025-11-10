@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_atv_sur_hd_free.png" tvg-id="tv_atv_sur_hd_free", ATV SUR
+#EXTINF:-1 tvg-logo="logos/tv_atv_sur_hd_free.png" tvg-id="tv_atv_sur_hd_free", ATV SUR
 http://181.189.244.252:8000/play/a031/index.m3u8

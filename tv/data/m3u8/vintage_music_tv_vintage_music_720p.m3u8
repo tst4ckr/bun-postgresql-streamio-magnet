@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_vintage_music_720p.png" tvg-id="tv_vintage_music_720p", Vintage Music
+#EXTINF:-1 tvg-logo="logos/tv_vintage_music_720p.png" tvg-id="tv_vintage_music_720p", Vintage Music
 http://59ef525c24caa.streamlock.net/vmtv/tvvintage/playlist.m3u8

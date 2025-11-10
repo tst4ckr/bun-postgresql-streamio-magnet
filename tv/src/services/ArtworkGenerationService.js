@@ -75,6 +75,8 @@ class ArtworkGenerationService {
     const outPath = path.join(this.backgroundDirectory, `${fileBase}.jpg`);
 
     try {
+      // Cinturón y tirantes: asegurar el directorio antes de escribir
+      await this.ensureBackgroundDirectory();
       const text = this.prepareText(channelName);
       const svg = this.createBackgroundSVG(text);
       await fs.writeFile(svgPath, svg, 'utf8');
@@ -119,6 +121,8 @@ class ArtworkGenerationService {
     const outPath = path.join(this.posterDirectory, `${fileBase}.png`);
 
     try {
+      // Cinturón y tirantes: asegurar el directorio antes de escribir
+      await this.ensurePosterDirectory();
       const text = this.prepareText(channelName);
       const svg = this.createPosterSVG(text, size.width, size.height);
       await fs.writeFile(svgPath, svg, 'utf8');

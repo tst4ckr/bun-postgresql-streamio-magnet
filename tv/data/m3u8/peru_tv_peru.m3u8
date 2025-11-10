@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_peru.png" tvg-id="tv_peru", PERU
+#EXTINF:-1 tvg-logo="logos/tv_peru.png" tvg-id="tv_peru", PERU
 http://148.72.155.144:8000/play/a03p/index.m3u8

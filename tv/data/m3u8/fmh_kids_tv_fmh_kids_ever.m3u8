@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_fmh_kids_ever.png" tvg-id="tv_fmh_kids_ever", FMH KIDS
+#EXTINF:-1 tvg-logo="logos/tv_fmh_kids_ever.png" tvg-id="tv_fmh_kids_ever", FMH KIDS
 http://38.183.182.166:8000/play/a12q/index.m3u8

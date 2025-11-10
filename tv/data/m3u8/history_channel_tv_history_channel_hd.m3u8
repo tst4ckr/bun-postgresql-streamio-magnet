@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_history_channel_hd.png" tvg-id="tv_history_channel_hd", History Channel
+#EXTINF:-1 tvg-logo="logos/tv_history_channel_hd.png" tvg-id="tv_history_channel_hd", History Channel
 http://38.183.182.166:8000/play/a0v9/index.m3u8

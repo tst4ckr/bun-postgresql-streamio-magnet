@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_viax.png" tvg-id="tv_viax", ViaX
+#EXTINF:-1 tvg-logo="logos/tv_viax.png" tvg-id="tv_viax", ViaX
 http://201.230.121.186:8000/play/a0fz/index.m3u8

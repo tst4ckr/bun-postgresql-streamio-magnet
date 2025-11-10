@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="../static/logos/tv_azteca_mundo.png" tvg-id="tv_azteca_mundo", Azteca Mundo
+#EXTINF:-1 tvg-logo="logos/tv_azteca_mundo.png" tvg-id="tv_azteca_mundo", Azteca Mundo
 http://200.12.41.194:8000/play/a0h8/index.m3u8
