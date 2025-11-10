@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_tnt_sports_premiun_hd.png" tvg-id="tv_tnt_sports_premiun_hd", TNT Sports Premiun
+http://38.183.182.166:8000/play/a0vv/index.m3u8

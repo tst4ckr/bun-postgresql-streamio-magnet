@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_red_bull_tv_en.png" tvg-id="tv_red_bull_tv_en", Red Bull TV EN
+http://rbmn-live.akamaized.net/hls/live/590964/borb-at/master.m3u8

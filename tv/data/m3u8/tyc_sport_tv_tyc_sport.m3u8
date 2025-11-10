@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_tyc_sport.png" tvg-id="tv_tyc_sport", TyC SPORT
+http://200.12.41.194:8000/play/a00i/index.m3u8

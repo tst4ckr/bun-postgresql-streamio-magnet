@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_now_80s.png" tvg-id="tv_now_80s", Now 80s
+http://lightning-now80s-samsungnz.amagi.tv/playlist.m3u8

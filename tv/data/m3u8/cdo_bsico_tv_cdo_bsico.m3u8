@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_cdo_bsico.png" tvg-id="tv_cdo_bsico", CDO Bsico
+http://179.51.136.19:8000/play/a1in/index.m3u8

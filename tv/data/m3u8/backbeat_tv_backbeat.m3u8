@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_backbeat.png" tvg-id="tv_backbeat", BACKBEAT
+http://200.12.41.194:8000/play/a06x/index.m3u8

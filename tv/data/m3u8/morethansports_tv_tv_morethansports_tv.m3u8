@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_morethansports_tv.png" tvg-id="tv_morethansports_tv", MoreThanSports TV
+http://mts1.iptv-playoutcenter.de/mts/mts-web/playlist.m3u8

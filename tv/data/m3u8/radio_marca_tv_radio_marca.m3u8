@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_radio_marca.png" tvg-id="tv_radio_marca", RADIO MARCA
+http://176.65.146.237:8401/play/a09l/index.m3u8

@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_animal_planet_hd.png" tvg-id="tv_animal_planet_hd", Animal Planet
+http://38.183.182.166:8000/play/a0v7/index.m3u8

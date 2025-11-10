@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_hispan_tv_iran.png" tvg-id="tv_hispan_tv_iran", Hispan TV Iran
+http://live.presstv.ir/hls/hispantv_5_482/index.m3u8

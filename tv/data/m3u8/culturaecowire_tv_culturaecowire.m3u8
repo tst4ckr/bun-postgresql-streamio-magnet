@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_culturaecowire.png" tvg-id="tv_culturaecowire", CULTURAECOWIRE
+http://148.72.155.144:8000/play/a01w/index.m3u8

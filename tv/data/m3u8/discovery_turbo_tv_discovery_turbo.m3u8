@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_discovery_turbo.png" tvg-id="tv_discovery_turbo", Discovery Turbo
+http://38.183.182.166:8000/play/a0uy/index.m3u8

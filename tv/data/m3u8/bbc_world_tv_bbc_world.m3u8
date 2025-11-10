@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_bbc_world.png" tvg-id="tv_bbc_world", BBC World
+http://38.183.182.166:8000/play/a0sv/index.m3u8

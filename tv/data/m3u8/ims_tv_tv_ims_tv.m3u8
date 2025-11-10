@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_ims_tv.png" tvg-id="tv_ims_tv", Ims TV
+http://secure3.todostreaming.es/live/imastv-livestream.m3u8

@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_city_tv.png" tvg-id="tv_city_tv", City TV
+http://179.51.136.19:8000/play/a1gj/index.m3u8

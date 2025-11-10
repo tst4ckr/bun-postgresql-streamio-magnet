@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_rtl_1025_tv_1080p.png" tvg-id="tv_rtl_1025_tv_1080p", RTL 102.5 TV
+http://dd782ed59e2a4e86aabf6fc508674b59.msvdn.net/live/s97044836/tbbp8t1zrpbl/playlist_video.m3u8

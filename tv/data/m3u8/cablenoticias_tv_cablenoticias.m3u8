@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_cablenoticias.png" tvg-id="tv_cablenoticias", CableNoticias
+http://170.244.209.135:8000/play/a0gk/index.m3u8

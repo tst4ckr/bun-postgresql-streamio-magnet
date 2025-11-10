@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_bta_tv_720p.png" tvg-id="tv_bta_tv_720p", BTA TV
+http://cloud.fastchannel.es/manifiest/hls/prog9/btatv.m3u8

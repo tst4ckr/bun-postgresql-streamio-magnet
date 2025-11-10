@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_discovery_home_health.png" tvg-id="tv_discovery_home_health", Discovery Home  Health
+http://179.51.136.19:8000/play/a18k/index.m3u8

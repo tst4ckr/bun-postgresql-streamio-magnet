@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_los40_urban.png" tvg-id="tv_los40_urban", LOS40 Urban
+http://176.65.146.237:8401/play/a0an/index.m3u8

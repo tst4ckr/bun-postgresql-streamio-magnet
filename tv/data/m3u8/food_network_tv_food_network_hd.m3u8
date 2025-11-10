@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_food_network_hd.png" tvg-id="tv_food_network_hd", Food Network
+http://38.183.182.166:8000/play/a0ra/index.m3u8

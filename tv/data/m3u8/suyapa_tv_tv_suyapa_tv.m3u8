@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_suyapa_tv.png" tvg-id="tv_suyapa_tv", SUYAPA TV
+http://200.12.41.194:8000/play/a00t/index.m3u8

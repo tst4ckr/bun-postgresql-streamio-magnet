@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_51_radio_tv_480p_geoblocked.png" tvg-id="tv_51_radio_tv_480p_geoblocked", 51 Radio TV
+http://wms.shared.streamshow.it/canale51/canale51/playlist.m3u8

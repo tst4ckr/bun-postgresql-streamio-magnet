@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_e_entertainment_tv.png" tvg-id="tv_e_entertainment_tv", E Entertainment TV
+http://38.183.182.166:8000/play/a0rs/index.m3u8

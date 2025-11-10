@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_disney_channel.png" tvg-id="tv_disney_channel", Disney Channel
+http://176.65.146.237:8401/play/a09h/index.m3u8

@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_dw_espanol.png" tvg-id="tv_dw_espanol", DW ESPANOL
+http://190.102.246.93:9005/play/a038

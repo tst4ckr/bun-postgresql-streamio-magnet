@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_pridetv_latam_1080p.png" tvg-id="tv_pridetv_latam_1080p", PRIDEtv LATAM
+http://backend.energeek.cl/webtv/pridetvweb/index.m3u8?token=zzdemoiptvgh

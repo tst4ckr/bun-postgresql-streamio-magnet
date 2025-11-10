@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_claro_sports_1_sd.png" tvg-id="tv_claro_sports_1_sd", Claro Sports 1
+http://179.51.136.19:8000/play/a18m/index.m3u8

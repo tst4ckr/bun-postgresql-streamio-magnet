@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_radio_onda_digital.png" tvg-id="tv_radio_onda_digital", Radio Onda Digital
+http://v4.tustreaming.cl/radioondadigitaltv/index.m3u8

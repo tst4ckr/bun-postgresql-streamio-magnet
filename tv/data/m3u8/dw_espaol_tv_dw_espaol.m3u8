@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logo/tv_dw_espaol.png" tvg-id="tv_dw_espaol", DW Espaol
+http://38.183.182.166:8000/play/a0te/index.m3u8
