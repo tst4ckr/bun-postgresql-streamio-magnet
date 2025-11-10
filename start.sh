@@ -183,6 +183,12 @@ fi
 TV_LOG_FILE="${TV_LOG_FILE:-$PROJECT_DIR/data/tvs/tv-generator.log}"
 mkdir -p "$(dirname "$TV_LOG_FILE")" || true
 echo "Logs de la librería IPTV: $TV_LOG_FILE"
+
+# Forzar un ID de addon válido para la librería TV durante su ejecución,
+# evitando errores de formato y sin afectar al addon principal posteriormente.
+TV_ADDON_ID="org.stremio.tv-iptv-addon"
+export ADDON_ID="$TV_ADDON_ID"
+
 if [ -z "$WINDOWS_DEV" ]; then
   gosu appuser sh -lc 'cd tv && bun run start 2>&1 | tee -a ../data/tvs/tv-generator.log' &
 else
@@ -265,8 +271,11 @@ fi
 # ===============================
 if [ -z "$WINDOWS_DEV" ]; then
   echo "Iniciando aplicación (addon) como appuser..."
+  # Restablecer ID de addon para la aplicación principal (magnet search)
+  export ADDON_ID="org.stremio.torrent.search"
   exec gosu appuser bun run start
 else
   echo "Iniciando aplicación (addon) como root (modo desarrollo)..."
+  export ADDON_ID="org.stremio.torrent.search"
   exec bun run start
 fi
