@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_70w_hbo2_hd.png" tvg-id="tv_70w_hbo2_hd", HBO2
+#EXTINF:-1 tvg-logo="../static/logos/tv_70w_hbo2_hd.png" tvg-id="tv_70w_hbo2_hd", HBO2
 http://181.189.244.253:8000/play/a019/index.m3u8

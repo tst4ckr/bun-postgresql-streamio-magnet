@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_3abn_kids.png" tvg-id="tv_3abn_kids", 3ABN Kids
+#EXTINF:-1 tvg-logo="../static/logos/tv_3abn_kids.png" tvg-id="tv_3abn_kids", 3ABN Kids
 http://3abn.bozztv.com/3abn2/kids_live/smil:kids_live.smil/playlist.m3u8

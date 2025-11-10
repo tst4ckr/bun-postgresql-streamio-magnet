@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_paka_paka_f.png" tvg-id="tv_paka_paka_f", PAKA PAKA
+#EXTINF:-1 tvg-logo="../static/logos/tv_paka_paka_f.png" tvg-id="tv_paka_paka_f", PAKA PAKA
 http://38.250.127.17:9800/play/a0am/index.m3u8

@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_axs_tv.png" tvg-id="tv_axs_tv", AXS TV
+#EXTINF:-1 tvg-logo="../static/logos/tv_axs_tv.png" tvg-id="tv_axs_tv", AXS TV
 http://fl41.moveonjoy.com/axs_tv/index.m3u8

@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_electrobitel.png" tvg-id="tv_electrobitel", ELECTROBITEL
+#EXTINF:-1 tvg-logo="../static/logos/tv_electrobitel.png" tvg-id="tv_electrobitel", ELECTROBITEL
 http://148.72.155.144:8000/play/a048/index.m3u8

@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_russia_today.png" tvg-id="tv_russia_today", Russia Today
+#EXTINF:-1 tvg-logo="../static/logos/tv_russia_today.png" tvg-id="tv_russia_today", Russia Today
 http://200.12.41.194:8000/play/a06h/index.m3u8

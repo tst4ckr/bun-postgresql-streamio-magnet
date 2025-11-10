@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_36_tv_huacho.png" tvg-id="tv_36_tv_huacho", 36 TV HUACHO
+#EXTINF:-1 tvg-logo="../static/logos/tv_36_tv_huacho.png" tvg-id="tv_36_tv_huacho", 36 TV HUACHO
 http://38.183.182.166:8000/play/a0xi/index.m3u8

@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_3cat_info.png" tvg-id="tv_3cat_info", 3Cat Info
+#EXTINF:-1 tvg-logo="../static/logos/tv_3cat_info.png" tvg-id="tv_3cat_info", 3Cat Info
 http://directes-tv-int.3catdirectes.cat/live-content/canal324-hls/master.m3u8

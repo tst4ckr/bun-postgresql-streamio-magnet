@@ -1,3 +1,0 @@
-#EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_ucl.png" tvg-id="tv_ucl", UCL
-http://179.51.136.19:8000/play/a1i5/index.m3u8

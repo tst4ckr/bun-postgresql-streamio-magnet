@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_disney_hd.png" tvg-id="tv_disney_hd", Disney
+#EXTINF:-1 tvg-logo="../static/logos/tv_disney_hd.png" tvg-id="tv_disney_hd", Disney
 http://38.183.182.166:8000/play/a0zs/index.m3u8

@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_babyfirst_spanish.png" tvg-id="tv_babyfirst_spanish", BabyFirst Spanish
+#EXTINF:-1 tvg-logo="../static/logos/tv_babyfirst_spanish.png" tvg-id="tv_babyfirst_spanish", BabyFirst Spanish
 http://streams2.sofast.tv/v1/master/611d79b11b77e2f571934fd80ca1413453772ac7/be6f9eac-280e-4748-b866-2eb2463c1844/manifest.m3u8

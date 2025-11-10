@@ -206,9 +206,6 @@ class ArtworkGenerationService {
     return `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@600;800&display=swap');
-    </style>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#333" />
       <stop offset="100%" stop-color="#1f1f1f" />
@@ -216,10 +213,10 @@ class ArtworkGenerationService {
   </defs>
   <rect x="0" y="0" width="${width}" height="${height}" fill="url(#bg)"/>
   <!-- Marca de agua con iniciales -->
-  <text x="50%" y="50%" text-anchor="middle" font-family="'Inter', sans-serif" font-size="${Math.floor(height * 0.6)}" font-weight="800" fill="#ffffff" opacity="0.08" dy="0.35em">${this.escapeXML(initials)}</text>
+  <text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="${Math.floor(height * 0.6)}" font-weight="800" fill="#ffffff" opacity="0.08" dy="0.35em">${this.escapeXML(initials)}</text>
   <!-- Etiqueta superior izquierda con nombre -->
   <rect x="24" y="22" rx="8" ry="8" width="${Math.min(width - 48, 420)}" height="48" fill="#00000055" />
-  <text x="44" y="56" font-family="'Inter', sans-serif" font-size="26" font-weight="600" fill="#ffffff">${this.escapeXML(text)}</text>
+  <text x="44" y="56" font-family="sans-serif" font-size="26" font-weight="600" fill="#ffffff">${this.escapeXML(text)}</text>
 </svg>`;
   }
 
@@ -301,13 +298,8 @@ class ArtworkGenerationService {
     const fontSize = Math.round(Math.min(width, height) * 0.16);
     return `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@700;800&display=swap');
-    </style>
-  </defs>
   <rect x="0" y="0" width="${width}" height="${height}" fill="#262626" rx="12" ry="12" />
-  <text x="50%" y="50%" text-anchor="middle" font-family="'Inter', sans-serif" font-size="${fontSize}" font-weight="800" fill="#ffffff" dy="0.35em">${this.escapeXML(text)}</text>
+  <text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="${fontSize}" font-weight="800" fill="#ffffff" dy="0.35em">${this.escapeXML(text)}</text>
 </svg>`;
   }
 
@@ -316,16 +308,13 @@ class ArtworkGenerationService {
     return `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@700;800&display=swap');
-    </style>
     <linearGradient id="posterBg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#3b3b3b" />
       <stop offset="100%" stop-color="#202020" />
     </linearGradient>
   </defs>
   <rect x="0" y="0" width="${width}" height="${height}" fill="url(#posterBg)" rx="12" ry="12" />
-  <text x="50%" y="50%" text-anchor="middle" font-family="'Inter', sans-serif" font-size="${fontSize}" font-weight="800" fill="#ffffff" dy="0.35em">${this.escapeXML(text)}</text>
+  <text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="${fontSize}" font-weight="800" fill="#ffffff" dy="0.35em">${this.escapeXML(text)}</text>
   <rect x="1" y="1" width="${width - 2}" height="${height - 2}" fill="none" stroke="#585858" stroke-width="2" rx="10" ry="10" />
 </svg>`;
   }

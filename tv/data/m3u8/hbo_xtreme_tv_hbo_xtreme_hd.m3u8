@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_hbo_xtreme_hd.png" tvg-id="tv_hbo_xtreme_hd", HBO XTREME
+#EXTINF:-1 tvg-logo="../static/logos/tv_hbo_xtreme_hd.png" tvg-id="tv_hbo_xtreme_hd", HBO XTREME
 http://38.183.182.166:8000/play/a0zc/index.m3u8

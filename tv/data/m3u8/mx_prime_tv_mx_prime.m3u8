@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_mx_prime.png" tvg-id="tv_mx_prime", MX PRIME
+#EXTINF:-1 tvg-logo="../static/logos/tv_mx_prime.png" tvg-id="tv_mx_prime", MX PRIME
 http://190.102.246.93:9005/play/a03t

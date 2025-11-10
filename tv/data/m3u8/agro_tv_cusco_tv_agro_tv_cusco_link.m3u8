@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_agro_tv_cusco_link.png" tvg-id="tv_agro_tv_cusco_link", AGRO TV CUSCO
+#EXTINF:-1 tvg-logo="../static/logos/tv_agro_tv_cusco_link.png" tvg-id="tv_agro_tv_cusco_link", AGRO TV CUSCO
 http://38.183.182.166:8000/play/a0yy/index.m3u8

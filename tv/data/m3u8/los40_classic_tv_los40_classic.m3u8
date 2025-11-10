@@ -1,3 +1,0 @@
-#EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_los40_classic.png" tvg-id="tv_los40_classic", LOS40 Classic
-http://176.65.146.237:8401/play/a0am/index.m3u8

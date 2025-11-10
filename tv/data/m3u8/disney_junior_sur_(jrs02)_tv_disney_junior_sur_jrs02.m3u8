@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_disney_junior_sur_jrs02.png" tvg-id="tv_disney_junior_sur_jrs02", Disney Junior Sur (JRS02)
+#EXTINF:-1 tvg-logo="../static/logos/tv_disney_junior_sur_jrs02.png" tvg-id="tv_disney_junior_sur_jrs02", Disney Junior Sur (JRS02)
 http://38.183.182.166:8000/play/a0j9/index.m3u8

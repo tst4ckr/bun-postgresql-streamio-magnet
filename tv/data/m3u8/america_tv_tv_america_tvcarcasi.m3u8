@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_america_tvcarcasi.png" tvg-id="tv_america_tvcarcasi", AMERICA TV
+#EXTINF:-1 tvg-logo="../static/logos/tv_america_tvcarcasi.png" tvg-id="tv_america_tvcarcasi", AMERICA TV
 http://38.183.182.166:8000/play/a146/index.m3u8

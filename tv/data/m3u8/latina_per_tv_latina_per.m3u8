@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_latina_per.png" tvg-id="tv_latina_per", Latina Per
+#EXTINF:-1 tvg-logo="../static/logos/tv_latina_per.png" tvg-id="tv_latina_per", Latina Per
 http://redirector.rudo.video/hls-video/567ffde3fa319fadf3419efda25619456231dfea/latina/latina.smil/playlist.m3u8

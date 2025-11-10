@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_azteca_guate.png" tvg-id="tv_azteca_guate", AZTECA GUATE
+#EXTINF:-1 tvg-logo="../static/logos/tv_azteca_guate.png" tvg-id="tv_azteca_guate", AZTECA GUATE
 http://200.12.41.194:8000/play/a00m/index.m3u8

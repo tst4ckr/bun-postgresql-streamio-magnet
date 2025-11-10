@@ -1,3 +1,0 @@
-#EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_tdp_hd.png" tvg-id="tv_tdp_hd", tdp
-http://176.65.146.237:8401/play/a093/index.m3u8

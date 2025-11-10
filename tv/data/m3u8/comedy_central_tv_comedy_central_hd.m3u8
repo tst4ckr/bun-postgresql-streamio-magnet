@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_comedy_central_hd.png" tvg-id="tv_comedy_central_hd", Comedy Central
+#EXTINF:-1 tvg-logo="../static/logos/tv_comedy_central_hd.png" tvg-id="tv_comedy_central_hd", Comedy Central
 http://38.183.182.166:8000/play/a0vb/index.m3u8

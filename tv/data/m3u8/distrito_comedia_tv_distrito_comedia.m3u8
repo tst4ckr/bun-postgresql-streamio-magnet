@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logo/tv_distrito_comedia.png" tvg-id="tv_distrito_comedia", Distrito Comedia
+#EXTINF:-1 tvg-logo="../static/logos/tv_distrito_comedia.png" tvg-id="tv_distrito_comedia", Distrito Comedia
 http://38.183.182.166:8000/play/a0sk/index.m3u8
