@@ -36,6 +36,8 @@ class LogoGenerationService {
         // Control de limpieza previa del directorio de logos
         // Por defecto: limpiar antes de generar para evitar duplicados/acumulación
         this.shouldCleanOutputDir = String(process.env.CLEAN_OUTPUT_DIRS || 'true').toLowerCase() !== 'false';
+        // Evitar limpiar múltiples veces cuando se procesan chunks en paralelo
+        this._logoDirInitialized = false;
     }
 
     /**
@@ -388,9 +390,10 @@ class LogoGenerationService {
         }
         
         const results = [];
-        // Limpiar directorio de salida si corresponde
-        if (this.shouldCleanOutputDir) {
+        // Limpiar directorio de salida SOLO una vez por sesión para evitar condiciones de carrera entre chunks paralelos
+        if (this.shouldCleanOutputDir && !this._logoDirInitialized) {
             await this.resetLogoDirectory();
+            this._logoDirInitialized = true;
         } else {
             await this.ensureLogoDirectory();
         }

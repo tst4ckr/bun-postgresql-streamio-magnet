@@ -55,6 +55,9 @@ class ArtworkGenerationService {
     // Control de limpieza previa de directorios de salida
     // Por defecto: limpiar antes de generar para evitar duplicados/acumulación
     this.shouldCleanOutputDirs = String(process.env.CLEAN_OUTPUT_DIRS || 'true').toLowerCase() !== 'false';
+    // Evitar limpiar múltiples veces cuando se procesan chunks en paralelo
+    this._bgDirInitialized = false;
+    this._posterDirInitialized = false;
   }
 
   /**
@@ -152,9 +155,10 @@ class ArtworkGenerationService {
    */
   async generateMultipleBackgrounds(channels, options = {}) {
     const { concurrency = 4 } = options;
-    // Limpiar el directorio si está habilitado
-    if (this.shouldCleanOutputDirs) {
+    // Limpiar el directorio SOLO una vez por sesión, para evitar carreras entre chunks paralelos
+    if (this.shouldCleanOutputDirs && !this._bgDirInitialized) {
       await this.resetBackgroundDirectory();
+      this._bgDirInitialized = true;
     } else {
       await this.ensureBackgroundDirectory();
     }
@@ -183,9 +187,10 @@ class ArtworkGenerationService {
    */
   async generateMultiplePosters(channels, options = {}) {
     const { concurrency = 4, shape = 'square' } = options;
-    // Limpiar el directorio si está habilitado
-    if (this.shouldCleanOutputDirs) {
+    // Limpiar el directorio SOLO una vez por sesión, para evitar carreras entre chunks paralelos
+    if (this.shouldCleanOutputDirs && !this._posterDirInitialized) {
       await this.resetPosterDirectory();
+      this._posterDirInitialized = true;
     } else {
       await this.ensurePosterDirectory();
     }
