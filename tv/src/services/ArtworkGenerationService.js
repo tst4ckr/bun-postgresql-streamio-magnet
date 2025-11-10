@@ -15,19 +15,33 @@
 import fs from 'fs/promises';
 import path from 'path';
 import ArtworkGenerationTools from './ArtworkGenerationService_tools.js';
+import { EnvLoader } from '../infrastructure/config/EnvLoader.js';
 
 class ArtworkGenerationService {
   constructor() {
+    // Asegurar que las variables de entorno declaradas en config/app.conf
+    // estén cargadas antes de leerlas. Esto garantiza resiliencia y estabilidad.
+    try {
+      EnvLoader.getInstance();
+    } catch (e) {
+      // No interrumpir si ya se cargó previamente en otra parte de la librería
+      // o si el cargador está en proceso; solo registrar en modo debug.
+      if (process.env.LOG_LEVEL === 'debug') {
+        console.debug('[ArtworkGenerationService] EnvLoader ya inicializado o en progreso.');
+      }
+    }
+
     const envBgDir = process.env.BACKGROUND_OUTPUT_DIR;
     const envPosterDir = process.env.POSTER_OUTPUT_DIR;
 
+    // Por defecto, usar los directorios bajo /static para que coincidan con el servidor Express
     this.backgroundDirectory = envBgDir && envBgDir.trim()
       ? (path.isAbsolute(envBgDir) ? envBgDir : path.resolve(process.cwd(), envBgDir))
-      : path.join(process.cwd(), 'background');
+      : path.join(process.cwd(), 'static', 'background');
 
     this.posterDirectory = envPosterDir && envPosterDir.trim()
       ? (path.isAbsolute(envPosterDir) ? envPosterDir : path.resolve(process.cwd(), envPosterDir))
-      : path.join(process.cwd(), 'poster');
+      : path.join(process.cwd(), 'static', 'poster');
 
     // Tamaños por defecto basados en guías de Stremio
     this.backgroundSize = { width: 1280, height: 786 }; // ≥ 1024x786
@@ -87,7 +101,8 @@ class ArtworkGenerationService {
    * @returns {Promise<string>} Ruta del archivo generado (PNG)
    */
   async generateChannelPoster(channelName, channelId, options = {}) {
-    const shape = options.shape === 'poster' ? 'poster' : 'square';
+    // Por defecto usamos el formato 'poster' 1:0.675, que suele producir archivos más pequeños
+    const shape = options.shape === 'square' ? 'square' : 'poster';
     const size = this.posterSizes[shape];
     const suffix = shape === 'poster' ? '-poster' : '-square';
     const fileBase = this.createSafeFileName(channelId, channelName) + suffix;
@@ -108,6 +123,10 @@ class ArtworkGenerationService {
       });
 
       await fs.unlink(svgPath).catch(() => {});
+
+      // Cumplimiento estricto MCP Context7 (Stremio): PNG y <100KB recomendado <50KB
+      // Intentamos optimizar si excede los límites.
+      await this.#ensurePosterUnderSize(outPath, { shape, initialWidth: size.width, initialHeight: size.height });
 
       const validation = await this.tools.validatePoster(outPath);
       if (!validation.isValid) {
@@ -201,6 +220,94 @@ class ArtworkGenerationService {
   <!-- Etiqueta superior izquierda con nombre -->
   <rect x="24" y="22" rx="8" ry="8" width="${Math.min(width - 48, 420)}" height="48" fill="#00000055" />
   <text x="44" y="56" font-family="'Inter', sans-serif" font-size="26" font-weight="600" fill="#ffffff">${this.escapeXML(text)}</text>
+</svg>`;
+  }
+
+  /**
+   * Optimiza el poster para que cumpla con el tamaño máximo (<100KB, idealmente <50KB) y formato PNG
+   * siguiendo las guías del manifiesto de Stremio (MCP Context7).
+   * Estrategia:
+   * 1) Re-encode con PNG palette + compressionLevel alto.
+   * 2) Si sigue >100KB, reducir dimensiones gradualmente manteniendo proporción.
+   * 3) Si aún supera, regenerar con fondo plano (sin gradiente) y volver a rasterizar.
+   * @param {string} pngPath
+   * @param {{shape: 'square'|'poster', initialWidth: number, initialHeight: number}} opts
+   */
+  async #ensurePosterUnderSize(pngPath, opts) {
+    const MAX_BYTES = 100 * 1024; // 100KB límite duro
+    const TARGET_BYTES = 50 * 1024; // objetivo recomendado
+    const { shape, initialWidth, initialHeight } = opts;
+
+    const getSize = async () => (await fs.stat(pngPath)).size;
+    const size1 = await getSize().catch(() => 0);
+    if (size1 <= MAX_BYTES) return; // ya cumple
+
+    // 1) Re-encode con palette/compression alto
+    try {
+      const sharpMod = (await import('sharp')).default;
+      await sharpMod(pngPath)
+        .png({ compressionLevel: 9, palette: true })
+        .toFile(pngPath + '.tmp');
+      await fs.rename(pngPath + '.tmp', pngPath);
+    } catch {}
+
+    let sizeNow = await getSize().catch(() => 0);
+    if (sizeNow <= MAX_BYTES) return;
+
+    // 2) Reducir dimensiones: 512→448→400→360→320
+    const widths = [512, 448, 400, 360, 320];
+    const ratio = initialHeight / initialWidth;
+    for (const w of widths) {
+      const h = Math.round(w * (shape === 'square' ? 1 : ratio));
+      try {
+        const sharpMod = (await import('sharp')).default;
+        await sharpMod(pngPath)
+          .resize(w, h, { fit: 'cover' })
+          .png({ compressionLevel: 9, palette: true })
+          .toFile(pngPath + '.tmp');
+        await fs.rename(pngPath + '.tmp', pngPath);
+        sizeNow = await getSize().catch(() => 0);
+        if (sizeNow <= MAX_BYTES) break;
+      } catch {}
+    }
+
+    if (sizeNow <= MAX_BYTES) return;
+
+    // 3) Fondo plano en lugar de gradiente para reducir paleta/entropía
+    try {
+      const fileBase = path.basename(pngPath, '.png');
+      const baseText = fileBase.replace(/^(tv_|channel_)/i, '').replace(/[-_](square|poster)$/i, '');
+      const text = this.prepareText(baseText);
+      const w = Math.min(initialWidth, 400);
+      const h = Math.round(w * (shape === 'square' ? 1 : (initialHeight / initialWidth)));
+      const flatSvg = this.#createFlatPosterSVG(text, w, h);
+      const tmpSvgPath = path.join(this.posterDirectory, `${fileBase}.re.svg`);
+      await fs.writeFile(tmpSvgPath, flatSvg, 'utf8');
+      await this.tools.rasterizeSVG(tmpSvgPath, {
+        width: w,
+        height: h,
+        format: 'png',
+        outputPath: pngPath,
+        png: { compressionLevel: 9, palette: true }
+      });
+      await fs.unlink(tmpSvgPath).catch(() => {});
+    } catch {}
+  }
+
+  /**
+   * Variante de poster con fondo plano para reducir tamaño.
+   */
+  #createFlatPosterSVG(text, width, height) {
+    const fontSize = Math.round(Math.min(width, height) * 0.16);
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@700;800&display=swap');
+    </style>
+  </defs>
+  <rect x="0" y="0" width="${width}" height="${height}" fill="#262626" rx="12" ry="12" />
+  <text x="50%" y="50%" text-anchor="middle" font-family="'Inter', sans-serif" font-size="${fontSize}" font-weight="800" fill="#ffffff" dy="0.35em">${this.escapeXML(text)}</text>
 </svg>`;
   }
 

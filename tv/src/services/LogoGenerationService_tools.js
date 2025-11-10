@@ -8,12 +8,21 @@
 import fs from 'fs/promises';
 import path from 'path';
 import sharp from 'sharp';
+import { EnvLoader } from '../infrastructure/config/EnvLoader.js';
 
 /**
  * Herramientas para conversión y manipulación de logos
  */
 class LogoGenerationTools {
     constructor() {
+        // Garantizar carga de variables desde config/app.conf antes de usarlas
+        try {
+            EnvLoader.getInstance();
+        } catch (e) {
+            if (process.env.LOG_LEVEL === 'debug') {
+                console.debug('[LogoGenerationTools] EnvLoader ya inicializado o en progreso.');
+            }
+        }
         this.targetSize = 256;
         // Permitir configurar el directorio de salida de logos vía variable de entorno
         const envLogoDir = process.env.LOGO_OUTPUT_DIR;
@@ -22,7 +31,8 @@ class LogoGenerationTools {
                 ? envLogoDir
                 : path.resolve(process.cwd(), envLogoDir);
         } else {
-            this.logoDirectory = path.join(process.cwd(), 'logo');
+            // Por defecto, usar /static/logos para alinearnos con el servidor Express
+            this.logoDirectory = path.join(process.cwd(), 'static', 'logos');
         }
     }
 
@@ -46,6 +56,7 @@ class LogoGenerationTools {
                     fit: 'contain',
                     background: { r: 45, g: 45, b: 45, alpha: 1 } // Fondo gris oscuro
                 })
+                .grayscale() // asegurar monocromo según guía MCP Context7
                 .png({
                     quality: 90,
                     compressionLevel: 6
