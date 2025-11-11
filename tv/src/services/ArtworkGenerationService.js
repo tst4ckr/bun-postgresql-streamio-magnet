@@ -48,7 +48,7 @@ class ArtworkGenerationService {
       : path.join(process.cwd(), 'static', 'poster');
 
     // Tamaños por defecto basados en guías de Stremio
-    this.backgroundSize = { width: 1024, height: 576 }; // Formato 16:9, cumple el mínimo de 1024x786
+    this.backgroundSize = { width: 1280, height: 786 }; // ≥ 1024x786, mantiene aspecto cercano al recomendado por Stremio
     this.posterSizes = {
       square: { width: 400, height: 400 }, // Reducido para optimizar
       poster: { width: 400, height: 270 } // Reducido para optimizar, ratio ~1:0.675
@@ -230,21 +230,24 @@ class ArtworkGenerationService {
   createBackgroundSVG(text) {
     const { width, height } = this.backgroundSize;
     const initials = this.generateInitials(text);
+    const watermarkSize = Math.floor(height * 0.48); // reducir para evitar saturación visual
+    const labelWidth = Math.min(width - 48, 420);
+    const safeLabelTextWidth = Math.max(24, labelWidth - 24);
     return `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#333" />
-      <stop offset="100%" stop-color="#1f1f1f" />
-    </linearGradient>
-  </defs>
-  <rect x="0" y="0" width="${width}" height="${height}" fill="url(#bg)"/>
-  <!-- Marca de agua con iniciales -->
-  <text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="${Math.floor(height * 0.6)}" font-weight="800" fill="#ffffff" opacity="0.08" dy="0.35em">${this.escapeXML(initials)}</text>
-  <!-- Etiqueta superior izquierda con nombre -->
-  <rect x="24" y="22" rx="8" ry="8" width="${Math.min(width - 48, 420)}" height="48" fill="#00000055" />
-  <text x="44" y="56" font-family="sans-serif" font-size="26" font-weight="600" fill="#ffffff">${this.escapeXML(text)}</text>
-</svg>`;
+ <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+   <defs>
+     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+       <stop offset="0%" stop-color="#333" />
+       <stop offset="100%" stop-color="#1f1f1f" />
+     </linearGradient>
+   </defs>
+   <rect x="0" y="0" width="${width}" height="${height}" fill="url(#bg)"/>
+   <!-- Marca de agua con iniciales -->
+   <text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="${watermarkSize}" font-weight="800" fill="#ffffff" opacity="0.06" dy="0.35em">${this.escapeXML(initials)}</text>
+   <!-- Etiqueta superior izquierda con nombre -->
+   <rect x="24" y="22" rx="8" ry="8" width="${labelWidth}" height="48" fill="#00000055" />
+   <text x="44" y="56" font-family="sans-serif" font-size="24" font-weight="600" fill="#ffffff" lengthAdjust="spacingAndGlyphs" textLength="${safeLabelTextWidth}">${this.escapeXML(text)}</text>
+ </svg>`;
   }
 
   /**
@@ -331,19 +334,87 @@ class ArtworkGenerationService {
   }
 
   createPosterSVG(text, width, height) {
-    const fontSize = Math.round(Math.min(width, height) * 0.16);
+    // Ajuste responsivo del texto para evitar desbordes
+    const maxCharsPerLine = Math.max(8, Math.floor(width / 22));
+    const lines = this.#splitTextForPoster(text, maxCharsPerLine);
+    // Base: un poco más pequeño para mejorar legibilidad en tarjetas pequeñas
+    const baseFactor = lines.length > 1 ? 0.13 : 0.16;
+    let fontSize = Math.round(Math.min(width, height) * baseFactor);
+    const lineSpacing = Math.round(fontSize * 1.25);
+    // Si la línea más larga aún podría desbordar, reducir un poco más
+    const longest = Math.max(...lines.map(l => l.length));
+    if (longest > maxCharsPerLine) {
+      fontSize = Math.round(fontSize * 0.9);
+    }
+
+    // Calcular posiciones Y para centrar verticalmente las líneas
+    const totalHeight = lineSpacing * lines.length;
+    const startY = Math.round((height - totalHeight) / 2 + fontSize * 0.9);
+
+    const textEls = lines.map((line, i) => {
+      const y = startY + i * lineSpacing;
+      const content = this.escapeXML(line);
+      // Usar textLength para ajustar a ancho disponible si fuera necesario
+      const safeWidth = Math.max(24, width - 24);
+      return `<text x="50%" y="${y}" text-anchor="middle" font-family="sans-serif" font-size="${fontSize}" font-weight="800" fill="#ffffff" lengthAdjust="spacingAndGlyphs" textLength="${safeWidth}">${content}</text>`;
+    }).join('\n   ');
+
     return `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="posterBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#3b3b3b" />
-      <stop offset="100%" stop-color="#202020" />
-    </linearGradient>
-  </defs>
-  <rect x="0" y="0" width="${width}" height="${height}" fill="url(#posterBg)" rx="12" ry="12" />
-  <text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="${fontSize}" font-weight="800" fill="#ffffff" dy="0.35em">${this.escapeXML(text)}</text>
-  <rect x="1" y="1" width="${width - 2}" height="${height - 2}" fill="none" stroke="#585858" stroke-width="2" rx="10" ry="10" />
-</svg>`;
+ <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+   <defs>
+     <linearGradient id="posterBg" x1="0%" y1="0%" x2="100%" y2="100%">
+       <stop offset="0%" stop-color="#3b3b3b" />
+       <stop offset="100%" stop-color="#202020" />
+     </linearGradient>
+   </defs>
+   <rect x="0" y="0" width="${width}" height="${height}" fill="url(#posterBg)" rx="12" ry="12" />
+   ${textEls}
+   <rect x="1" y="1" width="${width - 2}" height="${height - 2}" fill="none" stroke="#585858" stroke-width="2" rx="10" ry="10" />
+ </svg>`;
+  }
+
+  /**
+   * Divide el texto en hasta 2 líneas buscando el espacio más cercano a la mitad.
+   * Garantiza que cada línea tenga una longitud aceptable para evitar desbordes.
+   * @param {string} text
+   * @param {number} maxCharsPerLine
+   * @returns {string[]}
+   */
+  #splitTextForPoster(text, maxCharsPerLine = 14) {
+    const t = String(text || '').trim().replace(/\s+/g, ' ');
+    if (t.length <= maxCharsPerLine) return [t];
+
+    // Si no hay espacios, truncar inteligentemente con guión
+    if (!/\s/.test(t)) {
+      // cortar en dos segmentos con guión
+      const mid = Math.floor(t.length / 2);
+      return [t.slice(0, mid) + '-', t.slice(mid)];
+    }
+
+    // Buscar el espacio más cercano al medio para dividir en dos líneas
+    const mid = Math.floor(t.length / 2);
+    let splitIdx = t.indexOf(' ', mid);
+    if (splitIdx === -1 || splitIdx > t.length - 5) {
+      // probar hacia atrás si hacia adelante no funciona
+      splitIdx = t.lastIndexOf(' ', mid);
+    }
+    if (splitIdx === -1) return [t];
+
+    const left = t.slice(0, splitIdx).trim();
+    const right = t.slice(splitIdx + 1).trim();
+    const lines = [left, right];
+
+    // Si alguna línea todavía es demasiado larga, hacer una segunda partición simple
+    return lines.map(l => {
+      if (l.length > maxCharsPerLine * 1.3) {
+        const m = Math.floor(l.length / 2);
+        const sIdx = l.indexOf(' ', m);
+        if (sIdx > 0) {
+          return l.slice(0, sIdx).trim();
+        }
+      }
+      return l;
+    });
   }
 
   generateInitials(text) {
