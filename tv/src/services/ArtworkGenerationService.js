@@ -193,7 +193,7 @@ class ArtworkGenerationService {
    * @param {{concurrency?: number, shape?: 'square'|'poster'}} options
    */
   async generateMultiplePosters(channels, options = {}) {
-    const { concurrency = 4, shape = 'square' } = options;
+    const { concurrency = 4, shape = 'poster' } = options;
     // Limpiar el directorio SOLO una vez por sesión, a nivel de módulo,
     // para evitar condiciones de carrera entre múltiples instancias/chunks.
     if (this.shouldCleanOutputDirs && !POSTER_DIR_INITIALIZED) {
@@ -325,7 +325,7 @@ class ArtworkGenerationService {
    * Variante de poster con fondo plano para reducir tamaño.
    */
   #createFlatPosterSVG(text, width, height) {
-    const fontSize = Math.round(Math.min(width, height) * 0.12);
+    const fontSize = Math.round(Math.min(width, height) * 0.10);
     return `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
   <rect x="0" y="0" width="${width}" height="${height}" fill="#262626" rx="12" ry="12" />
@@ -338,7 +338,7 @@ class ArtworkGenerationService {
     const maxCharsPerLine = Math.max(8, Math.floor(width / 24));
     const lines = this.#splitTextForPoster(text, maxCharsPerLine);
     // Reducir significativamente la tipografía
-    const baseFactor = lines.length > 1 ? 0.10 : 0.12;
+    const baseFactor = lines.length > 1 ? 0.08 : 0.10;
     let fontSize = Math.round(Math.min(width, height) * baseFactor);
     // Limitar aún más el tamaño máximo de fuente en posters pequeños
     fontSize = Math.min(fontSize, Math.round(width * 0.11));
@@ -356,9 +356,8 @@ class ArtworkGenerationService {
     const textEls = lines.map((line, i) => {
       const y = startY + i * lineSpacing;
       const content = this.escapeXML(line);
-      // Usar textLength para ajustar a ancho disponible si fuera necesario
-      const safeWidth = Math.max(24, width - 48);
-      return `<text x="50%" y="${y}" text-anchor="middle" font-family="sans-serif" font-size="${fontSize}" font-weight="800" fill="#ffffff" lengthAdjust="spacingAndGlyphs" textLength="${safeWidth}">${content}</text>`;
+      // Evitar estirar el texto: NO usar textLength/lengthAdjust para mantener letras pequeñas y legibles
+      return `<text x="50%" y="${y}" text-anchor="middle" font-family="sans-serif" font-size="${fontSize}" font-weight="800" fill="#ffffff">${content}</text>`;
     }).join('\n   ');
 
     return `<?xml version="1.0" encoding="UTF-8"?>

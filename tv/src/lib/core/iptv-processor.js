@@ -663,8 +663,8 @@ export class IPTVProcessor {
                 
                 // 4. Generación de artwork (background y poster)
                 const bgResults = await services.artworkGenerationService.generateMultipleBackgrounds(channelsForLogos, { concurrency: 4 });
-                // Elegimos poster cuadrado por defecto; opcionalmente se puede cambiar a 'poster'
-                const posterResults = await services.artworkGenerationService.generateMultiplePosters(channelsForLogos, { concurrency: 4, shape: 'square' });
+                // Para cumplir las guías oficiales de Stremio (poster 1:0.675 o 1:1, PNG), generamos por defecto el formato 'poster' (1:0.675)
+                const posterResults = await services.artworkGenerationService.generateMultiplePosters(channelsForLogos, { concurrency: 4, shape: 'poster' });
 
                 // 5. Integración de logos/background/poster
                 const logoMap = new Map();
