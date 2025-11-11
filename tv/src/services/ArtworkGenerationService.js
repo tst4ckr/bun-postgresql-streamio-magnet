@@ -230,9 +230,9 @@ class ArtworkGenerationService {
   createBackgroundSVG(text) {
     const { width, height } = this.backgroundSize;
     const initials = this.generateInitials(text);
-    const watermarkSize = Math.floor(height * 0.48); // reducir para evitar saturación visual
-    const labelWidth = Math.min(width - 48, 420);
-    const safeLabelTextWidth = Math.max(24, labelWidth - 24);
+    const watermarkSize = Math.floor(height * 0.34); // aún más pequeño
+    const labelWidth = Math.min(width - 64, 420);
+    const safeLabelTextWidth = Math.max(24, labelWidth - 36);
     return `<?xml version="1.0" encoding="UTF-8"?>
  <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
    <defs>
@@ -246,8 +246,8 @@ class ArtworkGenerationService {
    <text x="50%" y="50%" text-anchor="middle" font-family="sans-serif" font-size="${watermarkSize}" font-weight="800" fill="#ffffff" opacity="0.06" dy="0.35em">${this.escapeXML(initials)}</text>
    <!-- Etiqueta superior izquierda con nombre -->
    <rect x="24" y="22" rx="8" ry="8" width="${labelWidth}" height="48" fill="#00000055" />
-   <text x="44" y="56" font-family="sans-serif" font-size="24" font-weight="600" fill="#ffffff" lengthAdjust="spacingAndGlyphs" textLength="${safeLabelTextWidth}">${this.escapeXML(text)}</text>
- </svg>`;
+   <text x="44" y="56" font-family="sans-serif" font-size="18" font-weight="600" fill="#ffffff" lengthAdjust="spacingAndGlyphs" textLength="${safeLabelTextWidth}">${this.escapeXML(text)}</text>
+  </svg>`;
   }
 
   /**
@@ -325,7 +325,7 @@ class ArtworkGenerationService {
    * Variante de poster con fondo plano para reducir tamaño.
    */
   #createFlatPosterSVG(text, width, height) {
-    const fontSize = Math.round(Math.min(width, height) * 0.16);
+    const fontSize = Math.round(Math.min(width, height) * 0.12);
     return `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
   <rect x="0" y="0" width="${width}" height="${height}" fill="#262626" rx="12" ry="12" />
@@ -334,13 +334,15 @@ class ArtworkGenerationService {
   }
 
   createPosterSVG(text, width, height) {
-    // Ajuste responsivo del texto para evitar desbordes
-    const maxCharsPerLine = Math.max(8, Math.floor(width / 22));
+    // Ajuste responsivo del texto para evitar desbordes (más pequeño por solicitud)
+    const maxCharsPerLine = Math.max(8, Math.floor(width / 24));
     const lines = this.#splitTextForPoster(text, maxCharsPerLine);
-    // Base: un poco más pequeño para mejorar legibilidad en tarjetas pequeñas
-    const baseFactor = lines.length > 1 ? 0.13 : 0.16;
+    // Reducir significativamente la tipografía
+    const baseFactor = lines.length > 1 ? 0.10 : 0.12;
     let fontSize = Math.round(Math.min(width, height) * baseFactor);
-    const lineSpacing = Math.round(fontSize * 1.25);
+    // Limitar aún más el tamaño máximo de fuente en posters pequeños
+    fontSize = Math.min(fontSize, Math.round(width * 0.11));
+    const lineSpacing = Math.round(fontSize * 1.15);
     // Si la línea más larga aún podría desbordar, reducir un poco más
     const longest = Math.max(...lines.map(l => l.length));
     if (longest > maxCharsPerLine) {
@@ -349,13 +351,13 @@ class ArtworkGenerationService {
 
     // Calcular posiciones Y para centrar verticalmente las líneas
     const totalHeight = lineSpacing * lines.length;
-    const startY = Math.round((height - totalHeight) / 2 + fontSize * 0.9);
+    const startY = Math.round((height - totalHeight) / 2 + fontSize * 0.85);
 
     const textEls = lines.map((line, i) => {
       const y = startY + i * lineSpacing;
       const content = this.escapeXML(line);
       // Usar textLength para ajustar a ancho disponible si fuera necesario
-      const safeWidth = Math.max(24, width - 24);
+      const safeWidth = Math.max(24, width - 48);
       return `<text x="50%" y="${y}" text-anchor="middle" font-family="sans-serif" font-size="${fontSize}" font-weight="800" fill="#ffffff" lengthAdjust="spacingAndGlyphs" textLength="${safeWidth}">${content}</text>`;
     }).join('\n   ');
 
