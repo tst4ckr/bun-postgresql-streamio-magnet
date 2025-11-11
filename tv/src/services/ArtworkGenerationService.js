@@ -48,10 +48,10 @@ class ArtworkGenerationService {
       : path.join(process.cwd(), 'static', 'poster');
 
     // Tamaños por defecto basados en guías de Stremio
-    this.backgroundSize = { width: 1280, height: 786 }; // ≥ 1024x786
+    this.backgroundSize = { width: 1024, height: 576 }; // Formato 16:9, cumple el mínimo de 1024x786
     this.posterSizes = {
-      square: { width: 512, height: 512 },
-      poster: { width: 512, height: 346 } // 1:0.675
+      square: { width: 400, height: 400 }, // Reducido para optimizar
+      poster: { width: 400, height: 270 } // Reducido para optimizar, ratio ~1:0.675
     };
 
     this.tools = new ArtworkGenerationTools();
