@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logos/tv_pequeradio_tv.png" tvg-id="tv_pequeradio_tv", Pequeradio TV
+#EXTINF:-1 tvg-id="tv_pequeradio_tv", Pequeradio TV
 http://canadaremar2.todostreaming.es/live/peque-pequetv.m3u8

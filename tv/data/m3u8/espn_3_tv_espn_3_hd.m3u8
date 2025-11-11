@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logos/tv_espn_3_hd.png" tvg-id="tv_espn_3_hd", ESPN 3
+#EXTINF:-1 tvg-id="tv_espn_3_hd", ESPN 3
 http://38.183.182.166:8000/play/a0x0/index.m3u8

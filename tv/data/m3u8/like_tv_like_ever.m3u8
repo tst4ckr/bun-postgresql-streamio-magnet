@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logos/tv_like_ever.png" tvg-id="tv_like_ever", LIKE
+#EXTINF:-1 tvg-id="tv_like_ever", LIKE
 http://38.183.182.166:8000/play/a10k/index.m3u8

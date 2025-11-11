@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logos/tv_espn_2_peru.png" tvg-id="tv_espn_2_peru", ESPN 2 Peru
+#EXTINF:-1 tvg-id="tv_espn_2_peru", ESPN 2 Peru
 http://38.183.182.166:8000/play/a0ix/index.m3u8

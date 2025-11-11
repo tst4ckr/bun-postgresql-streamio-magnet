@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logos/tv_pbs_kids_hawaii.png" tvg-id="tv_pbs_kids_hawaii", PBS Kids Hawaii
+#EXTINF:-1 tvg-logo="https://i.imgur.com/ambc9le.png" tvg-id="tv_pbs_kids_hawaii", PBS Kids Hawaii
 http://livestream.pbskids.org/out/v1/aa31792fee094b24b09045483f04d150/hast.m3u8
