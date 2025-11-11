@@ -41,11 +41,11 @@ class ArtworkGenerationService {
     // Por defecto, usar los directorios bajo /static para que coincidan con el servidor Express
     this.backgroundDirectory = envBgDir && envBgDir.trim()
       ? (path.isAbsolute(envBgDir) ? envBgDir : path.resolve(process.cwd(), envBgDir))
-      : path.join(process.cwd(), 'static', 'background');
+      : path.resolve(process.cwd(), '..', 'static', 'background');
 
     this.posterDirectory = envPosterDir && envPosterDir.trim()
       ? (path.isAbsolute(envPosterDir) ? envPosterDir : path.resolve(process.cwd(), envPosterDir))
-      : path.join(process.cwd(), 'static', 'poster');
+      : path.resolve(process.cwd(), '..', 'static', 'poster');
 
     // Tamaños por defecto basados en guías de Stremio
     this.backgroundSize = { width: 1280, height: 786 }; // ≥ 1024x786, mantiene aspecto cercano al recomendado por Stremio
@@ -58,7 +58,8 @@ class ArtworkGenerationService {
 
     // Control de limpieza previa de directorios de salida
     // Por defecto: limpiar antes de generar para evitar duplicados/acumulación
-    this.shouldCleanOutputDirs = String(process.env.CLEAN_OUTPUT_DIRS || 'true').toLowerCase() !== 'false';
+    // Evitar borrados completos por defecto para no interferir con el servidor del addon
+    this.shouldCleanOutputDirs = String(process.env.CLEAN_OUTPUT_DIRS || 'false').toLowerCase() !== 'false';
     // Las banderas de inicialización se gestionan a nivel de módulo
   }
 
