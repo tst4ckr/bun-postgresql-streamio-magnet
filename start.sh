@@ -86,6 +86,10 @@ else
 fi
 export OUTPUT_CSV_PATH OUTPUT_M3U_PATH CHANNELS_FILE PER_CHANNEL_M3U8_DIR
 
+# Alinear el servidor principal con el directorio de m3u8 generado por la librería TV
+# Si M3U8_DIR no está definido en entorno/.env, usar PER_CHANNEL_M3U8_DIR como valor por defecto
+export M3U8_DIR="${M3U8_DIR:-$PER_CHANNEL_M3U8_DIR}"
+
 # Directorios de assets (logos, backgrounds, posters) en el proyecto
 # Usar rutas ABSOLUTAS basadas en el directorio del proyecto para evitar ambigüedades de cwd
 LOGO_OUTPUT_DIR="${LOGO_OUTPUT_DIR:-$PROJECT_DIR/static/logos}"
@@ -113,6 +117,7 @@ echo "  OUTPUT_CSV_PATH=$OUTPUT_CSV_PATH"
 echo "  OUTPUT_M3U_PATH=$OUTPUT_M3U_PATH"
 echo "  CHANNELS_FILE=$CHANNELS_FILE"
 echo "  PER_CHANNEL_M3U8_DIR=$PER_CHANNEL_M3U8_DIR"
+echo "  M3U8_DIR=$M3U8_DIR"
 echo "  TV_CSV_PATH_DEFAULT=$TV_CSV_PATH_DEFAULT"
 echo "  M3U_URL=$M3U_URL"
 
