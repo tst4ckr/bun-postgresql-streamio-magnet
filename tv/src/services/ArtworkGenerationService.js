@@ -326,7 +326,9 @@ class ArtworkGenerationService {
    * Variante de poster con fondo plano para reducir tamaño.
    */
   #createFlatPosterSVG(text, width, height) {
-    const fontSize = Math.round(Math.min(width, height) * 0.10);
+    // Aumentar la tipografía en +1 px respecto al ajuste anterior
+    const fontBase = Math.round(Math.min(width, height) * 0.10);
+    const fontSize = fontBase + 1;
     return `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
   <rect x="0" y="0" width="${width}" height="${height}" fill="#262626" rx="12" ry="12" />
@@ -343,12 +345,14 @@ class ArtworkGenerationService {
     let fontSize = Math.round(Math.min(width, height) * baseFactor);
     // Limitar aún más el tamaño máximo de fuente en posters pequeños
     fontSize = Math.min(fontSize, Math.round(width * 0.11));
-    const lineSpacing = Math.round(fontSize * 1.15);
     // Si la línea más larga aún podría desbordar, reducir un poco más
     const longest = Math.max(...lines.map(l => l.length));
     if (longest > maxCharsPerLine) {
       fontSize = Math.round(fontSize * 0.9);
     }
+    // Aumento solicitado: +1 px para mejorar legibilidad sin comprometer límites de tamaño
+    fontSize = fontSize + 1;
+    const lineSpacing = Math.round(fontSize * 1.15);
 
     // Calcular posiciones Y para centrar verticalmente las líneas
     const totalHeight = lineSpacing * lines.length;

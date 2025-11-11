@@ -6,7 +6,9 @@
 // Cargar variables de entorno una sola vez, antes de cualquier otro import
 import './config/loadEnv.js';
 
-import { addonBuilder, serveHTTP, getRouter } from 'stremio-addon-sdk';
+import addonSDK from 'stremio-addon-sdk';
+// Compatibilidad con CommonJS de stremio-addon-sdk en Node.js
+const { addonBuilder, serveHTTP, getRouter } = addonSDK;
 import express from 'express';
 import axios from 'axios';
 import path from 'path';
