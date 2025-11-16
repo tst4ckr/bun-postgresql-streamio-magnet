@@ -94,10 +94,13 @@ export class CSVMagnetRepository extends MagnetRepository {
    */
   async getMagnetsByContentId(contentId, type = 'movie') {
     if (!this.#isInitialized) await this.initialize();
-    const magnets = this.#magnetMap.get(contentId) || [];
+    let magnets = this.#magnetMap.get(contentId) || [];
     if (magnets.length === 0) {
-      throw new MagnetNotFoundError(contentId);
+      const baseId = contentId.includes(':') ? contentId.split(':')[0] : contentId;
+      const imdbish = baseId.startsWith('tt') ? baseId : `tt${baseId}`;
+      magnets = this.#magnetMap.get(baseId) || this.#magnetMap.get(imdbish) || [];
     }
+    if (magnets.length === 0) throw new MagnetNotFoundError(contentId);
     return magnets;
   }
 
