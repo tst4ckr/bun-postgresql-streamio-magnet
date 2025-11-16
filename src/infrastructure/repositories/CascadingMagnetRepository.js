@@ -389,6 +389,12 @@ export class CascadingMagnetRepository extends MagnetRepository {
           
           const duration = Date.now() - startTime;
           this.#logger.info(`Búsqueda completada con API español en ${duration}ms`);
+          if (process.env.ALWAYS_SEARCH_ENGLISH === 'true') {
+            try {
+              await this.#torrentioApiService.searchMagnetsInEnglish(contentId, type);
+              await this.#reinitializeRepository(this.#englishRepository, 'english.csv');
+            } catch (e) {}
+          }
           return enrichedSpanishResults;
         } else {
           // Marcar API español como agotada

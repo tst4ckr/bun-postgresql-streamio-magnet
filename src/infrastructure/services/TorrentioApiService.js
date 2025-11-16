@@ -82,6 +82,7 @@ export class TorrentioApiService {
     this.#globalDuplicateCache = new Set(); // Cache global para prevenir duplicados entre búsquedas
     
     this.#ensureTorrentioFileExists();
+    this.#ensureEnglishFileExists();
   }
 
   /**
@@ -1707,6 +1708,20 @@ export class TorrentioApiService {
       const headers = CONSTANTS.FILE.CSV_HEADERS;
       writeFileSync(this.#torrentioFilePath, headers, 'utf8');
       this.#logger.info(`Archivo torrentio.csv creado en: ${this.#torrentioFilePath}`);
+    }
+  }
+
+  #ensureEnglishFileExists() {
+    if (!this.#englishFilePath || this.#englishFilePath.trim() === '') {
+      return;
+    }
+    const dir = dirname(this.#englishFilePath);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    if (!existsSync(this.#englishFilePath)) {
+      const headers = CONSTANTS.FILE.CSV_HEADERS;
+      writeFileSync(this.#englishFilePath, headers, 'utf8');
     }
   }
 
