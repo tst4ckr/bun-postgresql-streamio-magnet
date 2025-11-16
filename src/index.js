@@ -25,6 +25,7 @@ import { DynamicTvRepository } from './infrastructure/repositories/DynamicTvRepo
 import { IpRoutingService } from './infrastructure/services/IpRoutingService.js';
 import { RequestContext } from './infrastructure/utils/RequestContext.js';
 import { EnhancedLogger } from './infrastructure/utils/EnhancedLogger.js';
+import { idDetectorService } from './infrastructure/services/IdDetectorService.js';
 
 /**
  * Clase principal que encapsula la lógica del addon.
@@ -68,6 +69,8 @@ class MagnetAddon {
     await this.#magnetRepository.initialize();
     this.#logger.info('Repositorio de magnets inicializado');
 
+    await this.#warmUpCachesFromEnv();
+
     // 2. Preparar manifest con opciones de género dinámicas desde CSV (si disponible)
     await populateTvGenreOptionsFromCsv();
     const manifest = getManifest();
@@ -81,6 +84,24 @@ class MagnetAddon {
 
     // 5. Configurar handlers
     await this.#setupHandlers();
+  }
+
+  async #warmUpCachesFromEnv() {
+    const raw = process.env.CACHE_WARMUP_IDS || '';
+    const ids = raw.split(',').map(s => s.trim()).filter(Boolean);
+    if (!ids.length) return;
+    for (const id of ids) {
+      try {
+        const detection = idDetectorService.detectIdType(id);
+        let type = 'movie';
+        if (detection.type && detection.type.includes('series')) type = 'series';
+        else if (['kitsu','mal','anilist','anidb','kitsu_series','mal_series','anilist_series','anidb_series'].includes(detection.type)) type = 'anime';
+        await this.#magnetRepository.getMagnetsByContentId(id, type);
+        this.#logger.info(`Warmup cache OK: ${id} (${type})`);
+      } catch (e) {
+        this.#logger.warn(`Warmup cache FAIL: ${id} - ${e?.message || e}`);
+      }
+    }
   }
 
   /**
