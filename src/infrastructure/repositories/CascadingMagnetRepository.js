@@ -274,8 +274,6 @@ export class CascadingMagnetRepository extends MagnetRepository {
       const idType = this.#detectIdType(contentId);
       this.#logger.debug(`Tipo de ID detectado: ${idType} para ${contentId}`);
       
-      // Buscar en todas las fuentes locales simultáneamente usando Promise.allSettled
-      // para evitar que un error en una fuente cancele las demás búsquedas
       const searchPromises = [];
       
       // Verificar si las fuentes locales ya fueron agotadas para evitar búsquedas redundantes
@@ -305,12 +303,21 @@ export class CascadingMagnetRepository extends MagnetRepository {
         searchPromises.push(Promise.resolve([]));
       }
       
+      // Repositorio en inglés como fuente local adicional
+      if (!this.#isSourceExhausted(contentId, 'english.csv')) {
+        searchPromises.push(this.#searchInRepositoryByContentId(this.#englishRepository, contentId, 'english.csv'));
+      } else {
+        searchPromises.push(Promise.resolve([]));
+        this.#logger.debug(`Saltando búsqueda en english.csv - fuente agotada para ${contentId}`);
+      }
+      
       const searchResults = await Promise.allSettled(searchPromises);
       
       // Extraer resultados exitosos y loggear errores sin interrumpir el flujo
       const primaryResults = searchResults[0].status === 'fulfilled' ? searchResults[0].value : [];
       const secondaryResults = searchResults[1].status === 'fulfilled' ? searchResults[1].value : [];
       const animeResults = searchResults[2].status === 'fulfilled' ? searchResults[2].value : [];
+      const englishResults = searchResults[3] && searchResults[3].status === 'fulfilled' ? searchResults[3].value : [];
       
       // Marcar fuentes como agotadas si no encontraron resultados
       if (primaryResults.length === 0) {
@@ -322,27 +329,30 @@ export class CascadingMagnetRepository extends MagnetRepository {
       if (animeResults.length === 0 && (type === 'anime' || idType === 'kitsu' || idType === 'mal' || idType === 'anilist')) {
         this.#markSourceAsExhausted(contentId, 'anime.csv');
       }
+      if (englishResults.length === 0) {
+        this.#markSourceAsExhausted(contentId, 'english.csv');
+      }
       
       // Loggear errores de búsquedas fallidas sin interrumpir el proceso
       searchResults.forEach((result, index) => {
         if (result.status === 'rejected') {
-          const sources = ['magnets.csv', 'torrentio.csv', 'anime.csv'];
+          const sources = ['magnets.csv', 'torrentio.csv', 'anime.csv', 'english.csv'];
           this.#logger.warn(`Error en búsqueda de ${sources[index]} para ${contentId}:`, result.reason?.message, { component: 'CascadingMagnetRepository' });
-          // Marcar como agotada también en caso de error
           this.#markSourceAsExhausted(contentId, sources[index]);
         }
       });
       
-      // Enriquecer magnets con metadatos
       const enrichedPrimary = this.#enrichMagnetsWithMetadata(primaryResults, metadata);
       const enrichedSecondary = this.#enrichMagnetsWithMetadata(secondaryResults, metadata);
       const enrichedAnime = this.#enrichMagnetsWithMetadata(animeResults, metadata);
+      const enrichedEnglish = this.#enrichMagnetsWithMetadata(englishResults, metadata);
       
       // Lógica de priorización mejorada según tipo de contenido
       let finalResults = this.#prioritizeResults({
         primary: enrichedPrimary,
-        secondary: enrichedSecondary, 
-        anime: enrichedAnime
+        secondary: enrichedSecondary,
+        anime: enrichedAnime,
+        english: enrichedEnglish
       }, type, contentId);
       
       if (finalResults.length > 0) {
