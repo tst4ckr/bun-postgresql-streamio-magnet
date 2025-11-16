@@ -1698,19 +1698,27 @@ export class TorrentioApiService {
     }
     
     if (!existsSync(this.#torrentioFilePath)) {
-      // Asegurar que el directorio padre existe
       const dir = dirname(this.#torrentioFilePath);
       if (!existsSync(dir)) {
         mkdirSync(dir, { recursive: true });
         this.#logger.info(`Directorio creado: ${dir}`);
       }
-      
       const headers = CONSTANTS.FILE.CSV_HEADERS;
       writeFileSync(this.#torrentioFilePath, headers, 'utf8');
       this.#logger.info(`Archivo torrentio.csv creado en: ${this.#torrentioFilePath}`);
+      return;
     }
+    try {
+      const content = readFileSync(this.#torrentioFilePath, 'utf8');
+      const headers = CONSTANTS.FILE.CSV_HEADERS;
+      const hasHeader = content.startsWith('content_id,');
+      if (!hasHeader) {
+        writeFileSync(this.#torrentioFilePath, headers + content, 'utf8');
+        this.#logger.info(`Encabezado CSV asegurado en: ${this.#torrentioFilePath}`);
+      }
+    } catch (_) {}
   }
-
+  
   #ensureEnglishFileExists() {
     if (!this.#englishFilePath || this.#englishFilePath.trim() === '') {
       return;
@@ -1722,7 +1730,16 @@ export class TorrentioApiService {
     if (!existsSync(this.#englishFilePath)) {
       const headers = CONSTANTS.FILE.CSV_HEADERS;
       writeFileSync(this.#englishFilePath, headers, 'utf8');
+      return;
     }
+    try {
+      const content = readFileSync(this.#englishFilePath, 'utf8');
+      const headers = CONSTANTS.FILE.CSV_HEADERS;
+      const hasHeader = content.startsWith('content_id,');
+      if (!hasHeader) {
+        writeFileSync(this.#englishFilePath, headers + content, 'utf8');
+      }
+    } catch (_) {}
   }
 
   /**

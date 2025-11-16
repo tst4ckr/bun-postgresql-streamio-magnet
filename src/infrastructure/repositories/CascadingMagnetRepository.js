@@ -32,6 +32,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
   #configInvoker;
   #cacheService;
   #exhaustedSourcesCache = new Map(); // Cache de fuentes agotadas por contentId
+  #clearExhaustedSource(contentId, source) { this.#exhaustedSourcesCache.delete(`${contentId}:${source}`); }
 
 
 
@@ -386,6 +387,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
           
           // Reinicializar repositorio secundario para incluir nuevos datos
           await this.#reinitializeSecondaryRepository();
+          this.#clearExhaustedSource(contentId, 'torrentio.csv');
           
           const duration = Date.now() - startTime;
           this.#logger.info(`Búsqueda completada con API español en ${duration}ms`);
