@@ -1096,7 +1096,7 @@ export class TorrentioApiService {
       // Filtrar magnets duplicados antes de guardar
       const newMagnets = magnets.filter(magnet => {
         const key = `${magnet.content_id}|${magnet.magnet}`;
-        return !existingMagnets.has(key) && !this.#globalDuplicateCache.has(key);
+        return !existingMagnets.has(key);
       });
 
       // Agregar los nuevos magnets a la cache global
