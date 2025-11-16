@@ -143,13 +143,28 @@ const config = {
   },
   repository: {
     // Rutas base configurables para CSV de torrents
-    primaryCsvPath: envString('PRIMARY_CSV_PATH', resolvePath(join(DATA_TORRENTS_DIR, 'magnets.csv'))),
-    secondaryCsvPath: envString('SECONDARY_CSV_PATH', resolvePath(join(DATA_TORRENTS_DIR, 'torrentio.csv'))),
-    animeCsvPath: envString('ANIME_CSV_PATH', resolvePath(join(DATA_TORRENTS_DIR, 'anime.csv'))),
+    primaryCsvPath: (() => {
+      const raw = process.env.PRIMARY_CSV_PATH;
+      return resolvePath(raw) || resolvePath(join(DATA_TORRENTS_DIR, 'magnets.csv'));
+    })(),
+    secondaryCsvPath: (() => {
+      const raw = process.env.SECONDARY_CSV_PATH;
+      return resolvePath(raw) || resolvePath(join(DATA_TORRENTS_DIR, 'torrentio.csv'));
+    })(),
+    animeCsvPath: (() => {
+      const raw = process.env.ANIME_CSV_PATH;
+      return resolvePath(raw) || resolvePath(join(DATA_TORRENTS_DIR, 'anime.csv'));
+    })(),
     // CSV por defecto para clientes no autorizados
-    tvCsvDefaultPath: envString('TV_CSV_PATH_DEFAULT', resolvePath(join(DATA_TVS_DIR, 'tv.csv'))),
+    tvCsvDefaultPath: (() => {
+      const raw = process.env.TV_CSV_PATH_DEFAULT;
+      return resolvePath(raw) || resolvePath(join(DATA_TVS_DIR, 'tv.csv'));
+    })(),
     // CSV para clientes autorizados según whitelist (opcional)
-    tvCsvWhitelistPath: envString('TV_CSV_PATH_WHITELIST', null),
+    tvCsvWhitelistPath: (() => {
+      const raw = process.env.TV_CSV_PATH_WHITELIST;
+      return resolvePath(raw) || null;
+    })(),
     torrentioApiUrl: envString('TORRENTIO_API_URL', 'https://torrentio.strem.fun/'),
     timeout: envInt('CSV_TIMEOUT', CONSTANTS.TIME.DEFAULT_TIMEOUT),
     // Configuración específica para TV M3U

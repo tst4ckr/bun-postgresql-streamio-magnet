@@ -418,16 +418,17 @@ class MagnetAddon {
       }
       // Ruta local
       try {
-        if (!existsSync(target)) {
+        const absoluteTarget = path.isAbsolute(target) ? target : path.resolve(process.cwd(), target);
+        if (!existsSync(absoluteTarget)) {
           return res.status(404).json({ error: 'Archivo no encontrado en servidor' });
         }
         res.type('text/csv');
-        res.sendFile(target, (err) => {
-          if (err) {
-            this.#logger.error('Error enviando archivo local', { target, error: err?.message });
-            if (!res.headersSent) res.status(500).json({ error: 'Error interno enviando archivo' });
-          }
+        const stream = fs.createReadStream(absoluteTarget);
+        stream.on('error', (err) => {
+          this.#logger.error('Error leyendo archivo local', { target: absoluteTarget, error: err?.message });
+          if (!res.headersSent) res.status(500).json({ error: 'Error interno enviando archivo' });
         });
+        stream.pipe(res);
       } catch (e) {
         this.#logger.error('Error procesando descarga local', { target, error: e?.message });
         res.status(500).json({ error: 'Error interno' });
