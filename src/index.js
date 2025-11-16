@@ -517,66 +517,58 @@ class MagnetAddon {
       app.get(routeConfig.anime, requireAuth, async (req, res) => serveDownloadByName(k, req, res));
     }
 
-    // =============================
-    // Publicación de M3U8 dinámica
-    // =============================
-    // Directorio base configurable para m3u8 locales
     const M3U8_DIR = resolveDir(process.env.M3U8_DIR) || path.join(process.cwd(), 'data', 'm3u8');
-    // Servir archivos m3u8 y cualquier recurso asociado (p.ej., .ts, .key) bajo token/IP
-    // Nota: express.static previene traversal y maneja nombres dinámicos automáticamente
-    app.use('/download/m3u8', requireAuth, express.static(M3U8_DIR, { index: false, fallthrough: true }));
+    if (process.env.DOWNLOAD_ROUTE_M3U8 && process.env.DOWNLOAD_ROUTE_M3U8.trim()) {
+      const m3u8Route = normalizeRoute(process.env.DOWNLOAD_ROUTE_M3U8, '');
+      app.use(m3u8Route, requireAuth, express.static(M3U8_DIR, { index: false, fallthrough: true }));
 
-    // Listado opcional: GET /download/m3u8/list?subdir=...&page=1&pageSize=100&ext=m3u8,ts
-    app.get('/download/m3u8/list', requireAuth, async (req, res) => {
-      try {
-        const subdir = (req.query?.subdir || '').toString().trim();
-        const page = Number(req.query?.page || 1);
-        const pageSize = Number(req.query?.pageSize || 100);
-        const ext = req.query?.ext ? String(req.query.ext).split(',').map(e => `.${e.trim().toLowerCase()}`) : null;
-        // Construir ruta segura dentro de M3U8_DIR
-        const base = M3U8_DIR;
-        const targetDir = subdir ? path.join(base, subdir) : base;
-        const normalized = path.normalize(targetDir);
-        // Evitar salir del directorio base
-        if (!normalized.startsWith(path.normalize(base))) {
-          return res.status(400).json({ error: 'Subdirectorio inválido' });
-        }
-        const list = await listFiles(normalized, { extFilter: ext, page, pageSize });
-        const items = list.items.map(it => ({
-          ...it,
-          url: `${req.baseUrl}/download/m3u8/${encodeURIComponent(subdir ? subdir + '/' + it.name : it.name)}`
-        }));
-        res.json({ total: list.total, items });
-      } catch (e) {
-        this.#logger.error('Error en /download/m3u8/list', { error: e?.message });
-        res.status(500).json({ error: 'No se pudieron listar los m3u8' });
-      }
-    });
-
-    // Fallback explícito para servir un archivo por ruta relativa si no lo captura static
-    app.get('/download/m3u8/*', requireAuth, async (req, res) => {
-      try {
-        const rel = req.params[0]; // todo lo que sigue a /download/m3u8/
-        const fullPath = path.join(M3U8_DIR, rel);
-        const normalized = path.normalize(fullPath);
-        // Validar que el archivo esté dentro del directorio permitido
-        if (!normalized.startsWith(path.normalize(M3U8_DIR))) {
-          return res.status(400).json({ error: 'Ruta inválida' });
-        }
-        if (!existsSync(normalized)) {
-          return res.status(404).json({ error: 'Archivo no encontrado' });
-        }
-        res.sendFile(normalized, (err) => {
-          if (err) {
-            this.#logger.error('Error enviando m3u8', { path: normalized, error: err?.message });
-            if (!res.headersSent) res.status(500).json({ error: 'Error interno' });
+      app.get(`${m3u8Route}/list`, requireAuth, async (req, res) => {
+        try {
+          const subdir = (req.query?.subdir || '').toString().trim();
+          const page = Number(req.query?.page || 1);
+          const pageSize = Number(req.query?.pageSize || 100);
+          const ext = req.query?.ext ? String(req.query.ext).split(',').map(e => `.${e.trim().toLowerCase()}`) : null;
+          const base = M3U8_DIR;
+          const targetDir = subdir ? path.join(base, subdir) : base;
+          const normalized = path.normalize(targetDir);
+          if (!normalized.startsWith(path.normalize(base))) {
+            return res.status(400).json({ error: 'Subdirectorio inválido' });
           }
-        });
-      } catch (e) {
-        this.#logger.error('Error en /download/m3u8/*', { error: e?.message });
-        res.status(500).json({ error: 'Error interno' });
-      }
-    });
+          const list = await listFiles(normalized, { extFilter: ext, page, pageSize });
+          const items = list.items.map(it => ({
+            ...it,
+            url: `${m3u8Route}/${encodeURIComponent(subdir ? subdir + '/' + it.name : it.name)}`
+          }));
+          res.json({ total: list.total, items });
+        } catch (e) {
+          this.#logger.error('Error en m3u8 list', { error: e?.message });
+          res.status(500).json({ error: 'No se pudieron listar los m3u8' });
+        }
+      });
+
+      app.get(`${m3u8Route}/*`, requireAuth, async (req, res) => {
+        try {
+          const rel = req.params[0];
+          const fullPath = path.join(M3U8_DIR, rel);
+          const normalized = path.normalize(fullPath);
+          if (!normalized.startsWith(path.normalize(M3U8_DIR))) {
+            return res.status(400).json({ error: 'Ruta inválida' });
+          }
+          if (!existsSync(normalized)) {
+            return res.status(404).json({ error: 'Archivo no encontrado' });
+          }
+          res.sendFile(normalized, (err) => {
+            if (err) {
+              this.#logger.error('Error enviando m3u8', { path: normalized, error: err?.message });
+              if (!res.headersSent) res.status(500).json({ error: 'Error interno' });
+            }
+          });
+        } catch (e) {
+          this.#logger.error('Error en m3u8 file', { error: e?.message });
+          res.status(500).json({ error: 'Error interno' });
+        }
+      });
+    }
 
     this.#logger.info('Rutas adicionales configuradas');
   }
