@@ -294,9 +294,10 @@ export class IPTVDataLoader {
         // Si es TVAddonConfig, usar getAll() y extraer fuentes
         if (this.config && typeof this.config.getAll === 'function') {
             const allConfig = this.config.getAll();
+            const hasRemoteM3U = Array.isArray(allConfig.dataSources?.remoteM3uUrls) && allConfig.dataSources.remoteM3uUrls.length > 0;
             return {
                 csv: allConfig.dataSources?.channelsSource === 'csv',
-                m3u: allConfig.dataSources?.m3uUrl || allConfig.dataSources?.autoM3uUrl,
+                m3u: hasRemoteM3U || allConfig.dataSources?.autoM3uUrl,
                 api: false // Por ahora no hay fuente API configurada
             };
         }

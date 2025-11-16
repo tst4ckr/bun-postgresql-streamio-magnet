@@ -55,15 +55,28 @@ export class ChannelRepositoryFactory {
         break;
 
       // Implementación para M3U Remoto (se activará después)
-      case 'remote_m3U':
       case 'remote_m3u':
-        const m3uParser = new M3UParserService(config.filters);
-        repository = new RemoteM3UChannelRepository(
-          dataSources.m3uUrl,
-          m3uParser,
-          config,
-          logger
-        );
+        {
+          const m3uParser = new M3UParserService(config.filters);
+          const candidates = [
+            dataSources.m3uUrl1,
+            dataSources.m3uUrl2,
+            dataSources.m3uUrl3,
+            dataSources.m3uUrl4,
+            dataSources.m3uUrl5,
+            dataSources.m3uUrl6
+          ].filter(u => typeof u === 'string' && u.trim().length > 0);
+          const firstUrl = candidates[0];
+          if (!firstUrl) {
+            throw new Error('Fuente remote_m3u requiere al menos una M3U_URL1..M3U_URL6');
+          }
+          repository = new RemoteM3UChannelRepository(
+            firstUrl,
+            m3uParser,
+            config,
+            logger
+          );
+        }
         break;
 
       case 'm3u':
@@ -73,14 +86,13 @@ export class ChannelRepositoryFactory {
         // Crear repositorio híbrido: CSV + M3U URLs (remotas y locales)
         // Construir lista de URLs remotas y eliminar duplicados
         const remoteM3uUrlsRaw = [
-          dataSources.m3uUrl,
-          dataSources.backupM3uUrl,
           dataSources.m3uUrl1,
           dataSources.m3uUrl2,
           dataSources.m3uUrl3,
           dataSources.m3uUrl4,
           dataSources.m3uUrl5,
-          dataSources.m3uUrl6
+          dataSources.m3uUrl6,
+          dataSources.backupM3uUrl
         ].filter(Boolean);
         const remoteM3uUrls = [...new Set(remoteM3uUrlsRaw)];
         

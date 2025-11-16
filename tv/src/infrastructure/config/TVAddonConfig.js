@@ -49,8 +49,16 @@ export class TVAddonConfig {
   #loadConfiguration() {
     const envSourceRaw = process.env.CHANNELS_SOURCE;
     const normalizedSource = this.#normalizeChannelSource(envSourceRaw);
-    // Preferir automáticamente remote_m3u si no se especificó fuente pero hay M3U_URL
-    const finalSource = (!envSourceRaw || envSourceRaw.trim() === '') && process.env.M3U_URL
+    // Preferir automáticamente remote_m3u si no se especificó fuente pero existen M3U_URL1..M3U_URL6
+    const anyM3u = [
+      process.env.M3U_URL1,
+      process.env.M3U_URL2,
+      process.env.M3U_URL3,
+      process.env.M3U_URL4,
+      process.env.M3U_URL5,
+      process.env.M3U_URL6
+    ].some(u => typeof u === 'string' && u.trim().length > 0);
+    const finalSource = (!envSourceRaw || envSourceRaw.trim() === '') && anyM3u
       ? 'remote_m3u'
       : (normalizedSource || 'csv');
 
@@ -70,9 +78,6 @@ export class TVAddonConfig {
       dataSources: {
         channelsSource: finalSource,
         channelsFile: process.env.CHANNELS_FILE || 'data/channels.csv',
-        // URL M3U principal (compatibilidad con ChannelRepositoryFactory)
-        // Acepta M3U_URL (principal) y M3U_URL0 (legacy)
-        m3uUrl0: process.env.M3U_URL0 || null,
         backupM3uUrl: process.env.BACKUP_M3U_URL || null,
         // URLs M3U adicionales para múltiples fuentes
         m3uUrl1: process.env.M3U_URL1 || '',
@@ -81,6 +86,15 @@ export class TVAddonConfig {
         m3uUrl4: process.env.M3U_URL4 || '',
         m3uUrl5: process.env.M3U_URL5 || '',
         m3uUrl6: process.env.M3U_URL6 || '',
+        // Lista agregada de M3U remotas (solo m3uUrl1..m3uUrl6)
+        remoteM3uUrls: [
+          process.env.M3U_URL1,
+          process.env.M3U_URL2,
+          process.env.M3U_URL3,
+          process.env.M3U_URL4,
+          process.env.M3U_URL5,
+          process.env.M3U_URL6
+        ].filter(u => typeof u === 'string' && u.trim().length > 0),
         // Archivos M3U locales
         localM3uLatam1: process.env.LOCAL_M3U_LATAM1 || '',
         localM3uLatam2: process.env.LOCAL_M3U_LATAM2 || '',
@@ -132,6 +146,15 @@ export class TVAddonConfig {
         religiousKeywords: this.#parseKeywordList(process.env.RELIGIOUS_KEYWORDS),
         adultKeywords: this.#parseKeywordList(process.env.ADULT_KEYWORDS),
         politicalKeywords: this.#parseKeywordList(process.env.POLITICAL_KEYWORDS)
+      },
+
+      // Configuración de ordenación de salida (tv.csv) desde variables de entorno
+      ordering: {
+        // Lista de nombres de canales prioritarios que deben aparecer primero.
+        // Se permiten hasta 2 variantes por nombre, el resto se relega.
+        priorityChannels: this.#parsePriorityChannels(process.env.PRIORITY_CHANNELS),
+        // Orden personalizado de categorías (género principal) para ordenar el resto.
+        categoryOrder: this.#parseCategoryOrder(process.env.CATEGORY_ORDER)
       },
 
       // Configuración de cache optimizada para streams en vivo según SDK
@@ -288,7 +311,7 @@ export class TVAddonConfig {
    * @throws {Error}
    */
   #validateConfiguration() {
-    const { addon, dataSources } = this.#config;
+    const { addon, dataSources, ordering } = this.#config;
 
     // Validar configuración del addon
     if (!addon.id || !addon.name) {
@@ -306,14 +329,22 @@ export class TVAddonConfig {
       throw new Error(`Fuente de canales inválida. Usar: ${validSources.join(', ')}`);
     }
 
-    // Validar URLs si son necesarias
-    if (dataSources.channelsSource.includes('m3u') && !dataSources.m3uUrl) {
-      throw new Error('URL M3U requerida para fuentes remotas');
+    // Validar URLs si son necesarias: exigir al menos una M3U_URLx para remote_m3u
+    if (dataSources.channelsSource === 'remote_m3u' && (!Array.isArray(dataSources.remoteM3uUrls) || dataSources.remoteM3uUrls.length === 0)) {
+      throw new Error('Se requiere al menos una M3U_URL1..M3U_URL6 para fuentes remotas');
     }
 
     // Validar configuración del modo automático
     if (dataSources.channelsSource === 'automatic' && !dataSources.autoM3uUrl) {
       throw new Error('URL M3U automática requerida');
+    }
+
+    // Validar ordenación
+    if (!Array.isArray(ordering.priorityChannels)) {
+      throw new Error('PRIORITY_CHANNELS debe parsearse como lista');
+    }
+    if (!Array.isArray(ordering.categoryOrder)) {
+      throw new Error('CATEGORY_ORDER debe parsearse como lista');
     }
   }
 
@@ -332,6 +363,34 @@ export class TVAddonConfig {
     if (s === 'hybrid' || s === 'mixed') return 'hybrid';
     if (s === 'automatic' || s === 'auto') return 'automatic';
     return s;
+  }
+
+  /**
+   * Parsea lista de canales prioritarios
+   * @private
+   * @param {string} value
+   * @returns {string[]}
+   */
+  #parsePriorityChannels(value) {
+    if (!value) return [];
+    return String(value)
+      .split(',')
+      .map(v => v.trim().toUpperCase())
+      .filter(v => v.length > 0);
+  }
+
+  /**
+   * Parsea orden de categorías
+   * @private
+   * @param {string} value
+   * @returns {string[]}
+   */
+  #parseCategoryOrder(value) {
+    if (!value) return [];
+    return String(value)
+      .split(',')
+      .map(v => v.trim())
+      .filter(v => v.length > 0);
   }
 
   /**
@@ -437,8 +496,8 @@ export class TVAddonConfig {
       dataSources: {
         channelsSource: this.#config.dataSources.channelsSource,
         channelsFile: this.#config.dataSources.channelsFile,
-        m3uUrl: this.#config.dataSources.m3uUrl,
-        backupM3uUrl: this.#config.dataSources.backupM3uUrl
+        remoteM3uUrls: this.#config.dataSources.remoteM3uUrls,
+        backupM3uUrl: this.#config.dataSources.backupM3uUrl || null
       },
       streaming: this.#config.streaming,
       filters: this.#config.filters,
