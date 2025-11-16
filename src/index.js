@@ -393,24 +393,37 @@ class MagnetAddon {
       }
     };
 
-    // Mapa de recursos descargables
+    const fileNameFromRoute = (route) => {
+      if (!route || typeof route !== 'string') return '';
+      const r = route.trim();
+      const parts = r.split('/').filter(Boolean);
+      return parts.length ? parts[parts.length - 1] : '';
+    };
     const buildDownloadMap = () => {
       const cfg = this.#config?.repository || {};
       const map = new Map();
-      // TV CSVs
-      if (cfg.tvCsvDefaultPath) map.set('tv.csv', cfg.tvCsvDefaultPath);
-      if (cfg.tvCsvWhitelistPath) map.set('tv_premium.csv', cfg.tvCsvWhitelistPath);
-      // Torrents CSVs
-      if (cfg.primaryCsvPath) map.set('magnets.csv', cfg.primaryCsvPath);
-      if (cfg.secondaryCsvPath) map.set('torrentio.csv', cfg.secondaryCsvPath);
-      if (cfg.animeCsvPath) map.set('anime.csv', cfg.animeCsvPath);
-      // english.csv: derivado del directorio de secondary (solo si es ruta local)
-      try {
-        if (cfg.secondaryCsvPath && !/^https?:\/\//i.test(cfg.secondaryCsvPath)) {
-          const dir = path.dirname(cfg.secondaryCsvPath);
-          map.set('english.csv', path.join(dir, 'english.csv'));
-        }
-      } catch (_) {}
+      const tvRoute = (process.env.DOWNLOAD_ROUTE_TV || '').trim();
+      const tvPremiumRoute = (process.env.DOWNLOAD_ROUTE_TV_PREMIUM || '').trim();
+      const magnetsRoute = (process.env.DOWNLOAD_ROUTE_MAGNETS || '').trim();
+      const torrentioRoute = (process.env.DOWNLOAD_ROUTE_TORRENTIO || '').trim();
+      const englishRoute = (process.env.DOWNLOAD_ROUTE_ENGLISH || '').trim();
+      const animeRoute = (process.env.DOWNLOAD_ROUTE_ANIME || '').trim();
+
+      if (tvRoute && cfg.tvCsvDefaultPath) map.set(fileNameFromRoute(tvRoute), cfg.tvCsvDefaultPath);
+      if (tvPremiumRoute && cfg.tvCsvWhitelistPath) map.set(fileNameFromRoute(tvPremiumRoute), cfg.tvCsvWhitelistPath);
+
+      const magnetsKey = magnetsRoute ? fileNameFromRoute(magnetsRoute) : '';
+      const torrentioKey = torrentioRoute ? fileNameFromRoute(torrentioRoute) : '';
+      const englishKey = englishRoute ? fileNameFromRoute(englishRoute) : '';
+      const animeKey = animeRoute ? fileNameFromRoute(animeRoute) : '';
+
+      if (magnetsKey && cfg.primaryCsvPath) map.set(magnetsKey, cfg.primaryCsvPath);
+      if (torrentioKey && cfg.secondaryCsvPath) map.set(torrentioKey, cfg.secondaryCsvPath);
+      if (animeKey && cfg.animeCsvPath) map.set(animeKey, cfg.animeCsvPath);
+      if (englishKey) {
+        const englishPath = this.#config?.repository?.englishCsvPath || (cfg.secondaryCsvPath ? path.join(path.dirname(cfg.secondaryCsvPath), englishKey) : null);
+        if (englishPath) map.set(englishKey, englishPath);
+      }
       return map;
     };
 
@@ -471,20 +484,38 @@ class MagnetAddon {
     };
 
     const routeConfig = {
-      tv: normalizeRoute(process.env.DOWNLOAD_ROUTE_TV, '/download/tv.csv'),
-      tvPremium: normalizeRoute(process.env.DOWNLOAD_ROUTE_TV_PREMIUM, '/download/tv_premium.csv'),
-      magnets: normalizeRoute(process.env.DOWNLOAD_ROUTE_MAGNETS, '/download/magnets.csv'),
-      torrentio: normalizeRoute(process.env.DOWNLOAD_ROUTE_TORRENTIO, '/download/torrentio.csv'),
-      english: normalizeRoute(process.env.DOWNLOAD_ROUTE_ENGLISH, '/download/english.csv'),
-      anime: normalizeRoute(process.env.DOWNLOAD_ROUTE_ANIME, '/download/anime.csv'),
+      tv: normalizeRoute(process.env.DOWNLOAD_ROUTE_TV, ''),
+      tvPremium: normalizeRoute(process.env.DOWNLOAD_ROUTE_TV_PREMIUM, ''),
+      magnets: normalizeRoute(process.env.DOWNLOAD_ROUTE_MAGNETS, ''),
+      torrentio: normalizeRoute(process.env.DOWNLOAD_ROUTE_TORRENTIO, ''),
+      english: normalizeRoute(process.env.DOWNLOAD_ROUTE_ENGLISH, ''),
+      anime: normalizeRoute(process.env.DOWNLOAD_ROUTE_ANIME, ''),
     };
 
-    app.get(routeConfig.tv, requireAuth, async (req, res) => serveDownloadByName('tv.csv', req, res));
-    app.get(routeConfig.tvPremium, requireAuth, async (req, res) => serveDownloadByName('tv_premium.csv', req, res));
-    app.get(routeConfig.magnets, requireAuth, async (req, res) => serveDownloadByName('magnets.csv', req, res));
-    app.get(routeConfig.torrentio, requireAuth, async (req, res) => serveDownloadByName('torrentio.csv', req, res));
-    app.get(routeConfig.english, requireAuth, async (req, res) => serveDownloadByName('english.csv', req, res));
-    app.get(routeConfig.anime, requireAuth, async (req, res) => serveDownloadByName('anime.csv', req, res));
+    if (process.env.DOWNLOAD_ROUTE_TV && process.env.DOWNLOAD_ROUTE_TV.trim()) {
+      const k = fileNameFromRoute(routeConfig.tv);
+      app.get(routeConfig.tv, requireAuth, async (req, res) => serveDownloadByName(k, req, res));
+    }
+    if (process.env.DOWNLOAD_ROUTE_TV_PREMIUM && process.env.DOWNLOAD_ROUTE_TV_PREMIUM.trim()) {
+      const k = fileNameFromRoute(routeConfig.tvPremium);
+      app.get(routeConfig.tvPremium, requireAuth, async (req, res) => serveDownloadByName(k, req, res));
+    }
+    if (process.env.DOWNLOAD_ROUTE_MAGNETS && process.env.DOWNLOAD_ROUTE_MAGNETS.trim()) {
+      const k = fileNameFromRoute(routeConfig.magnets);
+      app.get(routeConfig.magnets, requireAuth, async (req, res) => serveDownloadByName(k, req, res));
+    }
+    if (process.env.DOWNLOAD_ROUTE_TORRENTIO && process.env.DOWNLOAD_ROUTE_TORRENTIO.trim()) {
+      const k = fileNameFromRoute(routeConfig.torrentio);
+      app.get(routeConfig.torrentio, requireAuth, async (req, res) => serveDownloadByName(k, req, res));
+    }
+    if (process.env.DOWNLOAD_ROUTE_ENGLISH && process.env.DOWNLOAD_ROUTE_ENGLISH.trim()) {
+      const k = fileNameFromRoute(routeConfig.english);
+      app.get(routeConfig.english, requireAuth, async (req, res) => serveDownloadByName(k, req, res));
+    }
+    if (process.env.DOWNLOAD_ROUTE_ANIME && process.env.DOWNLOAD_ROUTE_ANIME.trim()) {
+      const k = fileNameFromRoute(routeConfig.anime);
+      app.get(routeConfig.anime, requireAuth, async (req, res) => serveDownloadByName(k, req, res));
+    }
 
     // =============================
     // Publicación de M3U8 dinámica
