@@ -440,6 +440,7 @@ class MagnetAddon {
       // Ruta local
       try {
         const absoluteTarget = path.isAbsolute(target) ? target : path.resolve(process.cwd(), target);
+        this.#logger.info(`CSV download target: ${absoluteTarget} (${name})`);
         if (!existsSync(absoluteTarget)) {
           return res.status(404).json({ error: 'Archivo no encontrado en servidor' });
         }

@@ -1066,6 +1066,7 @@ export class TorrentioApiService {
     }
     
     try {
+      this.#logger.info(`CSV target: ${targetFilePath} (${fileName})`, { component: 'TorrentioApiService' });
       // Verificar permisos de escritura antes de intentar escribir
       const fileDir = dirname(targetFilePath);
       if (!existsSync(fileDir)) {
@@ -1077,6 +1078,7 @@ export class TorrentioApiService {
       const existingMagnets = new Set();
       if (existsSync(targetFilePath)) {
         const existingContent = readFileSync(targetFilePath, 'utf8');
+        this.#logger.debug(`CSV current size: ${existingContent.length} bytes`, { component: 'TorrentioApiService' });
         const lines = existingContent.split('\n').slice(1); // Omitir header
         for (const line of lines) {
           if (line.trim()) {
@@ -1111,8 +1113,12 @@ export class TorrentioApiService {
         const csvLine = this.#magnetToCsvLine(magnet);
         appendFileSync(targetFilePath, csvLine + '\n', 'utf8');
       }
-      
+
       this.#logger.info(`Guardados ${newMagnets.length} magnets nuevos en ${fileName} (${magnets.length - newMagnets.length} duplicados omitidos)`, { component: 'TorrentioApiService' });
+      try {
+        const postContent = readFileSync(targetFilePath, 'utf8');
+        this.#logger.debug(`CSV new size: ${postContent.length} bytes`, { component: 'TorrentioApiService' });
+      } catch (_) {}
       
       if (this.#globalDuplicateCache.size > 0) {
         this.#logger.debug(`Cache global de duplicados: ${this.#globalDuplicateCache.size} items únicos`, { component: 'TorrentioApiService' });
