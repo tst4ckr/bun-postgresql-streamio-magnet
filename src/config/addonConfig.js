@@ -13,8 +13,17 @@ import { CONSTANTS } from './constants.js';
 import { envString, envInt, envBool, envDurationMs } from '../infrastructure/utils/env.js';
 
 
-// Detectar si estamos en un contenedor
-const isContainer = process.env.NODE_ENV === 'production' && process.env.CONTAINER_ENV === 'true';
+const isWindows = process.platform === 'win32';
+const isContainer = (() => {
+  if (process.env.CONTAINER_ENV === 'true') return true;
+  if (process.env.CONTAINER_ENV === 'false') return false;
+  try {
+    if (fs.existsSync('/.dockerenv')) return true;
+    const cg = fs.readFileSync('/proc/1/cgroup', 'utf8');
+    if (/docker|containerd|kubepods/i.test(cg)) return true;
+  } catch (_) {}
+  return false;
+})();
 
 // Obtener directorio del proyecto
 const __filename = fileURLToPath(import.meta.url);
@@ -29,10 +38,8 @@ function resolvePath(targetPath) {
     return targetPath;
   }
   if (isContainer) {
-    // En contenedor, usar rutas relativas desde /app
     return join('/app', targetPath);
   }
-  // En desarrollo local, usar rutas relativas desde el proyecto
   return join(projectRoot, targetPath);
 }
 
