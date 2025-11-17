@@ -311,25 +311,17 @@ export class TorrentioApiService {
       
       if (combinedResults && combinedResults.length > 0) {
         const combinedResultsWithSeeds = this.#filterResultsWithSeeds(combinedResults);
-        
-        // Si ya teníamos algunos resultados españoles, combinarlos con los nuevos
-        if (spanishResults && spanishResults.length > 0) {
-          const spanishResultsWithSeeds = this.#filterResultsWithSeeds(spanishResults);
-          
-          // Eliminar duplicados usando método unificado
-          const uniqueResults = this.#deduplicateAndCombineResults(spanishResultsWithSeeds, combinedResultsWithSeeds);
-          
-          if (uniqueResults.length > 0) {
-            this.#logger.info(`Encontrados ${uniqueResults.length} resultados únicos combinando español (${spanishResultsWithSeeds.length}) y combinado (${combinedResultsWithSeeds.length})`);
-            await this.#saveMagnetsToFile(uniqueResults, 'spanish');
-            return uniqueResults;
+        const spanishResultsWithSeeds = spanishResults ? this.#filterResultsWithSeeds(spanishResults) : [];
+        const uniqueResults = this.#deduplicateAndCombineResults(spanishResultsWithSeeds, combinedResultsWithSeeds);
+        if (uniqueResults.length > 0) {
+          const typeConfig = addonConfig.torrentio[detectedType];
+          const spanishProviders = new Set(String(typeConfig.languageConfigs.spanish.providers).split(',').map(p => p.trim().toLowerCase()));
+          const spanishOnly = uniqueResults.filter(m => spanishProviders.has(String(m.provider || '').trim().toLowerCase()));
+          if (spanishOnly.length > 0) {
+            await this.#saveMagnetsToFile(spanishOnly, 'spanish');
           }
-        } else if (combinedResultsWithSeeds.length > 0) {
-          this.#logger.info(`Encontrados ${combinedResultsWithSeeds.length} resultados con seeds en trackers combinados`);
-          await this.#saveMagnetsToFile(combinedResultsWithSeeds, 'spanish');
-          return combinedResultsWithSeeds;
-        } else {
-          this.#logger.warn(`Encontrados ${combinedResults.length} resultados combinados pero sin seeds disponibles`);
+          await this.#appendToAggregator(uniqueResults);
+          return uniqueResults;
         }
       }
       
@@ -390,12 +382,13 @@ export class TorrentioApiService {
       
       if (englishResults && englishResults.length > 0) {
         const resultsWithSeeds = this.#filterResultsWithSeeds(englishResults);
-        if (resultsWithSeeds.length > 0) {
-          this.#logger.info(`Encontrados ${resultsWithSeeds.length} resultados con seeds en trackers ingleses`);
-          await this.#saveMagnetsToFile(resultsWithSeeds, 'english');
-          return resultsWithSeeds;
-        } else {
-          this.#logger.warn(`Encontrados ${englishResults.length} resultados en inglés pero sin seeds disponibles`);
+        const typeConfig = addonConfig.torrentio[detectedType];
+        const spanishProviders = new Set(String(typeConfig.languageConfigs.spanish.providers).split(',').map(p => p.trim().toLowerCase()));
+        const englishOnly = resultsWithSeeds.filter(m => !spanishProviders.has(String(m.provider || '').trim().toLowerCase()));
+        if (englishOnly.length > 0) {
+          await this.#saveMagnetsToFile(englishOnly, 'english');
+          await this.#appendToAggregator(englishOnly);
+          return englishOnly;
         }
       }
       
@@ -1190,6 +1183,37 @@ export class TorrentioApiService {
         this.#logger.warn(`Error de sistema (${error.code}). Continuando sin guardar.`, { component: 'TorrentioApiService' });
       }
     }
+  }
+
+  async #appendToAggregator(magnets) {
+    if (!this.#torrentioFilePath || this.#torrentioFilePath.trim() === '') return;
+    try {
+      const aggPath = this.#torrentioFilePath;
+      const dirAgg = dirname(aggPath);
+      if (!existsSync(dirAgg)) {
+        mkdirSync(dirAgg, { recursive: true });
+      }
+      const existingAgg = new Set();
+      if (existsSync(aggPath)) {
+        const existingContentAgg = readFileSync(aggPath, 'utf8');
+        const linesAgg = existingContentAgg.split('\n').slice(1);
+        for (const line of linesAgg) {
+          if (line.trim()) {
+            const fields = line.split(',');
+            if (fields.length >= 3) {
+              existingAgg.add(`${fields[0]}|${fields[2]}`);
+            }
+          }
+        }
+      }
+      const newAggMagnets = magnets.filter(m => !existingAgg.has(`${m.content_id}|${m.magnet}`));
+      if (newAggMagnets.length > 0) {
+        for (const magnet of newAggMagnets) {
+          const csvLine = this.#magnetToCsvLine(magnet);
+          appendFileSync(aggPath, csvLine + '\n', 'utf8');
+        }
+      }
+    } catch (_) {}
   }
 
   /**
