@@ -47,6 +47,7 @@ export class TorrentioApiService {
   #logger;
   #torrentioFilePath;
   #englishFilePath;
+  #spanishFilePath;
   #providerConfigs;
   #manifestCache;
   #manifestCacheExpiry;
@@ -66,6 +67,7 @@ export class TorrentioApiService {
     this.#baseUrl = baseUrl;
     this.#torrentioFilePath = torrentioFilePath;
     this.#englishFilePath = englishFilePath || (torrentioFilePath ? join(dirname(torrentioFilePath), 'english.csv') : null);
+    this.#spanishFilePath = torrentioFilePath ? join(dirname(torrentioFilePath), 'spanish.csv') : null;
     this.#logger = logger || new EnhancedLogger('TorrentioApiService');
     this.#timeout = timeout;
     
@@ -83,6 +85,7 @@ export class TorrentioApiService {
     
     this.#ensureTorrentioFileExists();
     this.#ensureEnglishFileExists();
+    this.#ensureSpanishFileExists();
   }
 
   /**
@@ -1063,8 +1066,7 @@ export class TorrentioApiService {
    * @param {Magnet[]} magnets - Magnets a guardar
    */
   async #saveMagnetsToFile(magnets, language = 'spanish') {
-    // Determinar archivo de destino según el idioma
-    const targetFilePath = language === 'english' ? this.#englishFilePath : this.#torrentioFilePath;
+    const targetFilePath = language === 'english' ? this.#englishFilePath : this.#spanishFilePath;
     const fileName = targetFilePath ? basename(targetFilePath) : (language === 'english' ? 'english.csv' : 'spanish.csv');
     
     // Si no hay ruta de archivo especificada, omitir el guardado
@@ -1114,22 +1116,51 @@ export class TorrentioApiService {
       
       if (newMagnets.length === 0) {
         this.#logger.debug(`Todos los magnets ya existen en ${fileName}, omitiendo guardado`, { component: 'TorrentioApiService' });
-        return;
+      } else {
+        for (const magnet of newMagnets) {
+          const csvLine = this.#magnetToCsvLine(magnet);
+          appendFileSync(targetFilePath, csvLine + '\n', 'utf8');
+        }
+        this.#logger.info(`Guardados ${newMagnets.length} magnets nuevos en ${fileName} (${magnets.length - newMagnets.length} duplicados omitidos)`, { component: 'TorrentioApiService' });
+        try {
+          const postContent = readFileSync(targetFilePath, 'utf8');
+          this.#logger.debug(`CSV new size: ${postContent.length} bytes`, { component: 'TorrentioApiService' });
+        } catch (_) {}
       }
-      
-      for (const magnet of newMagnets) {
-        const csvLine = this.#magnetToCsvLine(magnet);
-        appendFileSync(targetFilePath, csvLine + '\n', 'utf8');
-      }
-
-      this.#logger.info(`Guardados ${newMagnets.length} magnets nuevos en ${fileName} (${magnets.length - newMagnets.length} duplicados omitidos)`, { component: 'TorrentioApiService' });
-      try {
-        const postContent = readFileSync(targetFilePath, 'utf8');
-        this.#logger.debug(`CSV new size: ${postContent.length} bytes`, { component: 'TorrentioApiService' });
-      } catch (_) {}
       
       if (this.#globalDuplicateCache.size > 0) {
         this.#logger.debug(`Cache global de duplicados: ${this.#globalDuplicateCache.size} items únicos`, { component: 'TorrentioApiService' });
+      }
+      if (this.#torrentioFilePath && this.#torrentioFilePath.trim() !== '') {
+        try {
+          const aggPath = this.#torrentioFilePath;
+          const aggName = basename(aggPath);
+          const dirAgg = dirname(aggPath);
+          if (!existsSync(dirAgg)) {
+            mkdirSync(dirAgg, { recursive: true });
+          }
+          const existingAgg = new Set();
+          if (existsSync(aggPath)) {
+            const existingContentAgg = readFileSync(aggPath, 'utf8');
+            const linesAgg = existingContentAgg.split('\n').slice(1);
+            for (const line of linesAgg) {
+              if (line.trim()) {
+                const fields = line.split(',');
+                if (fields.length >= 3) {
+                  existingAgg.add(`${fields[0]}|${fields[2]}`);
+                }
+              }
+            }
+          }
+          const newAggMagnets = magnets.filter(m => !existingAgg.has(`${m.content_id}|${m.magnet}`));
+          if (newAggMagnets.length > 0) {
+            for (const magnet of newAggMagnets) {
+              const csvLine = this.#magnetToCsvLine(magnet);
+              appendFileSync(aggPath, csvLine + '\n', 'utf8');
+            }
+            this.#logger.info(`Guardados ${newAggMagnets.length} magnets nuevos en ${aggName} (${magnets.length - newAggMagnets.length} duplicados omitidos)`, { component: 'TorrentioApiService' });
+          }
+        } catch (_) {}
       }
     } catch (error) {
       // Crear objeto de error detallado para debugging
@@ -1745,6 +1776,29 @@ export class TorrentioApiService {
       const hasHeader = content.startsWith('content_id,');
       if (!hasHeader) {
         writeFileSync(this.#englishFilePath, headers + content, 'utf8');
+      }
+    } catch (_) {}
+  }
+
+  #ensureSpanishFileExists() {
+    if (!this.#spanishFilePath || this.#spanishFilePath.trim() === '') {
+      return;
+    }
+    const dir = dirname(this.#spanishFilePath);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    if (!existsSync(this.#spanishFilePath)) {
+      const headers = CONSTANTS.FILE.CSV_HEADERS;
+      writeFileSync(this.#spanishFilePath, headers, 'utf8');
+      return;
+    }
+    try {
+      const content = readFileSync(this.#spanishFilePath, 'utf8');
+      const headers = CONSTANTS.FILE.CSV_HEADERS;
+      const hasHeader = content.startsWith('content_id,');
+      if (!hasHeader) {
+        writeFileSync(this.#spanishFilePath, headers + content, 'utf8');
       }
     } catch (_) {}
   }

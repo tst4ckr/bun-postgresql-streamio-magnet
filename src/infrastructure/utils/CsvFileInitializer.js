@@ -25,9 +25,10 @@ export class CsvFileInitializer {
     static initializeAllCsvFiles(dataDirectory) {
         const csvFiles = [
             'anime.csv',
-            'english.csv', 
+            'english.csv',
             'magnets.csv',
-            'spanish.csv'
+            'spanish.csv',
+            'torrentio.csv'
         ];
 
         const legacyPath = `${dataDirectory}/torrentio.csv`;
