@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_rt_en_espaol.png" tvg-id="tv_rt_en_espaol", RT en Espaol
+http://181.209.125.237:9000/play/a05n/index.m3u8

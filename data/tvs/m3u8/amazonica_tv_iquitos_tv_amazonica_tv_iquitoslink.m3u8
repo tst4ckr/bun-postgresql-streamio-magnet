@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_amazonica_tv_iquitoslink.png" tvg-id="tv_amazonica_tv_iquitoslink", AMAZONICA TV IQUITOS
+http://38.183.182.166:8000/play/a0yx/index.m3u8

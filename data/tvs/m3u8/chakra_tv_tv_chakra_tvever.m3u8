@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_chakra_tvever.png" tvg-id="tv_chakra_tvever", CHAKRA TV
+http://38.183.182.166:8000/play/a0jr/index.m3u8

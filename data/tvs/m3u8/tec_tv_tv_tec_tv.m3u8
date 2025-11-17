@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_tec_tv.png" tvg-id="tv_tec_tv", TEC TV
+http://181.209.125.237:9000/play/a04v/index.m3u8

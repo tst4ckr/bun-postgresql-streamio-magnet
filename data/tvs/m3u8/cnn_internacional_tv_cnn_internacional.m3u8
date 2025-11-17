@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_cnn_internacional.png" tvg-id="tv_cnn_internacional", CNN Internacional
+http://38.159.227.126:8000/play/a09e/index.m3u8

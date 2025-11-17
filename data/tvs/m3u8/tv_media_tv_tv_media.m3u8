@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_tv_media.png" tvg-id="tv_tv_media", TV MEDIA
+http://38.159.227.126:8000/play/a0am/index.m3u8

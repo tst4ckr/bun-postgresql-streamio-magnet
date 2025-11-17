@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_tvesever.png" tvg-id="tv_tvesever", TVES
+http://38.183.182.166:8000/play/a0xv/index.m3u8

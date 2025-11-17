@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_el_destape.png" tvg-id="tv_el_destape", EL DESTAPE
+http://181.209.125.237:9000/play/a03x/index.m3u8

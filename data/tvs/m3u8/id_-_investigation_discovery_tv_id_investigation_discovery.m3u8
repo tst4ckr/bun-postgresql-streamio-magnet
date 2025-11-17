@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_id_investigation_discovery.png" tvg-id="tv_id_investigation_discovery", ID - Investigation Discovery
+http://179.51.136.19:8000/play/a1k7/index.m3u8

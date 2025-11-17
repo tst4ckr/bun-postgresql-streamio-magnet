@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_taurus_tvever.png" tvg-id="tv_taurus_tvever", TAURUS TV
+http://38.183.182.166:8000/play/a0jt/index.m3u8

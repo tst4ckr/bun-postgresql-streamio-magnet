@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_espn_7.png" tvg-id="tv_espn_7", ESPN 7
+http://170.244.209.135:8000/play/a0ft/index.m3u8

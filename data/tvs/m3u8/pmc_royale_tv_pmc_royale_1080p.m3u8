@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_pmc_royale_1080p.png" tvg-id="tv_pmc_royale_1080p", PMC Royale
+http://pmcrohls.wns.live/hls/stream.m3u8

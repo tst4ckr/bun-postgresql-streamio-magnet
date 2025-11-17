@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_europa_hd.png" tvg-id="tv_europa_hd", Europa
+http://38.159.227.126:8000/play/a04v/index.m3u8

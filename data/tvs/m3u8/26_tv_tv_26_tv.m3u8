@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_26_tv.png" tvg-id="tv_26_tv", 26 TV
+http://181.209.125.237:9000/play/a02z/index.m3u8

@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_corazontvcwp.png" tvg-id="tv_corazontvcwp", CorazontvCWP
+http://148.72.155.144:8000/play/a00b/index.m3u8

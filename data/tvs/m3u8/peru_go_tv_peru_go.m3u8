@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_peru_go.png" tvg-id="tv_peru_go", PERU GO
+http://38.183.182.166:8000/play/a0gr/index.m3u8

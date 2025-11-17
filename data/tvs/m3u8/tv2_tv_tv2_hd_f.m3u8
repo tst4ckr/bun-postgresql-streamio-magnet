@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_tv2_hd_f.png" tvg-id="tv_tv2_hd_f", TV2
+http://38.250.127.17:9800/play/a07e/index.m3u8

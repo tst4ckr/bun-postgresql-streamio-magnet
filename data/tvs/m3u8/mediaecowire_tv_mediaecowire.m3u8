@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_mediaecowire.png" tvg-id="tv_mediaecowire", MEDIAECOWIRE
+http://148.72.155.144:8000/play/a01z/index.m3u8

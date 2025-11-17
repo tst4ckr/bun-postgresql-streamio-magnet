@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_cgtn_news_en.png" tvg-id="tv_cgtn_news_en", CGTN News EN
+http://english-livebkali.cgtn.com/live/encgtn.m3u8

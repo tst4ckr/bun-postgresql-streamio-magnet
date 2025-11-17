@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_akc_tv_dogs_en.png" tvg-id="tv_akc_tv_dogs_en", AKC TV Dogs EN
+http://install.akctvcontrol.com/speed/broadcast/138/desktop-playlist.m3u8

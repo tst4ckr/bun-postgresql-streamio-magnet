@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_universal_hd.png" tvg-id="tv_universal_hd", Universal
+http://181.209.125.237:9000/play/a053/index.m3u8

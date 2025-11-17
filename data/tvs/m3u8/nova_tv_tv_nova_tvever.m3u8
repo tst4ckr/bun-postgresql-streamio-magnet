@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_nova_tvever.png" tvg-id="tv_nova_tvever", NOVA TV
+http://38.183.182.166:8000/play/a0jc/index.m3u8

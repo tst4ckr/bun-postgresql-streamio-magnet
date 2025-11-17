@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_hitn.png" tvg-id="tv_hitn", HITN
+http://200.12.41.194:8000/play/a003/index.m3u8

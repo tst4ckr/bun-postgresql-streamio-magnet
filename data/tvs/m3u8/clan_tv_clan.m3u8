@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_clan.png" tvg-id="tv_clan", CLAN
+http://200.12.41.194:8000/play/a010/index.m3u8

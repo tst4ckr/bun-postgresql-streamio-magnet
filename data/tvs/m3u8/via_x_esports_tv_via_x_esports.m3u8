@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_via_x_esports.png" tvg-id="tv_via_x_esports", Via X Esports
+http://38.183.182.166:8000/play/a0s9/index.m3u8

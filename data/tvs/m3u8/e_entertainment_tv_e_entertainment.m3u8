@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_e_entertainment.png" tvg-id="tv_e_entertainment", E Entertainment
+http://201.230.121.186:8000/play/a0ff/index.m3u8

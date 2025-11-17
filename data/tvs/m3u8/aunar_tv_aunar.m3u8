@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_aunar.png" tvg-id="tv_aunar", AUNAR
+http://181.209.125.237:9000/play/a034/index.m3u8

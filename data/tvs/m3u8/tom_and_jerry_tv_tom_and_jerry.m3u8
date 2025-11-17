@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_tom_and_jerry.png" tvg-id="tv_tom_and_jerry", Tom And Jerry
+http://live20.bozztv.com/giatvplayout7/giatv-208314/playlist.m3u8

@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="https://i.imgur.com/VCUZKiw.png" tvg-id="tv_activa_tv_720p", Activa TV
+http://streamtv.mediasector.es/hls/activatv/index.m3u8

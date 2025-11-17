@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_soy_plancha_tv_720p.png" tvg-id="tv_soy_plancha_tv_720p", SOY Plancha TV
+http://59ef525c24caa.streamlock.net/vmtv/soyplancha/playlist.m3u8

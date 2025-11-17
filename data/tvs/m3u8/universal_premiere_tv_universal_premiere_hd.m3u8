@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_universal_premiere_hd.png" tvg-id="tv_universal_premiere_hd", UNIVERSAL PREMIERE
+http://38.159.227.126:8000/play/a02w/index.m3u8

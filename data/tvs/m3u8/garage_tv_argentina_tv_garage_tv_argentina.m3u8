@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_garage_tv_argentina.png" tvg-id="tv_garage_tv_argentina", Garage TV Argentina
+http://stream1.sersat.com/hls/garagetv.m3u8

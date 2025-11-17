@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_la_nacion_tv.png" tvg-id="tv_la_nacion_tv", La Nacion TV
+http://181.209.125.237:9000/play/a05w/index.m3u8

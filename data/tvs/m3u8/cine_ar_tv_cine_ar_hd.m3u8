@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_cine_ar_hd.png" tvg-id="tv_cine_ar_hd", CINE AR
+http://181.209.125.237:9000/play/a03b/index.m3u8

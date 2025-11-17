@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_creo_movieever.png" tvg-id="tv_creo_movieever", CREO MOVIE
+http://38.183.182.166:8000/play/a0jb/index.m3u8

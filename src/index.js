@@ -520,14 +520,32 @@ class MagnetAddon {
     const M3U8_DIR = resolveDir(process.env.M3U8_DIR) || path.join(process.cwd(), 'data', 'm3u8');
     if (process.env.DOWNLOAD_ROUTE_M3U8 && process.env.DOWNLOAD_ROUTE_M3U8.trim()) {
       const m3u8Route = normalizeRoute(process.env.DOWNLOAD_ROUTE_M3U8, '');
-      app.use(m3u8Route, requireAuth, express.static(M3U8_DIR, { index: false, fallthrough: true }));
+      app.use(m3u8Route, requireAuth, express.static(M3U8_DIR, {
+        index: false,
+        fallthrough: true,
+        etag: true,
+        lastModified: true,
+        cacheControl: true,
+        maxAge: 0,
+        setHeaders: (res, filePath) => {
+          const ext = path.extname(filePath).toLowerCase();
+          res.setHeader('Cache-Control', 'no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+          res.setHeader('X-Content-Type-Options', 'nosniff');
+          if (ext === '.m3u8') res.setHeader('Content-Type', 'application/x-mpegURL; charset=utf-8');
+          else if (ext === '.ts') res.setHeader('Content-Type', 'video/mp2t');
+          const name = path.basename(filePath);
+          res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+        }
+      }));
 
       app.get(`${m3u8Route}/list`, requireAuth, async (req, res) => {
         try {
           const subdir = (req.query?.subdir || '').toString().trim();
           const page = Number(req.query?.page || 1);
           const pageSize = Number(req.query?.pageSize || 100);
-          const ext = req.query?.ext ? String(req.query.ext).split(',').map(e => `.${e.trim().toLowerCase()}`) : null;
+          const ext = req.query?.ext ? String(req.query.ext).split(',').map(e => `.${e.trim().toLowerCase()}`) : ['.m3u8', '.ts', '.key'];
           const base = M3U8_DIR;
           const targetDir = subdir ? path.join(base, subdir) : base;
           const normalized = path.normalize(targetDir);
