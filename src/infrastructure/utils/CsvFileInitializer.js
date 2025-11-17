@@ -4,7 +4,7 @@
  */
 
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
-import { existsSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, writeFileSync, mkdirSync, readFileSync } from 'fs';
 import { dirname } from 'path';
 
 export class CsvFileInitializer {
@@ -27,8 +27,24 @@ export class CsvFileInitializer {
             'anime.csv',
             'english.csv', 
             'magnets.csv',
-            'torrentio.csv'
+            'spanish.csv'
         ];
+
+        const legacyPath = `${dataDirectory}/torrentio.csv`;
+        const newPath = `${dataDirectory}/spanish.csv`;
+        if (existsSync(legacyPath)) {
+            try {
+                const legacyContent = readFileSync(legacyPath, 'utf8');
+                const legacyHasData = legacyContent.split('\n').length > 1;
+                const spanishExists = existsSync(newPath);
+                const spanishContent = spanishExists ? readFileSync(newPath, 'utf8') : '';
+                const spanishHasOnlyHeader = spanishContent.trim().length <= CsvFileInitializer.CSV_HEADER.length + 1;
+                if (!spanishExists || (spanishHasOnlyHeader && legacyHasData)) {
+                    writeFileSync(newPath, legacyContent, 'utf8');
+                    CsvFileInitializer.#logger.info(`[CsvFileInitializer] Migración aplicada: torrentio.csv -> spanish.csv`);
+                }
+            } catch (_) {}
+        }
 
         // Crear directorio si no existe
         if (!existsSync(dataDirectory)) {

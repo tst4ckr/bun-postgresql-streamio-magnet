@@ -4,7 +4,7 @@
  */
 
 import { writeFileSync, appendFileSync, existsSync, mkdirSync, readFileSync } from 'fs';
-import { dirname } from 'path';
+import { dirname, basename, join } from 'path';
 import { Magnet } from '../../domain/entities/Magnet.js';
 import { EnhancedLogger } from '../utils/EnhancedLogger.js';
 import { addonConfig } from '../../config/addonConfig.js';
@@ -65,7 +65,7 @@ export class TorrentioApiService {
   constructor(baseUrl, torrentioFilePath, logger = null, timeout = CONSTANTS.TIME.DEFAULT_TIMEOUT, torConfig = {}, englishFilePath = null) {
     this.#baseUrl = baseUrl;
     this.#torrentioFilePath = torrentioFilePath;
-    this.#englishFilePath = englishFilePath || torrentioFilePath.replace('torrentio.csv', 'english.csv');
+    this.#englishFilePath = englishFilePath || (torrentioFilePath ? join(dirname(torrentioFilePath), 'english.csv') : null);
     this.#logger = logger || new EnhancedLogger('TorrentioApiService');
     this.#timeout = timeout;
     
@@ -1058,7 +1058,7 @@ export class TorrentioApiService {
   async #saveMagnetsToFile(magnets, language = 'spanish') {
     // Determinar archivo de destino según el idioma
     const targetFilePath = language === 'english' ? this.#englishFilePath : this.#torrentioFilePath;
-    const fileName = language === 'english' ? 'english.csv' : 'torrentio.csv';
+    const fileName = targetFilePath ? basename(targetFilePath) : (language === 'english' ? 'english.csv' : 'spanish.csv');
     
     // Si no hay ruta de archivo especificada, omitir el guardado
     if (!targetFilePath || targetFilePath.trim() === '') {
@@ -1693,7 +1693,7 @@ export class TorrentioApiService {
   #ensureTorrentioFileExists() {
     // Si no hay ruta de archivo especificada, omitir la creación del archivo
     if (!this.#torrentioFilePath || this.#torrentioFilePath.trim() === '') {
-      this.#logger.debug('No se especificó ruta para archivo torrentio.csv, omitiendo creación', { component: 'TorrentioApiService' });
+      this.#logger.debug('No se especificó ruta para archivo secundario, omitiendo creación', { component: 'TorrentioApiService' });
       return;
     }
     
@@ -1705,7 +1705,7 @@ export class TorrentioApiService {
       }
       const headers = CONSTANTS.FILE.CSV_HEADERS;
       writeFileSync(this.#torrentioFilePath, headers, 'utf8');
-      this.#logger.info(`Archivo torrentio.csv creado en: ${this.#torrentioFilePath}`);
+      this.#logger.info(`Archivo creado: ${basename(this.#torrentioFilePath)} en ${this.#torrentioFilePath}`);
       return;
     }
     try {

@@ -156,7 +156,7 @@ const config = {
     })(),
     secondaryCsvPath: (() => {
       const raw = process.env.SECONDARY_CSV_PATH;
-      return resolvePath(raw) || resolvePath(join(DATA_TORRENTS_DIR, 'torrentio.csv'));
+      return resolvePath(raw) || resolvePath(join(DATA_TORRENTS_DIR, 'spanish.csv'));
     })(),
     animeCsvPath: (() => {
       const raw = process.env.ANIME_CSV_PATH;

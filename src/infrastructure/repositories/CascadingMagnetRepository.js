@@ -11,7 +11,7 @@ import { metadataService } from '../services/MetadataService.js';
 import { cacheService } from '../services/CacheService.js';
 import { ConfigurationCommandFactory } from '../patterns/ConfigurationCommand.js';
 import { CsvFileInitializer } from '../utils/CsvFileInitializer.js';
-import { dirname } from 'path';
+import { dirname, join, basename } from 'path';
 
 /**
  * Repositorio que implementa búsqueda en cascada con fallback automático.
@@ -50,7 +50,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
     this.#logger = logger;
     this.#secondaryCsvPath = secondaryCsvPath;
     this.#animeCsvPath = animeCsvPath;
-    this.#englishCsvPath = englishCsvPath || secondaryCsvPath.replace('torrentio.csv', 'english.csv');
+    this.#englishCsvPath = englishCsvPath || join(dirname(secondaryCsvPath), 'english.csv');
     this.#idService = idService;
     
     // Repositorio principal (magnets.csv)
@@ -99,7 +99,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       await this.#initializeRepository(this.#primaryRepository, 'magnets.csv');
       
       // Inicializar repositorio secundario
-      await this.#initializeRepository(this.#secondaryRepository, 'torrentio.csv');
+      await this.#initializeRepository(this.#secondaryRepository, basename(this.#secondaryCsvPath));
       
       // Inicializar repositorio anime
       await this.#initializeRepository(this.#animeRepository, 'anime.csv');
