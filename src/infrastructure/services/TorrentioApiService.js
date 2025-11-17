@@ -413,6 +413,7 @@ export class TorrentioApiService {
     }
     
     return results.filter(magnet => {
+      if (this.#isBannedStreamName(magnet.name)) return false;
       const seeders = parseInt(magnet.seeders) || 0;
       return seeders > 0;
     });
@@ -632,9 +633,13 @@ export class TorrentioApiService {
     }
     
     const config = addonConfig.magnetSelection;
+    const notBannedCandidates = candidates.filter(m => !this.#isBannedStreamName(m.name));
+    if (notBannedCandidates.length === 0) {
+      return [];
+    }
     
     // Filtrar magnets que cumplan el mínimo de seeders
-    const validCandidates = candidates.filter(magnet => 
+    const validCandidates = notBannedCandidates.filter(magnet => 
       (magnet.seeders || 0) >= config.minSeeders
     );
     
