@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-id="tv_tv_publica_hd", TV Publica
+#EXTINF:-1 tvg-logo="logos/tv_tv_publica_hd.png" tvg-id="tv_tv_publica_hd", TV Publica
 http://181.209.125.237:9000/play/a057/index.m3u8

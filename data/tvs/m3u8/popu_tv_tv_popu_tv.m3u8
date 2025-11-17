@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-id="tv_popu_tv", POPU TV
+#EXTINF:-1 tvg-logo="logos/tv_popu_tv.png" tvg-id="tv_popu_tv", POPU TV
 http://201.230.121.186:8000/play/a0pd/index.m3u8

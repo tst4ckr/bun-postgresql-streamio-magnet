@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-id="tv_cgtn", CGTN
+#EXTINF:-1 tvg-logo="logos/tv_cgtn.png" tvg-id="tv_cgtn", CGTN
 http://espanol-livews.cgtn.com/hls/lsveogbabw41ea7ukkvaudkq220802lstexu6xaufh8vznble1znea220802cd/playlist.m3u8

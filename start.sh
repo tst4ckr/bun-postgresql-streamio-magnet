@@ -73,7 +73,7 @@ if [ -z "$WINDOWS_DEV" ]; then
   OUTPUT_CSV_PATH="${OUTPUT_CSV_PATH:-/app/data/tvs/tv.csv}"
   OUTPUT_M3U_PATH="${OUTPUT_M3U_PATH:-/app/data/tvs/channels.m3u}"
   CHANNELS_FILE="${CHANNELS_FILE:-/app/data/tvs/channels.csv}"
-  PER_CHANNEL_M3U8_DIR="${PER_CHANNEL_M3U8_DIR:-/app/data/m3u8}"
+  PER_CHANNEL_M3U8_DIR="${PER_CHANNEL_M3U8_DIR:-/app/data/tvs/m3u8}"
 else
   # Desarrollo local en Windows: rutas ABSOLUTAS derivadas del directorio del proyecto (respetando tv/data)
   SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
@@ -82,7 +82,7 @@ else
   OUTPUT_CSV_PATH="${OUTPUT_CSV_PATH:-$SCRIPT_DIR/data/tvs/tv.csv}"
   OUTPUT_M3U_PATH="${OUTPUT_M3U_PATH:-$SCRIPT_DIR/data/tvs/channels.m3u}"
   CHANNELS_FILE="${CHANNELS_FILE:-$SCRIPT_DIR/data/tvs/channels.csv}"
-  PER_CHANNEL_M3U8_DIR="${PER_CHANNEL_M3U8_DIR:-$SCRIPT_DIR/data/m3u8}"
+  PER_CHANNEL_M3U8_DIR="${PER_CHANNEL_M3U8_DIR:-$SCRIPT_DIR/data/tvs/m3u8}"
 fi
 export OUTPUT_CSV_PATH OUTPUT_M3U_PATH CHANNELS_FILE PER_CHANNEL_M3U8_DIR
 

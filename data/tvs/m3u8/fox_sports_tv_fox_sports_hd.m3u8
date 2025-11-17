@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-id="tv_fox_sports_hd", Fox Sports
+#EXTINF:-1 tvg-logo="logos/tv_fox_sports_hd.png" tvg-id="tv_fox_sports_hd", Fox Sports
 http://181.209.125.237:9000/play/a04e/index.m3u8

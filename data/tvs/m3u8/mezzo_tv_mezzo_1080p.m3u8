@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="https://i.imgur.com/auNdGeW.png" tvg-id="tv_mezzo_1080p", Mezzo
+#EXTINF:-1 tvg-logo="logos/tv_mezzo_1080p.png" tvg-id="tv_mezzo_1080p", Mezzo
 http://viamotionhsi.netplus.ch/live/eds/mezzo/browser-hls8/mezzo.m3u8

@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-id="tv_national_geographic", National Geographic
+#EXTINF:-1 tvg-logo="logos/tv_national_geographic.png" tvg-id="tv_national_geographic", National Geographic
 http://170.244.209.135:8000/play/a0fj/index.m3u8
