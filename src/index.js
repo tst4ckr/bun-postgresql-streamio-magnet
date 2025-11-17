@@ -14,6 +14,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import { existsSync } from 'fs';
+import mime from 'mime-types';
 import { addonConfig, getManifest, populateTvGenreOptionsFromCsv } from './config/addonConfig.js';
 import { CascadingMagnetRepository } from './infrastructure/repositories/CascadingMagnetRepository.js';
 import { StreamHandler } from './application/handlers/StreamHandler.js';
@@ -518,6 +519,7 @@ class MagnetAddon {
     }
 
     const M3U8_DIR = resolveDir(process.env.M3U8_DIR) || path.join(process.cwd(), 'data', 'm3u8');
+    this.#logger.info('M3U8 config', { route: process.env.DOWNLOAD_ROUTE_M3U8, dir: M3U8_DIR });
     if (process.env.DOWNLOAD_ROUTE_M3U8 && process.env.DOWNLOAD_ROUTE_M3U8.trim()) {
       const m3u8Route = normalizeRoute(process.env.DOWNLOAD_ROUTE_M3U8, '');
       app.use(m3u8Route, requireAuth, express.static(M3U8_DIR, {
@@ -529,12 +531,12 @@ class MagnetAddon {
         maxAge: 0,
         setHeaders: (res, filePath) => {
           const ext = path.extname(filePath).toLowerCase();
+          const ct = mime.contentType(ext) || (ext === '.ts' ? 'video/mp2t' : 'application/octet-stream');
           res.setHeader('Cache-Control', 'no-store, must-revalidate');
           res.setHeader('Pragma', 'no-cache');
           res.setHeader('Expires', '0');
           res.setHeader('X-Content-Type-Options', 'nosniff');
-          if (ext === '.m3u8') res.setHeader('Content-Type', 'application/x-mpegURL; charset=utf-8');
-          else if (ext === '.ts') res.setHeader('Content-Type', 'video/mp2t');
+          res.setHeader('Content-Type', ct);
           const name = path.basename(filePath);
           res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
         }
@@ -575,6 +577,14 @@ class MagnetAddon {
           if (!existsSync(normalized)) {
             return res.status(404).json({ error: 'Archivo no encontrado' });
           }
+          const ext = path.extname(normalized).toLowerCase();
+          const ct = mime.contentType(ext) || (ext === '.ts' ? 'video/mp2t' : 'application/octet-stream');
+          res.setHeader('Cache-Control', 'no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+          res.setHeader('X-Content-Type-Options', 'nosniff');
+          res.setHeader('Content-Type', ct);
+          res.setHeader('Content-Disposition', `attachment; filename="${path.basename(normalized)}"`);
           res.sendFile(normalized, (err) => {
             if (err) {
               this.#logger.error('Error enviando m3u8', { path: normalized, error: err?.message });
@@ -977,9 +987,9 @@ class MagnetAddon {
       }
     });
 
+    this.#setupAdditionalRoutes(app);
     // Montar router del addon (proporciona /manifest.json y endpoints del protocolo)
     app.use('/', router);
-    this.#setupAdditionalRoutes(app);
 
     const server = app.listen(port, () => {
       const localUrl = `http://localhost:${port}`;

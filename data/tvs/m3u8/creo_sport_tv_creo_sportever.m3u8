@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logos/tv_creo_sportever.png" tvg-id="tv_creo_sportever", CREO SPORT
+#EXTINF:-1 tvg-id="tv_creo_sportever", CREO SPORT
 http://38.183.182.166:8000/play/a0xa/index.m3u8

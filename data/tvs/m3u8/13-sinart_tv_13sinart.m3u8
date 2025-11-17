@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-id="tv_13sinart", 13-Sinart
+http://200.125.170.122:8000/play/a0e6/index.m3u8

@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logos/tv_nick_jr.png" tvg-id="tv_nick_jr", Nick Jr
+#EXTINF:-1 tvg-id="tv_nick_jr", Nick Jr
 http://38.183.182.166:8000/play/a0ro/index.m3u8

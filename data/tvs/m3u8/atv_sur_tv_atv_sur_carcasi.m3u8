@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logos/tv_atv_sur_carcasi.png" tvg-id="tv_atv_sur_carcasi", ATV SUR
+#EXTINF:-1 tvg-id="tv_atv_sur_carcasi", ATV SUR
 http://38.183.182.166:8000/play/a14a/index.m3u8

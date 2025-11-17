@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-id="tv_gamavisin", Gamavisin
+#EXTINF:-1 tvg-logo="logos/tv_gamavisin.png" tvg-id="tv_gamavisin", Gamavisin
 http://170.244.209.135:8000/play/a0f9/index.m3u8

@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logos/tv_now_90s00s.png" tvg-id="tv_now_90s00s", NOW 90s00s
+#EXTINF:-1 tvg-id="tv_now_90s00s", NOW 90s00s
 http://amg01076-amg01076c19-rakuten-gb-8653.playouts.now.amagi.tv/playlist/amg01076-lightning-now90s00s-rakutengb/playlist.m3u8

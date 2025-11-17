@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logos/tv_oromar_tv_ever.png" tvg-id="tv_oromar_tv_ever", OROMAR TV
+#EXTINF:-1 tvg-id="tv_oromar_tv_ever", OROMAR TV
 http://38.183.182.166:8000/play/a13i/index.m3u8

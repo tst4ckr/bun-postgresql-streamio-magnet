@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-id="tv_ipe_md2", IPE- MD2
+#EXTINF:-1 tvg-logo="logos/tv_ipe_md2.png" tvg-id="tv_ipe_md2", IPE- MD2
 http://38.183.182.166:8000/play/a12x/index.m3u8
