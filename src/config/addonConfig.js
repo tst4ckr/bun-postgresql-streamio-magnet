@@ -338,6 +338,9 @@ const config = {
       logPrioritization: true,
       logFinalResults: true
     }
+  },
+  filters: {
+    bannedStreamNames: (process.env.BANNED_STREAM_NAMES || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
   }
 };
 

@@ -529,7 +529,17 @@ export class StreamHandler {
       return [];
     }
 
-    const streams = magnets.map(magnet => {
+    const banned = (this.#config.filters?.bannedStreamNames || []);
+    const normalize = (s) => String(s).toLowerCase().trim().replace(/\s+/g, ' ');
+    const isBanned = (name) => {
+      if (!name) return false;
+      const n = normalize(name);
+      return banned.some(b => n === normalize(b));
+    };
+
+    const filteredMagnets = magnets.filter(m => !isBanned(m.name));
+
+    const streams = filteredMagnets.map(magnet => {
       try {
         const parsedMagnet = parseMagnet(magnet.magnet);
         const infoHash = parsedMagnet.infoHash;

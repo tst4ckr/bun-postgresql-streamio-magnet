@@ -503,6 +503,10 @@ export class TorrentioApiService {
         
         // Combinar name y title para obtener información completa
         const fullName = this.#buildFullStreamName(streamName, streamTitle);
+        if (this.#isBannedStreamName(fullName) || this.#isBannedStreamName(streamName) || this.#isBannedStreamName(streamTitle)) {
+          this.#logger.debug(`Stream descartado por nombre inválido: ${fullName}`);
+          continue;
+        }
         const quality = this.#extractQualityFromStream(stream, streamName, streamTitle);
         const size = this.#extractSizeFromStream(stream, streamTitle);
         const filename = this.#extractFilename(stream);
@@ -571,6 +575,14 @@ export class TorrentioApiService {
     
     // Priorizar y devolver solo el mejor resultado
     return this.#selectBestMagnet(candidates);
+  }
+
+  #isBannedStreamName(name) {
+    if (!name) return false;
+    const normalize = (s) => String(s).toLowerCase().trim().replace(/\s+/g, ' ');
+    const n = normalize(name);
+    const banned = addonConfig.filters?.bannedStreamNames || [];
+    return banned.some(b => n === normalize(b));
   }
 
   /**
@@ -1098,7 +1110,7 @@ export class TorrentioApiService {
       // Filtrar magnets duplicados antes de guardar
       const newMagnets = magnets.filter(magnet => {
         const key = `${magnet.content_id}|${magnet.magnet}`;
-        return !existingMagnets.has(key);
+        return !this.#isBannedStreamName(magnet.name) && !existingMagnets.has(key);
       });
 
       // Agregar los nuevos magnets a la cache global
@@ -1145,7 +1157,7 @@ export class TorrentioApiService {
               }
             }
           }
-          const newAggMagnets = magnets.filter(m => !existingAgg.has(`${m.content_id}|${m.magnet}`));
+          const newAggMagnets = magnets.filter(m => !this.#isBannedStreamName(m.name) && !existingAgg.has(`${m.content_id}|${m.magnet}`));
           if (newAggMagnets.length > 0) {
             for (const magnet of newAggMagnets) {
               const csvLine = this.#magnetToCsvLine(magnet);
@@ -1206,7 +1218,7 @@ export class TorrentioApiService {
           }
         }
       }
-      const newAggMagnets = magnets.filter(m => !existingAgg.has(`${m.content_id}|${m.magnet}`));
+      const newAggMagnets = magnets.filter(m => !this.#isBannedStreamName(m.name) && !existingAgg.has(`${m.content_id}|${m.magnet}`));
       if (newAggMagnets.length > 0) {
         for (const magnet of newAggMagnets) {
           const csvLine = this.#magnetToCsvLine(magnet);
