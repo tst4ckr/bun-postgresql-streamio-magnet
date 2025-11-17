@@ -520,8 +520,8 @@ class MagnetAddon {
 
     const M3U8_DIR = resolveDir(process.env.M3U8_DIR) || path.join(process.cwd(), 'data', 'm3u8');
     this.#logger.info('M3U8 config', { route: process.env.DOWNLOAD_ROUTE_M3U8, dir: M3U8_DIR });
-    if (process.env.DOWNLOAD_ROUTE_M3U8 && process.env.DOWNLOAD_ROUTE_M3U8.trim()) {
-      const m3u8Route = normalizeRoute(process.env.DOWNLOAD_ROUTE_M3U8, '');
+    {
+      const m3u8Route = normalizeRoute(process.env.DOWNLOAD_ROUTE_M3U8, '/download/m3u8');
       app.use(m3u8Route, requireAuth, express.static(M3U8_DIR, {
         index: false,
         fallthrough: true,

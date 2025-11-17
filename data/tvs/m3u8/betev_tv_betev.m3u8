@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-id="tv_betev", betev
+#EXTINF:-1 tvg-logo="logos/tv_betev.png" tvg-id="tv_betev", betev
 http://cdnapisec.kaltura.com/p/2346171/sp/234617100/playmanifest/entryid/1_vfibi2fe/protocol/https/format/applehttp/a.m3u8?referrer=ahr0chm6ly9izxrldmuuy2f0

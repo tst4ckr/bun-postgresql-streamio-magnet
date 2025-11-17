@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="https://i.imgur.com/POdTmaD.png" tvg-id="tv_tdi_radio_tv", TDI Radio TV
+#EXTINF:-1 tvg-logo="logos/tv_tdi_radio_tv.png" tvg-id="tv_tdi_radio_tv", TDI Radio TV
 http://peer2.tdiradio.com/static/streaming-playlists/hls/8f5d84ce-e8ac-4109-9975-9665f5605557/master.m3u8

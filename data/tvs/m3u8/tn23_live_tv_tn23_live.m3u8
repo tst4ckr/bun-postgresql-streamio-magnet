@@ -1,3 +1,0 @@
-#EXTM3U
-#EXTINF:-1 tvg-logo="logos/tv_tn23_live.png" tvg-id="tv_tn23_live", TN23 LIVE
-http://200.12.41.194:8000/play/a03m/index.m3u8
