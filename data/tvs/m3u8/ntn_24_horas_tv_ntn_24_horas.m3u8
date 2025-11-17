@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-id="tv_ntn_24_horas", NTN 24 Horas
+http://38.183.182.166:8000/play/a0s4/index.m3u8

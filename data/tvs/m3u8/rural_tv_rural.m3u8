@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-id="tv_rural", RURAL
+#EXTINF:-1 tvg-logo="logos/tv_rural.png" tvg-id="tv_rural", RURAL
 http://181.209.125.237:9000/play/a05m/index.m3u8

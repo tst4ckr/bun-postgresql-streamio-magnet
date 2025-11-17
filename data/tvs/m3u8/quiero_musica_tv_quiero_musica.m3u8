@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-id="tv_quiero_musica", Quiero Musica
+#EXTINF:-1 tvg-logo="logos/tv_quiero_musica.png" tvg-id="tv_quiero_musica", Quiero Musica
 http://181.209.125.237:9000/play/a05p/index.m3u8

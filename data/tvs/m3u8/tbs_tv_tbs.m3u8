@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_tbs.png" tvg-id="tv_tbs", TBS
+http://200.12.41.194:8000/play/a0g9/index.m3u8

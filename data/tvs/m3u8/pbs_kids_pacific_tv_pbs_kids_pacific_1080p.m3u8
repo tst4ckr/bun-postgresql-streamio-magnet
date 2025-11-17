@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_pbs_kids_pacific_1080p.png" tvg-id="tv_pbs_kids_pacific_1080p", PBS Kids Pacific
+http://livestream.pbskids.org/out/v1/11f2e6b73eaa4887b3746cb863960e79/pst.m3u8

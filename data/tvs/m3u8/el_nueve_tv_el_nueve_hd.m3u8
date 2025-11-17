@@ -1,3 +1,3 @@
 #EXTM3U
-#EXTINF:-1 tvg-logo="logos/tv_el_nueve_hd.png" tvg-id="tv_el_nueve_hd", el nueve
+#EXTINF:-1 tvg-id="tv_el_nueve_hd", el nueve
 http://181.209.125.237:9000/play/a04x/index.m3u8

@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="logos/tv_nick_2_hd.png" tvg-id="tv_nick_2_hd", Nick 2
+http://200.12.41.194:8000/play/a03f/index.m3u8

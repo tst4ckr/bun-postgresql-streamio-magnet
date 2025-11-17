@@ -518,30 +518,15 @@ class MagnetAddon {
       app.get(routeConfig.anime, requireAuth, async (req, res) => serveDownloadByName(k, req, res));
     }
 
-    const M3U8_DIR = resolveDir(process.env.M3U8_DIR) || path.join(process.cwd(), 'data', 'm3u8');
+    const envM3u8 = resolveDir(process.env.M3U8_DIR);
+    const tvM3u8 = path.join(process.cwd(), 'data', 'tvs', 'm3u8');
+    const defaultM3u8 = path.join(process.cwd(), 'data', 'm3u8');
+    const candidates = [envM3u8, tvM3u8, defaultM3u8].filter(Boolean);
+    let M3U8_DIR = candidates.find(d => { try { return fs.existsSync(d) && fs.readdirSync(d).length >= 1; } catch (_) { return false; } });
+    if (!M3U8_DIR) M3U8_DIR = envM3u8 || tvM3u8 || defaultM3u8;
     this.#logger.info('M3U8 config', { route: process.env.DOWNLOAD_ROUTE_M3U8, dir: M3U8_DIR });
     {
       const m3u8Route = normalizeRoute(process.env.DOWNLOAD_ROUTE_M3U8, '/download/m3u8');
-      app.use(m3u8Route, requireAuth, express.static(M3U8_DIR, {
-        index: false,
-        fallthrough: true,
-        etag: true,
-        lastModified: true,
-        cacheControl: true,
-        maxAge: 0,
-        setHeaders: (res, filePath) => {
-          const ext = path.extname(filePath).toLowerCase();
-          const ct = mime.contentType(ext) || (ext === '.ts' ? 'video/mp2t' : 'application/octet-stream');
-          res.setHeader('Cache-Control', 'no-store, must-revalidate');
-          res.setHeader('Pragma', 'no-cache');
-          res.setHeader('Expires', '0');
-          res.setHeader('X-Content-Type-Options', 'nosniff');
-          res.setHeader('Content-Type', ct);
-          const name = path.basename(filePath);
-          res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
-        }
-      }));
-
       app.get(`${m3u8Route}/list`, requireAuth, async (req, res) => {
         try {
           const subdir = (req.query?.subdir || '').toString().trim();
@@ -566,7 +551,104 @@ class MagnetAddon {
         }
       });
 
+      app.use(m3u8Route, requireAuth, express.static(M3U8_DIR, {
+        index: false,
+        fallthrough: true,
+        etag: true,
+        lastModified: true,
+        cacheControl: true,
+        maxAge: 0,
+        setHeaders: (res, filePath) => {
+          const ext = path.extname(filePath).toLowerCase();
+          const ct = mime.contentType(ext) || (ext === '.ts' ? 'video/mp2t' : 'application/octet-stream');
+          res.setHeader('Cache-Control', 'no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+          res.setHeader('X-Content-Type-Options', 'nosniff');
+          res.setHeader('Content-Type', ct);
+          const name = path.basename(filePath);
+          res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+        }
+      }));
+
+      // Fallback explícito por si la variable de entorno no se aplica correctamente
+      app.use('/download/m3u8', requireAuth, express.static(M3U8_DIR, {
+        index: false,
+        fallthrough: true,
+        etag: true,
+        lastModified: true,
+        cacheControl: true,
+        maxAge: 0,
+        setHeaders: (res, filePath) => {
+          const ext = path.extname(filePath).toLowerCase();
+          const ct = mime.contentType(ext) || (ext === '.ts' ? 'video/mp2t' : 'application/octet-stream');
+          res.setHeader('Cache-Control', 'no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+          res.setHeader('X-Content-Type-Options', 'nosniff');
+          res.setHeader('Content-Type', ct);
+          const name = path.basename(filePath);
+          res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+        }
+      }));
+
+
+      app.get(`/download/m3u8/list`, requireAuth, async (req, res) => {
+        try {
+          const subdir = (req.query?.subdir || '').toString().trim();
+          const page = Number(req.query?.page || 1);
+          const pageSize = Number(req.query?.pageSize || 100);
+          const ext = req.query?.ext ? String(req.query.ext).split(',').map(e => `.${e.trim().toLowerCase()}`) : ['.m3u8', '.ts', '.key'];
+          const base = M3U8_DIR;
+          const targetDir = subdir ? path.join(base, subdir) : base;
+          const normalized = path.normalize(targetDir);
+          if (!normalized.startsWith(path.normalize(base))) {
+            return res.status(400).json({ error: 'Subdirectorio inválido' });
+          }
+          const list = await listFiles(normalized, { extFilter: ext, page, pageSize });
+          const items = list.items.map(it => ({
+            ...it,
+            url: `/download/m3u8/${encodeURIComponent(subdir ? subdir + '/' + it.name : it.name)}`
+          }));
+          res.json({ total: list.total, items });
+        } catch (e) {
+          this.#logger.error('Error en m3u8 list', { error: e?.message });
+          res.status(500).json({ error: 'No se pudieron listar los m3u8' });
+        }
+      });
+
       app.get(`${m3u8Route}/*`, requireAuth, async (req, res) => {
+        try {
+          const rel = req.params[0];
+          const fullPath = path.join(M3U8_DIR, rel);
+          const normalized = path.normalize(fullPath);
+          if (!normalized.startsWith(path.normalize(M3U8_DIR))) {
+            return res.status(400).json({ error: 'Ruta inválida' });
+          }
+          if (!existsSync(normalized)) {
+            return res.status(404).json({ error: 'Archivo no encontrado' });
+          }
+          const ext = path.extname(normalized).toLowerCase();
+          const ct = mime.contentType(ext) || (ext === '.ts' ? 'video/mp2t' : 'application/octet-stream');
+          res.setHeader('Cache-Control', 'no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+          res.setHeader('X-Content-Type-Options', 'nosniff');
+          res.setHeader('Content-Type', ct);
+          res.setHeader('Content-Disposition', `attachment; filename="${path.basename(normalized)}"`);
+          res.sendFile(normalized, (err) => {
+            if (err) {
+              this.#logger.error('Error enviando m3u8', { path: normalized, error: err?.message });
+              if (!res.headersSent) res.status(500).json({ error: 'Error interno' });
+            }
+          });
+        } catch (e) {
+          this.#logger.error('Error en m3u8 file', { error: e?.message });
+          res.status(500).json({ error: 'Error interno' });
+        }
+      });
+
+      app.get(`/download/m3u8/*`, requireAuth, async (req, res) => {
         try {
           const rel = req.params[0];
           const fullPath = path.join(M3U8_DIR, rel);
