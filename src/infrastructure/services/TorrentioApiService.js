@@ -529,14 +529,21 @@ export class TorrentioApiService {
         
         // Procesamiento inteligente de content_id específico por tipo
         const contentIdInfo = this.#intelligentContentIdProcessing(contentId);
-        
-        // Usar información procesada inteligentemente
         const finalContentId = contentIdInfo.finalContentId;
         const idType = contentIdInfo.idType;
         const imdbId = contentIdInfo.imdbId;
+        const contentIdToStore = (() => {
+          if ((type === 'series' || type === 'anime') && episodeInfo && episodeInfo.season != null && episodeInfo.episode != null) {
+            if (idType === 'imdb') {
+              const base = imdbId || finalContentId.split(':')[0];
+              return `${base}:${episodeInfo.season}:${episodeInfo.episode}`;
+            }
+          }
+          return finalContentId;
+        })();
         
         const magnetData = {
-          content_id: finalContentId,
+          content_id: contentIdToStore,
           name: fullName,
           magnet: magnetUri,
           quality: quality || 'unknown',

@@ -8,7 +8,7 @@ const MagnetSchema = z.object({
   size: z.string(),
   // Campos opcionales para compatibilidad hacia atrás
   imdb_id: z.string().regex(/^tt\d+(?::\d+)?(?::\d+)?$/).optional(),
-  id_type: z.enum(['imdb', 'tmdb', 'tvdb', 'kitsu', 'anilist', 'mal']).default('imdb').optional(),
+  id_type: z.enum(['imdb', 'tmdb', 'tvdb', 'kitsu', 'anilist', 'mal', 'anidb']).default('imdb').optional(),
   // Campos adicionales opcionales
   provider: z.string().optional(),
   filename: z.string().optional(),
