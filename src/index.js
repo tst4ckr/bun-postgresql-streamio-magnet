@@ -571,7 +571,6 @@ class MagnetAddon {
         }
       }));
 
-      // Fallback explícito por si la variable de entorno no se aplica correctamente
       app.use('/download/m3u8', requireAuth, express.static(M3U8_DIR, {
         index: false,
         fallthrough: true,
