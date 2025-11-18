@@ -826,20 +826,19 @@ export class IPTVProcessor {
                 const lines = ['#EXTM3U', generateExtInf(channel), urlLine];
                 const content = lines.join('\n');
 
-                // Nombre de archivo seguro y único
-                const namePart = sanitizeTitle(channel.name || 'canal')
-                    .toLowerCase()
-                    .replace(/\s+/g, '_');
-                const idPart = String(channel.id || '')
+                const rawId = channel.id || '';
+                const idClean = String(rawId)
                     .toLowerCase()
                     .replace(/[^\w\-]/g, '')
-                    .slice(0, 64);
-                let fileBase = namePart || idPart || `canal_${Date.now()}`;
-                if (idPart) fileBase = `${fileBase}_${idPart}`;
-                let fileName = `${fileBase}.m3u8`;
+                    .slice(0, 128);
+                const fallbackName = sanitizeTitle(channel.name || 'canal')
+                    .toLowerCase()
+                    .replace(/\s+/g, '_');
+                const baseName = idClean || fallbackName || `canal_${Date.now()}`;
+                let fileName = `${baseName}.m3u8`;
                 let attempt = 1;
                 while (usedNames.has(fileName)) {
-                    fileName = `${fileBase}_${attempt}.m3u8`;
+                    fileName = `${baseName}_${attempt}.m3u8`;
                     attempt++;
                 }
                 usedNames.add(fileName);
