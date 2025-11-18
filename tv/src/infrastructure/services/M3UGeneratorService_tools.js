@@ -164,3 +164,36 @@ export function generateMetadataLines(metadata) {
 export function generateCategorySeparator(category) {
     return [`# === ${category.toUpperCase()} ===`];
 }
+
+export function createSlug(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+}
+
+export function createTvgIdFromChannel(channel, options = {}) {
+    const prefix = options.tvgIdPrefix ?? 'tv_';
+    const base = channel.name || '';
+    const slug = createSlug(base);
+    const appendCountry = options.appendCountry ?? false;
+    const country = appendCountry && channel.country ? `_${String(channel.country).toLowerCase()}` : '';
+    return `${prefix}${slug}${country}`;
+}
+
+export function assignDynamicTvgIds(channels, options = {}) {
+    const used = new Set();
+    return channels.map(ch => {
+        const baseId = (ch.id && String(ch.id).trim() !== '') ? String(ch.id).trim() : createTvgIdFromChannel(ch, options);
+        let id = baseId;
+        let i = 2;
+        while (used.has(id)) {
+            id = `${baseId}_${i}`;
+            i++;
+        }
+        used.add(id);
+        return { ...ch, id };
+    });
+}

@@ -775,7 +775,7 @@ http://179.51.136.19:8000/play/a1n0/index.m3u8
 http://179.51.136.19:8000/play/a1i0/index.m3u8
 #EXTINF:-1 tvg-logo="logos/tv_t13.png" tvg-id="tv_t13", T13
 http://179.51.136.19:8000/play/a1i1/index.m3u8
-#EXTINF:-1 tvg-logo="logos/tv_ucl.png" tvg-id="tv_ucl", UCL
+#EXTINF:-1 tvg-logo="logos/tv_ucl.png" tvg-id=", UCL
 http://179.51.136.19:8000/play/a1i5/index.m3u8
 #EXTINF:-1 tvg-logo="logos/tv_bloomberg_europe_en.png" tvg-id="tv_bloomberg_europe_en", Bloomberg Europe EN
 http://www.bloomberg.com/media-manifest/streams/eu.m3u8

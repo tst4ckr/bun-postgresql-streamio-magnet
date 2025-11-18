@@ -7,7 +7,8 @@ import {
     sortCategories,
     validateChannelsArray,
     generateMetadataLines,
-    generateCategorySeparator
+    generateCategorySeparator,
+    assignDynamicTvgIds
 } from './M3UGeneratorService_tools.js';
 
 /**
@@ -29,10 +30,10 @@ class M3UGeneratorService {
      */
     generateM3U(channels, options = {}) {
         validateChannelsArray(channels);
-
+        const prepared = assignDynamicTvgIds(channels, options);
         const lines = [this.header];
         
-        channels.forEach(channel => {
+        prepared.forEach(channel => {
             if (isValidChannel(channel)) {
                 const extinf = generateExtInf(channel);
                 lines.push(extinf);
@@ -56,7 +57,8 @@ class M3UGeneratorService {
         const metadataLines = generateMetadataLines(metadata);
         lines.push(...metadataLines);
 
-        channels.forEach(channel => {
+        const prepared = assignDynamicTvgIds(channels, {});
+        prepared.forEach(channel => {
             if (isValidChannel(channel)) {
                 const extinf = generateExtendedExtInf(channel);
                 lines.push(extinf);
@@ -74,11 +76,11 @@ class M3UGeneratorService {
      */
     generateCategorizedM3U(channels) {
         validateChannelsArray(channels);
-
+        const prepared = assignDynamicTvgIds(channels, {});
         const lines = [this.header];
         
         // Agrupar canales por categoría usando herramientas auxiliares
-        const channelsByCategory = groupChannelsByCategory(channels);
+        const channelsByCategory = groupChannelsByCategory(prepared);
         
         // Generar M3U organizado por categorías con orden personalizado
         const sortedCategories = sortCategories(Object.keys(channelsByCategory));
