@@ -27,7 +27,7 @@ export class M3UTvRepository {
     if (!m3uUrl || typeof m3uUrl !== 'string') {
       throw new Error('M3U URL is required');
     }
-    
+
     this.#m3uUrl = m3uUrl;
     this.#cacheTimeout = config.repository.m3uCacheTimeout;
     this.#logger = logger;
@@ -69,20 +69,20 @@ export class M3UTvRepository {
    */
   async getStats() {
     this.#logger.debug('[DEBUG] Fetching TV channels statistics');
-    
+
     try {
       await this.#ensureTvsLoaded();
       const total = this.#tvs.size;
       const groups = new Set();
       this.#tvs.forEach(tv => groups.add(tv.group));
-      
+
       const stats = {
         total,
         groups: groups.size,
         groupNames: Array.from(groups).sort(),
         lastUpdated: this.#lastFetch
       };
-      
+
       this.#logger.debug('[DEBUG] TV channels statistics:', stats);
       return stats;
     } catch (error) {
@@ -102,7 +102,7 @@ export class M3UTvRepository {
    */
   async refreshTvs() {
     this.#lastFetch = null;
-    this.#tvs.clear();
+    // No limpiamos this.#tvs aquí para mantener los datos antiguos si la recarga falla
     await this.#ensureTvsLoaded();
   }
 
@@ -115,7 +115,7 @@ export class M3UTvRepository {
     if (!this.#lastFetch) {
       return false;
     }
-    
+
     const now = Date.now();
     return (now - this.#lastFetch) < this.#cacheTimeout;
   }
@@ -131,45 +131,49 @@ export class M3UTvRepository {
     }
 
     try {
-      await this.#loadTvsFromSource();
+      const newTvsMap = await this.#fetchTvsFromSource();
+
+      // Actualización atómica: solo reemplazamos si la carga fue exitosa
+      this.#tvs = newTvsMap;
+      this.#lastFetch = Date.now();
+
+      this.#logger.debug(`Updated TV repository with ${this.#tvs.size} channels`);
     } catch (error) {
       this.#logger.error('Error loading tvs from M3U source:', error);
-      
-      // Si hay canales de TV en cache, usarlos aunque estén expirados
+
+      // Si hay canales de TV en cache (aunque expirados), los mantenemos
       if (this.#tvs.size > 0) {
-        this.#logger.debug('Using expired cache due to fetch error');
+        this.#logger.warn('Using stale cache due to fetch error');
         return;
       }
-      
+
       throw new Error(`Failed to load tvs: ${error.message}`);
     }
   }
 
   /**
-   * Carga canales de TV desde la fuente M3U.
+   * Carga canales de TV desde la fuente M3U y devuelve un nuevo Map.
    * @private
-   * @returns {Promise<void>}
+   * @returns {Promise<Map<string, Object>>} Nuevo mapa de canales
    */
-  async #loadTvsFromSource() {
+  async #fetchTvsFromSource() {
     this.#logger.debug(`Loading M3U source: ${this.#m3uUrl}`);
 
     const m3uContent = await this.#loadM3UContent();
-    
+
     if (!M3UParser.isValidM3U(m3uContent)) {
       throw new Error('Invalid M3U format received');
     }
 
-    const tvs = M3UParser.parse(m3uContent);
-    
-    // Actualizar cache
-    this.#tvs.clear();
-    tvs.forEach(tv => {
-      this.#tvs.set(tv.id, tv);
+    const tvsList = M3UParser.parse(m3uContent);
+    const tvsMap = new Map();
+
+    tvsList.forEach(tv => {
+      tvsMap.set(tv.id, tv);
     });
-    
-    this.#lastFetch = Date.now();
-    
-    this.#logger.debug(`Loaded ${tvs.length} tvs from M3U source`);
+
+    this.#logger.debug(`Fetched ${tvsList.length} tvs from M3U source`);
+    return tvsMap;
   }
 
   /**

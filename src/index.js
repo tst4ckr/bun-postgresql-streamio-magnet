@@ -96,7 +96,7 @@ class MagnetAddon {
         const detection = idDetectorService.detectIdType(id);
         let type = 'movie';
         if (detection.type && detection.type.includes('series')) type = 'series';
-        else if (['kitsu','mal','anilist','anidb','kitsu_series','mal_series','anilist_series','anidb_series'].includes(detection.type)) type = 'anime';
+        else if (['kitsu', 'mal', 'anilist', 'anidb', 'kitsu_series', 'mal_series', 'anilist_series', 'anidb_series'].includes(detection.type)) type = 'anime';
         await this.#magnetRepository.getMagnetsByContentId(id, type);
         this.#logger.info(`Warmup cache OK: ${id} (${type})`);
       } catch (e) {
@@ -220,10 +220,10 @@ class MagnetAddon {
    * @private
    */
   #setupAdditionalRoutes(app) {
-  // Configuración de rutas estáticas configurable
-  const STATIC_DIR = process.env.STATIC_DIR || 'static';
-  const STATIC_MOUNT_PATH = process.env.STATIC_MOUNT_PATH || '/static';
-  app.use(STATIC_MOUNT_PATH, express.static(STATIC_DIR));
+    // Configuración de rutas estáticas configurable
+    const STATIC_DIR = process.env.STATIC_DIR || 'static';
+    const STATIC_MOUNT_PATH = process.env.STATIC_MOUNT_PATH || '/static';
+    app.use(STATIC_MOUNT_PATH, express.static(STATIC_DIR));
 
     // =============================
     // Endpoints dinámicos de assets
@@ -709,11 +709,11 @@ class MagnetAddon {
             });
             return result;
           }
-          
+
           this.#logger.warn(`[DEBUG] No TvHandler available for TV request - returning empty streams`);
           return { streams: [] };
         }
-        
+
         // Delegar a StreamHandler para el resto de tipos
         this.#logger.debug(`[DEBUG] Delegating to StreamHandler for type: ${args.type}`);
         const result = await this.#streamHandler.createAddonHandler()(args);
@@ -723,8 +723,8 @@ class MagnetAddon {
         });
         return result;
       } catch (error) {
-        this.#logger.error('[DEBUG] Error in main stream handler', { 
-          error: error.message, 
+        this.#logger.error('[DEBUG] Error in main stream handler', {
+          error: error.message,
           stack: error.stack,
           args,
           errorType: error.constructor.name
@@ -732,7 +732,7 @@ class MagnetAddon {
         return { streams: [] };
       }
     });
-    
+
     this.#logger.info('StreamHandler configurado.');
   }
 
@@ -794,7 +794,7 @@ class MagnetAddon {
         if ((args.type === 'tv' || args.type === 'channel') && this.#tvHandler) {
           return await this.#tvHandler.createCatalogHandler()(args);
         }
-        
+
         // StreamHandler no maneja catálogos
         return { metas: [] };
       } catch (error) {
@@ -802,7 +802,7 @@ class MagnetAddon {
         return { metas: [] };
       }
     });
-    
+
     this.#logger.info('CatalogHandler configurado.');
   }
 
@@ -834,13 +834,13 @@ class MagnetAddon {
           });
           return result;
         }
-        
+
         this.#logger.debug(`[DEBUG] Non-TV meta request or no TvHandler - returning empty meta`);
         // Respuesta por defecto para otros tipos
         return { meta: {} };
       } catch (error) {
-        this.#logger.error('[DEBUG] Error in main meta handler', { 
-          error: error.message, 
+        this.#logger.error('[DEBUG] Error in main meta handler', {
+          error: error.message,
           stack: error.stack,
           args,
           errorType: error.constructor.name
@@ -848,7 +848,7 @@ class MagnetAddon {
         return { meta: {} };
       }
     });
-    
+
     this.#logger.info('MetaHandler configurado.');
   }
 
@@ -866,7 +866,7 @@ class MagnetAddon {
     this.#tvCsvWatchers = this.#tvCsvWatchers || new Map();
     this.#tvRefreshIntervalId = this.#tvRefreshIntervalId || {};
 
-    const scheduleDebounced = (label, fn, delayMs = 750) => {
+    const scheduleDebounced = (label, fn, delayMs = 2000) => {
       const prev = debounceTimers.get(label);
       if (prev) clearTimeout(prev);
       const id = setTimeout(async () => {
@@ -874,6 +874,8 @@ class MagnetAddon {
           await fn();
         } catch (e) {
           this.#logger.warn(`[Hot-Reload] Falló recarga (${label}): ${e?.message || e}`);
+        } finally {
+          debounceTimers.delete(label);
         }
       }, delayMs);
       debounceTimers.set(label, id);
@@ -905,6 +907,19 @@ class MagnetAddon {
         this.#logger.warn(`[Hot-Reload] Ruta CSV (${label}) no existe: ${pathLike}`);
         return null;
       }
+
+      // Verificar integridad básica del archivo
+      try {
+        const stats = await fs.promises.stat(pathLike);
+        if (stats.size === 0) {
+          this.#logger.warn(`[Hot-Reload] CSV local (${label}) está vacío (posible escritura en curso), ignorando.`);
+          return null;
+        }
+      } catch (e) {
+        this.#logger.warn(`[Hot-Reload] Error verificando archivo (${label}): ${e.message}`);
+        return null;
+      }
+
       const repo = new CsvTvRepository(pathLike, this.#logger);
       await repo.init();
       this.#logger.info(`[Hot-Reload] CSV local (${label}) recargado`);
@@ -919,7 +934,7 @@ class MagnetAddon {
           scheduleDebounced('default', async () => {
             const repo = await buildCsvRepo(csvDefaultPath, 'default');
             if (repo) rebuildDynamicAndHandler({ defaultRepo: repo });
-            try { await populateTvGenreOptionsFromCsv(); } catch (_) {}
+            try { await populateTvGenreOptionsFromCsv(); } catch (_) { }
           });
         }, seconds * 1000);
         this.#logger.info(`[Hot-Reload] Intervalo de refresco CSV default (remoto) cada ${seconds}s`);
@@ -930,7 +945,7 @@ class MagnetAddon {
               scheduleDebounced('default', async () => {
                 const repo = await buildCsvRepo(csvDefaultPath, 'default');
                 if (repo) rebuildDynamicAndHandler({ defaultRepo: repo });
-                try { await populateTvGenreOptionsFromCsv(); } catch (_) {}
+                try { await populateTvGenreOptionsFromCsv(); } catch (_) { }
               });
             }
           });
@@ -950,7 +965,7 @@ class MagnetAddon {
           scheduleDebounced('whitelist', async () => {
             const repo = await buildCsvRepo(csvWhitelistPath, 'whitelist');
             if (repo) rebuildDynamicAndHandler({ whitelistRepo: repo });
-            try { await populateTvGenreOptionsFromCsv(); } catch (_) {}
+            try { await populateTvGenreOptionsFromCsv(); } catch (_) { }
           });
         }, seconds * 1000);
         this.#logger.info(`[Hot-Reload] Intervalo de refresco CSV whitelist (remoto) cada ${seconds}s`);
@@ -961,7 +976,7 @@ class MagnetAddon {
               scheduleDebounced('whitelist', async () => {
                 const repo = await buildCsvRepo(csvWhitelistPath, 'whitelist');
                 if (repo) rebuildDynamicAndHandler({ whitelistRepo: repo });
-                try { await populateTvGenreOptionsFromCsv(); } catch (_) {}
+                try { await populateTvGenreOptionsFromCsv(); } catch (_) { }
               });
             }
           });
@@ -978,18 +993,18 @@ class MagnetAddon {
       try {
         if (this.#tvRefreshIntervalId?.default) clearInterval(this.#tvRefreshIntervalId.default);
         if (this.#tvRefreshIntervalId?.whitelist) clearInterval(this.#tvRefreshIntervalId.whitelist);
-      } catch (_) {}
+      } catch (_) { }
       try {
         for (const [label, watcher] of (this.#tvCsvWatchers || new Map()).entries()) {
-          try { watcher.close(); } catch (_) {}
+          try { watcher.close(); } catch (_) { }
           this.#logger.info(`[Hot-Reload] watcher '${label}' cerrado`);
         }
-      } catch (_) {}
+      } catch (_) { }
     };
     process.once('SIGINT', cleanup);
     process.once('SIGTERM', cleanup);
   }
-  
+
   /**
    * Inicia el servidor HTTP del addon usando serveHTTP nativo del SDK.
    */
@@ -1015,7 +1030,7 @@ class MagnetAddon {
     // Confiar en cabeceras de proxy para obtener IP real
     app.set('trust proxy', true);
     const router = getRouter(addonInterface);
-    
+
     // Middleware global para capturar IP y establecer contexto
     app.use((req, res, next) => {
       try {
@@ -1044,7 +1059,7 @@ class MagnetAddon {
           // CSP restrictiva para contenido estático básico
           'Content-Security-Policy': "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'"
         });
-  const filePath = path.join(process.cwd(), process.env.STATIC_DIR || 'static', 'index.html');
+        const filePath = path.join(process.cwd(), process.env.STATIC_DIR || 'static', 'index.html');
         res.sendFile(filePath, (err) => {
           if (err) {
             // Fallback a una landing mínima si no existe index.html
@@ -1102,11 +1117,11 @@ class MagnetAddon {
   #createLogger() {
     const { logLevel, enableDetailedLogging, production } = this.#config.logging;
     const isProduction = process.env.NODE_ENV === 'production';
-    
+
     // En producción, usar configuración optimizada
     const sourceTracking = isProduction ? false : enableDetailedLogging;
     const productionConfig = isProduction ? production : {};
-    
+
     return new EnhancedLogger(logLevel, sourceTracking, productionConfig);
   }
 }
@@ -1127,12 +1142,12 @@ async function main() {
         minimalOutput: true
       });
     }
-    
+
     logger.error('❌ Error fatal al iniciar el addon', {
       error: error.message || error,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
-    
+
     process.exit(1);
   }
 }
