@@ -52,19 +52,19 @@ export class CascadingMagnetRepository extends MagnetRepository {
     this.#animeCsvPath = animeCsvPath;
     this.#englishCsvPath = englishCsvPath || join(dirname(secondaryCsvPath), 'english.csv');
     this.#idService = idService;
-    
+
     // Repositorio principal (magnets.csv)
     this.#primaryRepository = new CSVMagnetRepository(primaryCsvPath, logger);
-    
+
     // Repositorio secundario (torrentio.csv)
     this.#secondaryRepository = new CSVMagnetRepository(secondaryCsvPath, logger);
-    
+
     // Repositorio de anime (anime.csv)
     this.#animeRepository = new CSVMagnetRepository(animeCsvPath, logger);
-    
+
     // Repositorio de inglés (english.csv)
     this.#englishRepository = new CSVMagnetRepository(this.#englishCsvPath, logger);
-    
+
     // Servicio de API externa
     this.#torrentioApiService = new TorrentioApiService(
       torrentioApiUrl,
@@ -74,10 +74,10 @@ export class CascadingMagnetRepository extends MagnetRepository {
       torConfig,
       this.#englishCsvPath
     );
-    
+
     // Inicializar invoker de comandos de configuración
     this.#configInvoker = ConfigurationCommandFactory.createInvoker(this.#logger);
-    
+
     // Inicializar servicio de caché
     this.#cacheService = cacheService;
   }
@@ -87,29 +87,29 @@ export class CascadingMagnetRepository extends MagnetRepository {
    */
   async initialize() {
     if (this.#isInitialized) return;
-    
+
     try {
       this.#logger.info('Inicializando repositorios en cascada...', { component: 'CascadingMagnetRepository' });
-      
+
       // Inicializar archivos CSV automáticamente
       const dataDirectory = dirname(this.#secondaryCsvPath);
       CsvFileInitializer.initializeAllCsvFiles(dataDirectory);
-      
+
       // Inicializar repositorio principal
       await this.#initializeRepository(this.#primaryRepository, 'magnets.csv');
-      
+
       // Inicializar repositorio secundario
       await this.#initializeRepository(this.#secondaryRepository, basename(this.#secondaryCsvPath));
-      
+
       // Inicializar repositorio anime
       await this.#initializeRepository(this.#animeRepository, 'anime.csv');
-      
+
       // Inicializar repositorio inglés
       await this.#initializeRepository(this.#englishRepository, 'english.csv');
-      
+
       this.#isInitialized = true;
       this.#logger.info('Repositorios en cascada inicializados correctamente', { component: 'CascadingMagnetRepository' });
-      
+
     } catch (error) {
       this.#logger.error('Error al inicializar repositorios en cascada', { component: 'CascadingMagnetRepository', error: error.message });
       throw error;
@@ -142,65 +142,65 @@ export class CascadingMagnetRepository extends MagnetRepository {
     if (!this.#isInitialized) {
       await this.initialize();
     }
-    
+
     this.#logger.info(`Iniciando búsqueda en cascada para: ${imdbId}`);
-    
+
     // Buscar en todas las fuentes locales simultáneamente
     const [primaryResults, secondaryResults, animeResults] = await Promise.all([
       this.#searchInRepository(this.#primaryRepository, imdbId, 'magnets.csv'),
       this.#searchInRepository(this.#secondaryRepository, imdbId, 'torrentio.csv'),
       this.#searchInRepository(this.#animeRepository, imdbId, 'anime.csv')
     ]);
-    
+
     // Lógica de priorización según los requisitos del usuario:
     // 1. Si hay resultados en torrentio.csv, usar 1 resultado principal
     // 2. Agregar coincidencias adicionales de magnets.csv o anime.csv
     let finalResults = [];
-    
+
     if (secondaryResults.length > 0) {
       // Tomar solo el primer resultado de torrentio.csv como principal
       finalResults.push(secondaryResults[0]);
       this.#logger.info(`Resultado principal encontrado en torrentio.csv para ${imdbId}`);
-      
+
       // Agregar coincidencias adicionales de magnets.csv
       if (primaryResults.length > 0) {
         finalResults.push(...primaryResults);
         this.#logger.info(`Agregados ${primaryResults.length} resultados adicionales de magnets.csv`);
       }
-      
+
       // Agregar coincidencias adicionales de anime.csv
       if (animeResults.length > 0) {
         finalResults.push(...animeResults);
         this.#logger.info(`Agregados ${animeResults.length} resultados adicionales de anime.csv`);
       }
-      
+
       return finalResults;
     }
-    
+
     // Si no hay resultados en torrentio.csv, usar lógica de cascada tradicional
     if (primaryResults.length > 0) {
       this.#logger.info(`Encontrados ${primaryResults.length} magnets en magnets.csv para ${imdbId}`);
       return primaryResults;
     }
-    
+
     if (animeResults.length > 0) {
       this.#logger.info(`Encontrados ${animeResults.length} magnets en anime.csv para ${imdbId}`);
       return animeResults;
     }
-    
+
     // Paso final: Buscar en API de Torrentio
     this.#logger.info(`No se encontraron magnets locales, consultando API Torrentio para ${imdbId} (${type})`, { component: 'CascadingMagnetRepository' });
     const apiResults = await this.#torrentioApiService.searchMagnetsById(imdbId, type);
-    
+
     if (apiResults.length > 0) {
       this.#logger.info(`Encontrados ${apiResults.length} magnets en API Torrentio para ${imdbId}`);
-      
+
       // Reinicializar repositorio secundario para incluir nuevos datos
       await this.#reinitializeSecondaryRepository();
-      
+
       return apiResults;
     }
-    
+
     // No se encontraron magnets en ninguna fuente
     this.#logger.warn(`No se encontraron magnets para ${imdbId} en ninguna fuente`);
     throw new MagnetNotFoundError(`No se encontraron magnets para IMDB ID: ${imdbId}`);
@@ -251,31 +251,31 @@ export class CascadingMagnetRepository extends MagnetRepository {
     if (!this.#isInitialized) {
       await this.initialize();
     }
-    
+
     const startTime = Date.now();
     this.#logger.info(`Búsqueda en cascada iniciada para content ID: ${contentId} (${type})`, { component: 'CascadingMagnetRepository' });
-    
+
     // Verificar cache primero
     const cacheKey = cacheService.generateMagnetCacheKey(contentId, type, options);
     const cachedResults = cacheService.get(cacheKey);
-    
+
     if (cachedResults) {
       const duration = Date.now() - startTime;
       this.#logger.info(`Resultados obtenidos desde cache para ${contentId} en ${duration}ms`);
       return cachedResults;
     }
-    
+
     try {
       // Obtener metadatos del contenido para enriquecer la búsqueda
       const metadata = await metadataService.getMetadata(contentId, type);
       this.#logger.info(`Metadatos obtenidos para ${contentId}: ${metadata.title || 'Sin título'}`);
-      
+
       // Detectar tipo de ID y aplicar estrategia específica
       const idType = this.#detectIdType(contentId);
       this.#logger.debug(`Tipo de ID detectado: ${idType} para ${contentId}`);
-      
+
       const searchPromises = [];
-      
+
       // Verificar si las fuentes locales ya fueron agotadas para evitar búsquedas redundantes
       if (!this.#isSourceExhausted(contentId, 'magnets.csv')) {
         searchPromises.push(this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv'));
@@ -283,14 +283,14 @@ export class CascadingMagnetRepository extends MagnetRepository {
         searchPromises.push(Promise.resolve([]));
         this.#logger.debug(`Saltando búsqueda en magnets.csv - fuente agotada para ${contentId}`);
       }
-      
+
       if (!this.#isSourceExhausted(contentId, 'torrentio.csv')) {
         searchPromises.push(this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv'));
       } else {
         searchPromises.push(Promise.resolve([]));
         this.#logger.debug(`Saltando búsqueda en torrentio.csv - fuente agotada para ${contentId}`);
       }
-      
+
       // Para anime, verificar también si ya fue agotado
       if (type === 'anime' || idType === 'kitsu' || idType === 'mal' || idType === 'anilist') {
         if (!this.#isSourceExhausted(contentId, 'anime.csv')) {
@@ -302,7 +302,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       } else {
         searchPromises.push(Promise.resolve([]));
       }
-      
+
       // Repositorio en inglés como fuente local adicional
       if (!this.#isSourceExhausted(contentId, 'english.csv')) {
         searchPromises.push(this.#searchInRepositoryByContentId(this.#englishRepository, contentId, 'english.csv'));
@@ -310,15 +310,15 @@ export class CascadingMagnetRepository extends MagnetRepository {
         searchPromises.push(Promise.resolve([]));
         this.#logger.debug(`Saltando búsqueda en english.csv - fuente agotada para ${contentId}`);
       }
-      
+
       const searchResults = await Promise.allSettled(searchPromises);
-      
+
       // Extraer resultados exitosos y loggear errores sin interrumpir el flujo
       const primaryResults = searchResults[0].status === 'fulfilled' ? searchResults[0].value : [];
       const secondaryResults = searchResults[1].status === 'fulfilled' ? searchResults[1].value : [];
       const animeResults = searchResults[2].status === 'fulfilled' ? searchResults[2].value : [];
       const englishResults = searchResults[3] && searchResults[3].status === 'fulfilled' ? searchResults[3].value : [];
-      
+
       // Marcar fuentes como agotadas si no encontraron resultados
       if (primaryResults.length === 0) {
         this.#markSourceAsExhausted(contentId, 'magnets.csv');
@@ -332,7 +332,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       if (englishResults.length === 0) {
         this.#markSourceAsExhausted(contentId, 'english.csv');
       }
-      
+
       // Loggear errores de búsquedas fallidas sin interrumpir el proceso
       searchResults.forEach((result, index) => {
         if (result.status === 'rejected') {
@@ -341,12 +341,12 @@ export class CascadingMagnetRepository extends MagnetRepository {
           this.#markSourceAsExhausted(contentId, sources[index]);
         }
       });
-      
+
       const enrichedPrimary = this.#enrichMagnetsWithMetadata(primaryResults, metadata);
       const enrichedSecondary = this.#enrichMagnetsWithMetadata(secondaryResults, metadata);
       const enrichedAnime = this.#enrichMagnetsWithMetadata(animeResults, metadata);
       const enrichedEnglish = this.#enrichMagnetsWithMetadata(englishResults, metadata);
-      
+
       // Lógica de priorización mejorada según tipo de contenido
       let finalResults = this.#prioritizeResults({
         primary: enrichedPrimary,
@@ -354,58 +354,58 @@ export class CascadingMagnetRepository extends MagnetRepository {
         anime: enrichedAnime,
         english: enrichedEnglish
       }, type, contentId);
-      
+
       if (finalResults.length > 0) {
         // Cachear resultados exitosos
         const cacheTTL = this.#getCacheTTL(type, finalResults.length);
         cacheService.set(cacheKey, finalResults, cacheTTL, {
           contentType: type,
-          metadata: { 
-            resultCount: finalResults.length, 
+          metadata: {
+            resultCount: finalResults.length,
             source: 'repository',
             duration: Date.now() - startTime
           }
         });
-        
+
         const duration = Date.now() - startTime;
         this.#logger.info(`Encontrados ${finalResults.length} magnets en fuentes locales para ${contentId} en ${duration}ms`);
         return finalResults;
       }
-      
+
       // Paso 1: Buscar en API de Torrentio en español (solo si no fue agotada)
       if (!this.#isSourceExhausted(contentId, 'api-spanish')) {
         this.#logger.info(`No se encontraron magnets locales, consultando API Torrentio en español para ${contentId} (${type})`, { component: 'CascadingMagnetRepository' });
         const spanishApiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFallback(contentId, type);
-        
+
         if (spanishApiResults.length > 0) {
           this.#logger.info(`Encontrados ${spanishApiResults.length} magnets en API Torrentio español para ${contentId}`);
-          
+
           // Enriquecer resultados de API con metadatos
           const enrichedSpanishResults = this.#enrichMagnetsWithMetadata(spanishApiResults, metadata);
-          
+
           // Cachear resultados de API con TTL más corto
           const apiCacheTTL = this.#getCacheTTL(type, enrichedSpanishResults.length, true);
           cacheService.set(cacheKey, enrichedSpanishResults, apiCacheTTL, {
             contentType: type,
-            metadata: { 
-              resultCount: enrichedSpanishResults.length, 
+            metadata: {
+              resultCount: enrichedSpanishResults.length,
               source: 'api',
               language: 'spanish',
               duration: Date.now() - startTime
             }
           });
-          
+
           // Reinicializar repositorio secundario para incluir nuevos datos
           await this.#reinitializeSecondaryRepository();
           this.#clearExhaustedSource(contentId, 'torrentio.csv');
-          
+
           const duration = Date.now() - startTime;
           this.#logger.info(`Búsqueda completada con API español en ${duration}ms`);
           if (process.env.ALWAYS_SEARCH_ENGLISH === 'true') {
             try {
               await this.#torrentioApiService.searchMagnetsInEnglish(contentId, type);
               await this.#reinitializeRepository(this.#englishRepository, 'english.csv');
-            } catch (e) {}
+            } catch (e) { }
           }
           return enrichedSpanishResults;
         } else {
@@ -415,12 +415,12 @@ export class CascadingMagnetRepository extends MagnetRepository {
       } else {
         this.#logger.debug(`Saltando API Torrentio español - fuente agotada para ${contentId}`);
       }
-      
+
       // Paso 2: Buscar en archivo english.csv (solo si no fue agotada)
       if (!this.#isSourceExhausted(contentId, 'english.csv')) {
         this.#logger.info(`No se encontraron magnets en API español, buscando en english.csv para ${contentId}`, { component: 'CascadingMagnetRepository' });
         const englishResults = await this.#searchInRepositoryByContentId(this.#englishRepository, contentId, 'english.csv');
-        
+
         if (englishResults.length > 0) {
           const enrichedEnglishResults = this.#enrichMagnetsWithMetadata(englishResults, metadata);
           const finalEnglishResults = this.#prioritizeResults({
@@ -429,20 +429,20 @@ export class CascadingMagnetRepository extends MagnetRepository {
             anime: [],
             english: enrichedEnglishResults
           }, type, contentId);
-          
+
           if (finalEnglishResults.length > 0) {
             // Cachear resultados de english.csv
             const cacheTTL = this.#getCacheTTL(type, finalEnglishResults.length);
             cacheService.set(cacheKey, finalEnglishResults, cacheTTL, {
               contentType: type,
-              metadata: { 
-                resultCount: finalEnglishResults.length, 
+              metadata: {
+                resultCount: finalEnglishResults.length,
                 source: 'repository',
                 language: 'english',
                 duration: Date.now() - startTime
               }
             });
-            
+
             const duration = Date.now() - startTime;
             this.#logger.info(`Encontrados ${finalEnglishResults.length} magnets en english.csv para ${contentId} en ${duration}ms`);
             return finalEnglishResults;
@@ -454,33 +454,33 @@ export class CascadingMagnetRepository extends MagnetRepository {
       } else {
         this.#logger.debug(`Saltando english.csv - fuente agotada para ${contentId}`);
       }
-      
+
       // Paso 3: Buscar en API de Torrentio en inglés (solo si no fue agotada)
       if (!this.#isSourceExhausted(contentId, 'api-english')) {
         this.#logger.info(`No se encontraron magnets en english.csv, consultando API Torrentio en inglés para ${contentId}`, { component: 'CascadingMagnetRepository' });
         const englishApiResults = await this.#torrentioApiService.searchMagnetsInEnglish(contentId, type);
-        
+
         if (englishApiResults.length > 0) {
           this.#logger.info(`Encontrados ${englishApiResults.length} magnets en API Torrentio inglés para ${contentId}`);
-          
+
           // Enriquecer resultados de API con metadatos
           const enrichedEnglishApiResults = this.#enrichMagnetsWithMetadata(englishApiResults, metadata);
-          
+
           // Cachear resultados de API con TTL más corto
           const apiCacheTTL = this.#getCacheTTL(type, enrichedEnglishApiResults.length, true);
           cacheService.set(cacheKey, enrichedEnglishApiResults, apiCacheTTL, {
             contentType: type,
-            metadata: { 
-              resultCount: enrichedEnglishApiResults.length, 
+            metadata: {
+              resultCount: enrichedEnglishApiResults.length,
               source: 'api',
               language: 'english',
               duration: Date.now() - startTime
             }
           });
-          
+
           // Reinicializar repositorio de inglés para incluir nuevos datos
           await this.#reinitializeRepository(this.#englishRepository, 'english.csv');
-          
+
           const duration = Date.now() - startTime;
           this.#logger.info(`Búsqueda completada con API inglés en ${duration}ms`);
           return enrichedEnglishApiResults;
@@ -491,24 +491,24 @@ export class CascadingMagnetRepository extends MagnetRepository {
       } else {
         this.#logger.debug(`Saltando API Torrentio inglés - fuente agotada para ${contentId}`);
       }
-      
+
       // No se encontraron magnets en ninguna fuente
       const duration = Date.now() - startTime;
       this.#logger.warn(`No se encontraron magnets para ${contentId} en ninguna fuente (${duration}ms)`, { component: 'CascadingMagnetRepository' });
-      
+
       // Cachear resultado vacío con TTL corto para evitar búsquedas repetidas
       const emptyTTL = this.#getCacheTTL(type, 0);
       cacheService.set(cacheKey, [], emptyTTL, {
         contentType: type,
-        metadata: { 
-          resultCount: 0, 
+        metadata: {
+          resultCount: 0,
           source: 'repository',
           duration: Date.now() - startTime
         }
       });
-      
+
       throw new MagnetNotFoundError(contentId);
-      
+
     } catch (error) {
       if (error instanceof MagnetNotFoundError) {
         throw error;
@@ -553,10 +553,10 @@ export class CascadingMagnetRepository extends MagnetRepository {
       return await repository.getMagnetsByImdbId(imdbId);
     } catch (error) {
       if (error instanceof MagnetNotFoundError) {
-        this.#logger.info(`No se encontraron magnets en ${sourceName} para ${imdbId}`);  
+        this.#logger.info(`No se encontraron magnets en ${sourceName} para ${imdbId}`);
         return [];
       }
-      
+
       this.#logger.error(`Error al buscar en ${sourceName} para ${imdbId}:`, error, { component: 'CascadingMagnetRepository' });
       return [];
     }
@@ -568,15 +568,10 @@ export class CascadingMagnetRepository extends MagnetRepository {
    */
   async #reinitializeSecondaryRepository() {
     try {
-      // Crear nuevo repositorio secundario para incluir datos actualizados
-      this.#secondaryRepository = new CSVMagnetRepository(
-        this.#secondaryCsvPath,
-        this.#logger
-      );
-      
-      await this.#secondaryRepository.initialize();
+      // Usar reload() para recargar atómicamente los datos actualizados
+      await this.#secondaryRepository.reload();
       this.#logger.debug('Repositorio secundario reinicializado');
-      
+
     } catch (error) {
       this.#logger.error('Error al reinicializar repositorio secundario:', error, { component: 'CascadingMagnetRepository' });
     }
@@ -592,18 +587,18 @@ export class CascadingMagnetRepository extends MagnetRepository {
   #isSourceExhausted(contentId, source) {
     const key = `${contentId}:${source}`;
     const exhaustedTime = this.#exhaustedSourcesCache.get(key);
-    
+
     if (!exhaustedTime) return false;
-    
+
     // TTL de 5 minutos para fuentes agotadas
     const TTL = 5 * 60 * 1000;
     const isExpired = Date.now() - exhaustedTime > TTL;
-    
+
     if (isExpired) {
       this.#exhaustedSourcesCache.delete(key);
       return false;
     }
-    
+
     return true;
   }
 
@@ -635,10 +630,10 @@ export class CascadingMagnetRepository extends MagnetRepository {
    */
   async #reinitializeRepository(repository, name) {
     try {
-      // Reinicializar el repositorio para incluir datos actualizados
-      await repository.initialize();
+      // Usar reload() para recargar atómicamente los datos actualizados
+      await repository.reload();
       this.#logger.debug(`Repositorio ${name} reinicializado`);
-      
+
     } catch (error) {
       this.#logger.error(`Error al reinicializar repositorio ${name}:`, error, { component: 'CascadingMagnetRepository' });
     }
@@ -668,7 +663,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       // Ejecutar comando
       if (this.#configInvoker.executeCommand(command)) {
         this.#logger.info('Idioma prioritario configurado temporalmente', { component: 'CascadingMagnetRepository', language, type });
-        
+
         // Retornar función para revertir
         return () => {
           this.#configInvoker.undoLastCommand();
@@ -723,9 +718,9 @@ export class CascadingMagnetRepository extends MagnetRepository {
       }
     };
 
-    return languageProviderMap[language]?.[type] || 
-           languageProviderMap.spanish[type] || 
-           'mejortorrent,wolfmax4k,cinecalidad';
+    return languageProviderMap[language]?.[type] ||
+      languageProviderMap.spanish[type] ||
+      'mejortorrent,wolfmax4k,cinecalidad';
   }
 
   /**
@@ -736,37 +731,37 @@ export class CascadingMagnetRepository extends MagnetRepository {
    */
   #detectIdType(contentId) {
     if (!contentId) return 'unknown';
-    
+
     // IMDb IDs empiezan con 'tt'
     if (contentId.startsWith('tt')) {
       return 'imdb';
     }
-    
+
     // Kitsu IDs empiezan con 'kitsu:'
     if (contentId.startsWith('kitsu:')) {
       return 'kitsu';
     }
-    
+
     // MyAnimeList IDs empiezan con 'mal:'
     if (contentId.startsWith('mal:')) {
       return 'mal';
     }
-    
+
     // AniList IDs empiezan con 'anilist:'
     if (contentId.startsWith('anilist:')) {
       return 'anilist';
     }
-    
+
     // AniDB IDs empiezan con 'anidb:'
     if (contentId.startsWith('anidb:')) {
       return 'anidb';
     }
-    
+
     // Si es solo números, podría ser Kitsu sin prefijo
     if (/^\d+$/.test(contentId)) {
       return 'numeric';
     }
-    
+
     return 'unknown';
   }
 
@@ -781,69 +776,69 @@ export class CascadingMagnetRepository extends MagnetRepository {
   #prioritizeResults(results, type, contentId) {
     const { primary, secondary, anime, english } = results;
     let finalResults = [];
-    
+
     // Para anime, priorizar repositorio de anime
     if (type === 'anime') {
       if (anime.length > 0) {
         finalResults.push(...anime);
         this.#logger.info(`Encontrados ${anime.length} magnets en repositorio de anime para ${contentId}`);
       }
-      
+
       // Agregar resultados de torrentio como secundarios para anime
       if (secondary.length > 0) {
         finalResults.push(...secondary.slice(0, 3)); // Limitar a 3 resultados adicionales
         this.#logger.info(`Agregados ${Math.min(secondary.length, 3)} resultados adicionales de torrentio.csv`, { component: 'CascadingMagnetRepository' });
       }
-      
+
       // Agregar algunos resultados del repositorio principal si es necesario
       if (primary.length > 0 && finalResults.length < 5) {
         const remainingSlots = 5 - finalResults.length;
         finalResults.push(...primary.slice(0, remainingSlots));
         this.#logger.info(`Agregados ${Math.min(primary.length, remainingSlots)} resultados adicionales de magnets.csv`, { component: 'CascadingMagnetRepository' });
       }
-      
+
       return finalResults;
     }
-    
+
     // Para películas y series, usar lógica tradicional mejorada
     if (secondary.length > 0) {
       // Tomar el primer resultado de torrentio.csv como principal
       finalResults.push(secondary[0]);
       this.#logger.info(`Resultado principal encontrado en torrentio.csv para ${contentId}`);
-      
+
       // Agregar coincidencias adicionales de magnets.csv
       if (primary.length > 0) {
         finalResults.push(...primary.slice(0, 4)); // Limitar a 4 adicionales
         this.#logger.info(`Agregados ${Math.min(primary.length, 4)} resultados adicionales de magnets.csv`, { component: 'CascadingMagnetRepository' });
       }
-      
+
       // Para series, también considerar anime.csv si hay resultados
       if (type === 'series' && anime.length > 0) {
         finalResults.push(...anime.slice(0, 2)); // Máximo 2 de anime
         this.#logger.info(`Agregados ${Math.min(anime.length, 2)} resultados adicionales de anime.csv`, { component: 'CascadingMagnetRepository' });
       }
-      
+
       return finalResults;
     }
-    
+
     // Si no hay resultados en torrentio.csv, usar repositorio principal
     if (primary.length > 0) {
       this.#logger.info(`Encontrados ${primary.length} magnets en repositorio primario para ${contentId}`);
       return primary;
     }
-    
+
     // Como último recurso, usar repositorio de anime
     if (anime.length > 0) {
       this.#logger.info(`Encontrados ${anime.length} magnets en repositorio de anime para ${contentId}`);
       return anime;
     }
-    
+
     // Finalmente, usar repositorio inglés si está disponible
     if (english && english.length > 0) {
       this.#logger.info(`Encontrados ${english.length} magnets en repositorio inglés para ${contentId}`);
       return english;
     }
-    
+
     return [];
   }
 
@@ -858,7 +853,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       anime: { name: 'anime.csv', count: 0, status: 'unknown' },
       api: { name: 'torrentio-api', status: 'available' }
     };
-    
+
     try {
       // Obtener estadísticas del repositorio principal
       if (this.#primaryRepository && typeof this.#primaryRepository.getTotalEntries === 'function') {
@@ -871,7 +866,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       stats.primary.status = 'error';
       this.#logger.error('Error obteniendo estadísticas del repositorio principal:', error.message, { component: 'CascadingMagnetRepository' });
     }
-    
+
     try {
       // Obtener estadísticas del repositorio secundario
       if (this.#secondaryRepository && typeof this.#secondaryRepository.getTotalEntries === 'function') {
@@ -884,7 +879,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       stats.secondary.status = 'error';
       this.#logger.error('Error obteniendo estadísticas del repositorio secundario:', error.message, { component: 'CascadingMagnetRepository' });
     }
-    
+
     try {
       // Obtener estadísticas del repositorio de anime
       if (this.#animeRepository && typeof this.#animeRepository.getTotalEntries === 'function') {
@@ -897,10 +892,10 @@ export class CascadingMagnetRepository extends MagnetRepository {
       stats.anime.status = 'error';
       this.#logger.error('Error obteniendo estadísticas del repositorio de anime:', error.message, { component: 'CascadingMagnetRepository' });
     }
-    
+
     return stats;
   }
-  
+
   /**
    * Enriquece los magnets con metadatos del contenido.
    * @private
@@ -912,7 +907,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
     if (!magnets || !Array.isArray(magnets) || !metadata) {
       return magnets || [];
     }
-    
+
     return magnets.map(magnet => ({
       ...magnet,
       metadata: {
@@ -926,7 +921,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       qualityScore: this.#calculateQualityScore(magnet, metadata)
     }));
   }
-  
+
   /**
    * Calcula un score de calidad basado en metadatos y características del magnet.
    * @private
@@ -936,33 +931,33 @@ export class CascadingMagnetRepository extends MagnetRepository {
    */
   #calculateQualityScore(magnet, metadata) {
     let score = 50; // Score base
-    
+
     // Bonus por coincidencia de título
     if (metadata.title && magnet.title) {
       const titleSimilarity = this.#calculateTitleSimilarity(magnet.title, metadata.title);
       score += titleSimilarity * 20;
     }
-    
+
     // Bonus por año
     if (metadata.year && magnet.title && magnet.title.includes(metadata.year)) {
       score += 10;
     }
-    
+
     // Bonus por calidad de video
     if (magnet.title) {
       if (magnet.title.includes('2160p') || magnet.title.includes('4K')) score += 15;
       else if (magnet.title.includes('1080p')) score += 10;
       else if (magnet.title.includes('720p')) score += 5;
     }
-    
+
     // Bonus por seeders
     if (magnet.seeders) {
       score += Math.min(magnet.seeders / 10, 15);
     }
-    
+
     return Math.min(Math.max(score, 0), 100);
   }
-  
+
   /**
    * Calcula la similitud entre dos títulos.
    * @private
@@ -972,22 +967,22 @@ export class CascadingMagnetRepository extends MagnetRepository {
    */
   #calculateTitleSimilarity(title1, title2) {
     if (!title1 || !title2) return 0;
-    
+
     const normalize = str => str.toLowerCase().replace(/[^a-z0-9]/g, '');
     const norm1 = normalize(title1);
     const norm2 = normalize(title2);
-    
+
     if (norm1 === norm2) return 1;
     if (norm1.includes(norm2) || norm2.includes(norm1)) return 0.8;
-    
+
     // Algoritmo simple de distancia de Levenshtein normalizada
     const maxLen = Math.max(norm1.length, norm2.length);
     if (maxLen === 0) return 1;
-    
+
     const distance = this.#levenshteinDistance(norm1, norm2);
     return 1 - (distance / maxLen);
   }
-  
+
   /**
    * Calcula la distancia de Levenshtein entre dos strings.
    * @private
@@ -997,15 +992,15 @@ export class CascadingMagnetRepository extends MagnetRepository {
    */
   #levenshteinDistance(str1, str2) {
     const matrix = [];
-    
+
     for (let i = 0; i <= str2.length; i++) {
       matrix[i] = [i];
     }
-    
+
     for (let j = 0; j <= str1.length; j++) {
       matrix[0][j] = j;
     }
-    
+
     for (let i = 1; i <= str2.length; i++) {
       for (let j = 1; j <= str1.length; j++) {
         if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
@@ -1019,10 +1014,10 @@ export class CascadingMagnetRepository extends MagnetRepository {
         }
       }
     }
-    
+
     return matrix[str2.length][str1.length];
   }
-  
+
   /**
    * Búsqueda de fallback sin metadatos.
    * @private
@@ -1032,31 +1027,31 @@ export class CascadingMagnetRepository extends MagnetRepository {
    */
   async #fallbackSearch(contentId, type) {
     this.#logger.info(`Ejecutando búsqueda de fallback para ${contentId}`);
-    
+
     try {
       // Detectar tipo de ID y aplicar estrategia específica
       const idType = this.#detectIdType(contentId);
-      
+
       // Buscar en todas las fuentes locales simultáneamente usando Promise.allSettled
       const searchPromises = [
         this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv'),
         this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv')
       ];
-      
+
       // Para anime, priorizar búsqueda en repositorio de anime
       if (type === 'anime' || idType === 'kitsu' || idType === 'mal' || idType === 'anilist') {
         searchPromises.push(this.#searchInRepositoryByContentId(this.#animeRepository, contentId, 'anime.csv'));
       } else {
         searchPromises.push(Promise.resolve([]));
       }
-      
+
       const searchResults = await Promise.allSettled(searchPromises);
-      
+
       // Extraer resultados exitosos de fallback
       const primaryResults = searchResults[0].status === 'fulfilled' ? searchResults[0].value : [];
       const secondaryResults = searchResults[1].status === 'fulfilled' ? searchResults[1].value : [];
       const animeResults = searchResults[2].status === 'fulfilled' ? searchResults[2].value : [];
-      
+
       // Loggear errores de fallback sin interrumpir
       searchResults.forEach((result, index) => {
         if (result.status === 'rejected') {
@@ -1064,31 +1059,31 @@ export class CascadingMagnetRepository extends MagnetRepository {
           this.#logger.warn(`Error en fallback de ${sources[index]} para ${contentId}:`, result.reason?.message, { component: 'CascadingMagnetRepository' });
         }
       });
-    
-    // Lógica de priorización básica
-    let finalResults = this.#prioritizeResults({
-      primary: primaryResults,
-      secondary: secondaryResults, 
-      anime: animeResults
-    }, type, contentId);
-    
-    if (finalResults.length > 0) {
-      this.#logger.info(`Encontrados ${finalResults.length} magnets en búsqueda de fallback para ${contentId}`);
-      return finalResults;
-    }
-    
-    // Paso final: Buscar en API de Torrentio con fallback de idioma
-    this.#logger.info(`Consultando API Torrentio con fallback de idioma para ${contentId} (${type})`, { component: 'CascadingMagnetRepository' });
-    const apiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFallback(contentId, type);
-    
-    if (apiResults.length > 0) {
-      this.#logger.info(`Encontrados ${apiResults.length} magnets en API Torrentio (fallback con idioma) para ${contentId}`, { component: 'CascadingMagnetRepository' });
-      await this.#reinitializeSecondaryRepository();
-      return apiResults;
-    }
-    
-    throw new MagnetNotFoundError(contentId);
-    
+
+      // Lógica de priorización básica
+      let finalResults = this.#prioritizeResults({
+        primary: primaryResults,
+        secondary: secondaryResults,
+        anime: animeResults
+      }, type, contentId);
+
+      if (finalResults.length > 0) {
+        this.#logger.info(`Encontrados ${finalResults.length} magnets en búsqueda de fallback para ${contentId}`);
+        return finalResults;
+      }
+
+      // Paso final: Buscar en API de Torrentio con fallback de idioma
+      this.#logger.info(`Consultando API Torrentio con fallback de idioma para ${contentId} (${type})`, { component: 'CascadingMagnetRepository' });
+      const apiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFallback(contentId, type);
+
+      if (apiResults.length > 0) {
+        this.#logger.info(`Encontrados ${apiResults.length} magnets en API Torrentio (fallback con idioma) para ${contentId}`, { component: 'CascadingMagnetRepository' });
+        await this.#reinitializeSecondaryRepository();
+        return apiResults;
+      }
+
+      throw new MagnetNotFoundError(contentId);
+
     } catch (error) {
       // Preservar stack trace completo del error de fallback
       const fallbackError = {
@@ -1099,12 +1094,12 @@ export class CascadingMagnetRepository extends MagnetRepository {
         type,
         operation: 'fallback_search'
       };
-      
+
       this.#logger.error('Error crítico en búsqueda de fallback:', fallbackError, { component: 'CascadingMagnetRepository' });
       throw new RepositoryError(`Fallback search failed for ${contentId}`, { cause: error, contentId, type });
     }
   }
-  
+
   /**
    * Calcula el TTL del cache basado en el tipo de contenido y número de resultados.
    * @private
@@ -1119,7 +1114,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       source: isApiResult ? 'api' : 'repository',
       timestamp: Date.now()
     });
-    
+
     this.#logger.info(`TTL adaptativo calculado para ${type} con ${resultCount} resultados (API: ${isApiResult}): ${adaptiveTTL}ms`, { component: 'CascadingMagnetRepository' });
     return adaptiveTTL;
   }

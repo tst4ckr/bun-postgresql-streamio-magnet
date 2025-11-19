@@ -20,21 +20,41 @@ export class CSVMagnetRepository extends MagnetRepository {
     if (this.#isInitialized) return;
 
     try {
-      await this.#loadFromCSV();
+      const { magnets, magnetMap } = await this.#loadDataFromCSV();
+      this.#magnets = magnets;
+      this.#magnetMap = magnetMap;
       this.#isInitialized = true;
     } catch (error) {
       throw new RepositoryError(`Error al cargar el archivo CSV: ${this.#filePath}`, error);
     }
   }
 
-  async #loadFromCSV() {
+  /**
+   * Recarga los datos del CSV de forma atómica.
+   * Si falla la carga, mantiene los datos anteriores.
+   */
+  async reload() {
+    try {
+      const { magnets, magnetMap } = await this.#loadDataFromCSV();
+      this.#magnets = magnets;
+      this.#magnetMap = magnetMap;
+      this.#isInitialized = true;
+      this.#logger.info(`Repositorio CSV recargado: ${this.#filePath} (${magnets.length} items)`);
+    } catch (error) {
+      throw new RepositoryError(`Error al recargar el archivo CSV: ${this.#filePath}`, error);
+    }
+  }
+
+  async #loadDataFromCSV() {
+    const magnets = [];
+    const magnetMap = new Map();
     const stream = createReadStream(this.#filePath).pipe(csv());
-    
+
     for await (const row of stream) {
       try {
         // Preservar content_id original para construcción de URLs
         const originalContentId = row.content_id || row.imdb_id;
-        
+
         // Mapear campos para compatibilidad con el nuevo esquema
         const magnetData = {
           content_id: originalContentId, // Preservar ID original
@@ -52,36 +72,37 @@ export class CSVMagnetRepository extends MagnetRepository {
           seeders: row.seeders ? parseInt(row.seeders, 10) : undefined,
           peers: row.peers ? parseInt(row.peers, 10) : undefined
         };
-        
+
         // Filtrar campos undefined para mantener el objeto limpio
         Object.keys(magnetData).forEach(key => {
           if (magnetData[key] === undefined || magnetData[key] === '') {
             delete magnetData[key];
           }
         });
-        
+
         const magnet = new Magnet(magnetData);
-        this.#magnets.push(magnet);
-        this.#addToMap(magnet);
+        magnets.push(magnet);
+        this.#addToMap(magnet, magnetMap);
       } catch (error) {
         this.#logger.error(`Fila CSV inválida: ${JSON.stringify(row)}, error: ${JSON.stringify(error.issues || error.message)}`);
       }
     }
+    return { magnets, magnetMap };
   }
 
-  #addToMap(magnet) {
+  #addToMap(magnet, map) {
     // Indexar por content_id (principal)
-    if (!this.#magnetMap.has(magnet.content_id)) {
-      this.#magnetMap.set(magnet.content_id, []);
+    if (!map.has(magnet.content_id)) {
+      map.set(magnet.content_id, []);
     }
-    this.#magnetMap.get(magnet.content_id).push(magnet);
-    
+    map.get(magnet.content_id).push(magnet);
+
     // Indexar también por imdb_id para compatibilidad hacia atrás
     if (magnet.imdb_id && magnet.imdb_id !== magnet.content_id) {
-      if (!this.#magnetMap.has(magnet.imdb_id)) {
-        this.#magnetMap.set(magnet.imdb_id, []);
+      if (!map.has(magnet.imdb_id)) {
+        map.set(magnet.imdb_id, []);
       }
-      this.#magnetMap.get(magnet.imdb_id).push(magnet);
+      map.get(magnet.imdb_id).push(magnet);
     }
   }
 

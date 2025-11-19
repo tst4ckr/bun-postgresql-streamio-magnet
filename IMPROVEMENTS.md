@@ -13,7 +13,7 @@ Este documento detalla una lista de posibles mejoras técnicas para fortalecer l
     - *Problema*: `fs.watch` nativo puede ser inestable (duplicación de eventos, inconsistencias entre OS).
     - *Solución*: Implementar un mecanismo de *debounce* más robusto o evaluar el uso de una librería probada como `chokidar` para la recarga en caliente de CSVs.
 
-- [ ] **Validación de Configuración al Inicio**:
+- [x] **Validación de Configuración al Inicio**:
     - *Problema*: Las variables de entorno se leen en múltiples lugares y pueden fallar silenciosamente o causar errores en tiempo de ejecución.
     - *Solución*: Centralizar y validar estrictamente todas las variables de entorno al inicio (ej. usando `zod` en `addonConfig.js`) para asegurar un "Fail Fast".
 

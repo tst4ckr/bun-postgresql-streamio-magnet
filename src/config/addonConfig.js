@@ -11,6 +11,7 @@ import axios from 'axios';
 import { fileURLToPath } from 'url';
 import { CONSTANTS } from './constants.js';
 import { envString, envInt, envBool, envDurationMs } from '../infrastructure/utils/env.js';
+import { z } from 'zod';
 
 
 const isWindows = process.platform === 'win32';
@@ -21,7 +22,7 @@ const isContainer = (() => {
     if (fs.existsSync('/.dockerenv')) return true;
     const cg = fs.readFileSync('/proc/1/cgroup', 'utf8');
     if (/docker|containerd|kubepods/i.test(cg)) return true;
-  } catch (_) {}
+  } catch (_) { }
   return false;
 })();
 
@@ -402,6 +403,60 @@ function generateManifest() {
   manifestCacheTimestamp = now;
 
   return manifest;
+}
+
+// Validación de configuración crítica al inicio
+try {
+  const configSchema = z.object({
+    addon: z.object({
+      id: z.string().min(1),
+      version: z.string().min(1),
+      name: z.string().min(1),
+    }),
+    server: z.object({
+      port: z.number().int().min(1).max(65535),
+    }),
+    repository: z.object({
+      torrentioApiUrl: z.string().url(),
+      timeout: z.number().int().positive(),
+      m3uUrl: z.string().nullable(),
+      m3uUrlBackup: z.string().nullable(),
+      m3uCacheTimeout: z.number().int().nonnegative(),
+      maxTvChannels: z.number().int().positive(),
+      primaryCsvPath: z.string(),
+      secondaryCsvPath: z.string(),
+      animeCsvPath: z.string(),
+      tvCsvDefaultPath: z.string(),
+      tvCsvWhitelistPath: z.string().nullable(),
+    }),
+    cache: z.object({
+      streamCacheMaxAge: z.number().int().nonnegative(),
+      streamStaleRevalidate: z.number().int().nonnegative(),
+      streamStaleError: z.number().int().nonnegative(),
+    }),
+    cascadeSearch: z.object({
+      enabled: z.boolean(),
+      maxRetries: z.number().int().nonnegative(),
+      retryDelay: z.number().int().nonnegative(),
+      timeout: z.number().int().positive(),
+    }),
+  });
+
+  // Validar solo las secciones críticas definidas en el esquema (permitiendo otras propiedades no definidas explícitamente en el esquema padre, pero zod.object por defecto ignora keys extra en el input)
+  // Nota: z.object() no falla si hay keys extra en el input, simplemente las descarta en el output.
+  // Esto es suficiente para validar que las keys requeridas tengan el tipo correcto.
+  configSchema.parse(config);
+} catch (error) {
+  console.error('❌ Error Crítico de Validación de Configuración:');
+  if (error instanceof z.ZodError) {
+    error.errors.forEach(err => {
+      console.error(`  - [${err.path.join('.')}] ${err.message}`);
+    });
+  } else {
+    console.error(error);
+  }
+  console.error('El proceso se detendrá para evitar comportamientos inestables.');
+  process.exit(1);
 }
 
 export const addonConfig = Object.freeze(config);
