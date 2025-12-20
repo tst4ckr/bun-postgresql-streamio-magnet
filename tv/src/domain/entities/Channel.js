@@ -418,7 +418,12 @@ export class Channel {
    */
   static generateId(name, type = Channel.TYPES.TV) {
     const prefix = 'tv_';
-    const sanitized = name
+    // Validar que name no sea undefined, null o vacío
+    const validName = (name && typeof name === 'string' && name.trim()) 
+      ? name.trim() 
+      : 'canal_desconocido';
+    
+    const sanitized = validName
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, '')
       .replace(/\s+/g, '_')
@@ -459,12 +464,18 @@ export class Channel {
     // Validar y generar ID apropiado
     let channelId = csvRow.id;
     if (!channelId || !Channel.#isValidChannelIdStatic(channelId)) {
-      channelId = Channel.generateId(csvRow.name, csvRow.type);
+      // Validar que csvRow.name exista antes de generar ID
+      const channelName = csvRow.name && typeof csvRow.name === 'string' && csvRow.name.trim()
+        ? csvRow.name.trim()
+        : 'Canal Desconocido';
+      channelId = Channel.generateId(channelName, csvRow.type);
     }
     
     return new Channel({
       id: channelId,
-      name: csvRow.name,
+      name: csvRow.name && typeof csvRow.name === 'string' && csvRow.name.trim()
+        ? csvRow.name.trim()
+        : 'Canal Desconocido',
       logo: csvRow.logo,
       streamUrl: csvRow.stream_url,
       genre: Channel.#mapGenreToStandard(csvRow.genre || 'General'),
@@ -492,9 +503,14 @@ export class Channel {
   static fromM3U(m3uData) {
     const quality = StreamQuality.fromUrl(m3uData.url);
     
+    // Validar que m3uData.name exista antes de usarlo
+    const channelName = m3uData.name && typeof m3uData.name === 'string' && m3uData.name.trim()
+      ? m3uData.name.trim()
+      : 'Canal Desconocido';
+    
     return new Channel({
-      id: m3uData.id || Channel.generateId(m3uData.name, Channel.TYPES.TV),
-      name: m3uData.name,
+      id: m3uData.id || Channel.generateId(channelName, Channel.TYPES.TV),
+      name: channelName,
       logo: m3uData.logo,
       streamUrl: m3uData.url,
       genre: m3uData.group || Channel.GENRES.GENERAL,

@@ -296,13 +296,35 @@ export class IPTVProcessor {
             console.log('📊 Paso 8: Generando archivos de salida...');
         }
         
+        // Validar que haya canales válidos antes de generar archivos
+        if (!Array.isArray(enhancedChannels) || enhancedChannels.length === 0) {
+            throw new Error('No hay canales válidos para generar archivos de salida');
+        }
+        
+        // Filtrar canales inválidos antes de escribir
+        const validChannels = enhancedChannels.filter(channel => {
+            const hasValidId = channel.id && typeof channel.id === 'string' && channel.id.trim();
+            const hasValidName = channel.name && typeof channel.name === 'string' && channel.name.trim();
+            const hasValidStreamUrl = channel.streamUrl && typeof channel.streamUrl === 'string' && channel.streamUrl.trim();
+            return hasValidId && hasValidName && hasValidStreamUrl;
+        });
+        
+        if (validChannels.length === 0) {
+            throw new Error('No hay canales con datos válidos (id, name, streamUrl) para generar archivos');
+        }
+        
+        if (validChannels.length < enhancedChannels.length && this.options.enableLogging) {
+            const filteredCount = enhancedChannels.length - validChannels.length;
+            console.warn(`   ⚠️  ${filteredCount} canal(es) inválido(s) filtrado(s) antes de generar archivos`);
+        }
+        
         const validatedChannelsCsvService = this.serviceContainer.resolve('validatedChannelsCsvService');
         
         // Generar CSV
         if (this.options.enableLogging) {
             console.log('   📝 Escribiendo archivo CSV...');
         }
-        const csvPath = await validatedChannelsCsvService.generateValidatedChannelsCsv(enhancedChannels);
+        const csvPath = await validatedChannelsCsvService.generateValidatedChannelsCsv(validChannels);
         
         // Verificar CSV
         if (!await this._fileExists(csvPath)) {
@@ -320,7 +342,21 @@ export class IPTVProcessor {
         
         const m3uService = new M3UChannelService();
         const orderedChannelsFromCsv = await validatedChannelsCsvService.getOrderedChannelsFromCsv(csvPath);
-        const m3uPath = await this._generateM3UFiles(m3uService, orderedChannelsFromCsv);
+        
+        // Validar canales antes de generar M3U
+        const validM3UChannels = orderedChannelsFromCsv.filter(channel => {
+            const hasValidName = channel.name && typeof channel.name === 'string' && channel.name.trim();
+            const hasValidStreamUrl = (channel.streamUrl || channel.stream_url) && 
+                typeof (channel.streamUrl || channel.stream_url) === 'string' && 
+                (channel.streamUrl || channel.stream_url).trim();
+            return hasValidName && hasValidStreamUrl;
+        });
+        
+        if (validM3UChannels.length === 0) {
+            throw new Error('No hay canales válidos para generar archivo M3U');
+        }
+        
+        const m3uPath = await this._generateM3UFiles(m3uService, validM3UChannels);
         
         if (this.options.enableLogging) {
             console.log('   ✅ M3U completado y guardado\n');
@@ -422,26 +458,42 @@ export class IPTVProcessor {
      */
     _assignUniqueIds(channels) {
         return channels.map((channel, index) => {
+            // Validar propiedades mínimas requeridas
+            const validName = (channel.name && typeof channel.name === 'string' && channel.name.trim())
+                ? channel.name.trim()
+                : `Canal Desconocido ${index + 1}`;
+            
+            const validStreamUrl = (channel.streamUrl && typeof channel.streamUrl === 'string' && channel.streamUrl.trim())
+                ? channel.streamUrl.trim()
+                : null;
+            
+            // Generar ID seguro si no existe
+            const channelId = channel.id && typeof channel.id === 'string' && channel.id.trim()
+                ? channel.id.trim()
+                : `channel_${Date.now()}_${index}`;
+            
             if (channel.constructor.name === 'Channel') {
                 return {
-                    id: channel.id || `channel_${Date.now()}_${index}`,
-                    name: channel.name,
-                    streamUrl: channel.streamUrl,
-                    logo: channel.logo,
-                    genre: channel.genre,
-                    country: channel.country,
-                    language: channel.language,
-                    quality: channel.quality,
-                    type: channel.type,
-                    isActive: channel.isActive,
-                    metadata: channel.metadata,
+                    id: channelId,
+                    name: validName,
+                    streamUrl: validStreamUrl || channel.streamUrl || '',
+                    logo: channel.logo || null,
+                    genre: channel.genre || 'General',
+                    country: channel.country || 'Internacional',
+                    language: channel.language || 'es',
+                    quality: channel.quality || 'AUTO',
+                    type: channel.type || 'TV',
+                    isActive: channel.isActive !== false,
+                    metadata: channel.metadata || {},
                     originalIndex: index
                 };
             }
             
             return {
                 ...channel,
-                id: channel.id || `channel_${Date.now()}_${index}`,
+                id: channelId,
+                name: validName,
+                streamUrl: validStreamUrl || channel.streamUrl || '',
                 originalIndex: index
             };
         });
@@ -637,14 +689,43 @@ export class IPTVProcessor {
         await services.artworkGenerationService.ensureBackgroundDirectory();
         await services.artworkGenerationService.ensurePosterDirectory();
         
-        // Procesar chunks en paralelo
-        const processedChunks = await Promise.all(
+        // Procesar chunks en paralelo con manejo de errores individual
+        const processedChunks = await Promise.allSettled(
             chunks.map(async (chunk, chunkIndex) => {
                 if (this.options.enableLogging) {
                     console.log(`   🔄 Procesando chunk ${chunkIndex + 1}/${chunks.length} (${chunk.length} canales)`);
                 }
                 
-                let processedChunk = [...chunk];
+                // Validar y filtrar canales inválidos antes de procesar
+                let processedChunk = chunk.filter(channel => {
+                    // Validar que el canal tenga propiedades mínimas requeridas
+                    const hasValidId = channel.id && typeof channel.id === 'string' && channel.id.trim();
+                    const hasValidName = channel.name && typeof channel.name === 'string' && channel.name.trim();
+                    const hasValidStreamUrl = channel.streamUrl && typeof channel.streamUrl === 'string' && channel.streamUrl.trim();
+                    
+                    return hasValidId && hasValidName && hasValidStreamUrl;
+                });
+                
+                // Si se filtraron canales inválidos, registrar advertencia
+                if (processedChunk.length < chunk.length && this.options.enableLogging) {
+                    const invalidCount = chunk.length - processedChunk.length;
+                    console.warn(`   ⚠️  ${invalidCount} canal(es) inválido(s) filtrado(s) en chunk ${chunkIndex + 1}`);
+                }
+                
+                // Si no hay canales válidos en el chunk, retornar vacío
+                if (processedChunk.length === 0) {
+                    return {
+                        channels: [],
+                        stats: {
+                            chunkIndex,
+                            processed: 0,
+                            logosGenerated: 0,
+                            backgroundsGenerated: 0,
+                            postersGenerated: 0,
+                            genreStats: {}
+                        }
+                    };
+                }
                 
                 // 1. Limpieza de nombres
                 processedChunk = await nameCleaningService.processChannelsInBatches(processedChunk);
@@ -653,11 +734,15 @@ export class IPTVProcessor {
                 const genreResults = genreDetectionService.processChannels(processedChunk);
                 processedChunk = genreResults.channels;
                 
-                // 3. Generación de logos
-                const channelsForLogos = processedChunk.map(channel => ({
-                    id: channel.id,
-                    name: channel.name || `Canal ${channel.originalIndex + 1}`
-                }));
+                // 3. Generación de logos - validar datos antes de generar
+                const channelsForLogos = processedChunk
+                    .filter(channel => channel.id && channel.name)
+                    .map(channel => ({
+                        id: channel.id,
+                        name: (channel.name && typeof channel.name === 'string' && channel.name.trim())
+                            ? channel.name.trim()
+                            : `Canal ${channel.originalIndex !== undefined ? channel.originalIndex + 1 : 'Desconocido'}`
+                    }));
                 
                 const logoResults = await logoGenerationService.generateMultipleLogos(channelsForLogos);
                 
@@ -720,13 +805,40 @@ export class IPTVProcessor {
             })
         );
         
+        // Procesar resultados de Promise.allSettled y manejar errores
+        const validChunks = [];
+        processedChunks.forEach((result, index) => {
+            if (result.status === 'fulfilled') {
+                validChunks.push(result.value);
+            } else {
+                if (this.options.enableLogging) {
+                    console.error(`   ❌ Error procesando chunk ${index + 1}: ${result.reason?.message || 'Error desconocido'}`);
+                }
+                // Agregar chunk vacío para mantener consistencia
+                validChunks.push({
+                    channels: [],
+                    stats: {
+                        chunkIndex: index,
+                        processed: 0,
+                        logosGenerated: 0,
+                        backgroundsGenerated: 0,
+                        postersGenerated: 0,
+                        genreStats: {}
+                    }
+                });
+            }
+        });
+        
+        // Usar validChunks en lugar de redefinir processedChunks
+        const finalChunks = validChunks;
+        
         // Consolidar resultados
-        const allProcessedChannels = processedChunks.flatMap(chunk => chunk.channels);
+        const allProcessedChannels = finalChunks.flatMap(chunk => chunk.channels);
         
         // Estadísticas consolidadas
-        const totalLogosGenerated = processedChunks.reduce((sum, chunk) => sum + chunk.stats.logosGenerated, 0);
-        const totalBackgroundsGenerated = processedChunks.reduce((sum, chunk) => sum + (chunk.stats.backgroundsGenerated || 0), 0);
-        const totalPostersGenerated = processedChunks.reduce((sum, chunk) => sum + (chunk.stats.postersGenerated || 0), 0);
+        const totalLogosGenerated = finalChunks.reduce((sum, chunk) => sum + chunk.stats.logosGenerated, 0);
+        const totalBackgroundsGenerated = finalChunks.reduce((sum, chunk) => sum + (chunk.stats.backgroundsGenerated || 0), 0);
+        const totalPostersGenerated = finalChunks.reduce((sum, chunk) => sum + (chunk.stats.postersGenerated || 0), 0);
         const cleaningMetrics = nameCleaningService.getMetrics();
         
         if (this.options.enableLogging) {

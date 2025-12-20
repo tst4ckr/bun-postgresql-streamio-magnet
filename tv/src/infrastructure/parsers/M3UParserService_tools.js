@@ -367,9 +367,23 @@ export const EntryProcessor = {
         // Comentarios - ignorar
         continue;
       } else if (currentEntry && !currentEntry.url) {
-        // URL del stream
-        currentEntry.url = line;
-        entries.push(currentEntry);
+        // URL del stream - validar que sea una URL válida antes de agregar
+        const url = line.trim();
+        const isValidUrl = url && (
+          url.startsWith('http://') || 
+          url.startsWith('https://') || 
+          url.startsWith('rtmp://') ||
+          url.startsWith('rtsp://')
+        );
+        
+        if (isValidUrl) {
+          currentEntry.url = url;
+          entries.push(currentEntry);
+        } else {
+          // URL inválida - registrar advertencia pero no agregar entrada
+          console.warn(`URL inválida en línea ${i + 1}: ${url.substring(0, 50)}...`);
+        }
+        
         currentEntry = null;
 
         // Verificar límite máximo
@@ -392,15 +406,20 @@ export const EntryProcessor = {
   createChannelData(entry, config) {
     const metadata = MetadataExtractor.extractFromExtinf(entry.extinf);
     
-    if (!metadata.name || !entry.url) {
+    // Validar que metadata.name sea válido antes de procesar
+    const channelName = metadata.name && typeof metadata.name === 'string' && metadata.name.trim()
+      ? metadata.name.trim()
+      : null;
+    
+    if (!channelName || !entry.url) {
       if (config.strictMode) {
         throw new Error('Nombre y URL son requeridos');
       }
       return null;
     }
 
-    // Generar ID único
-    const id = Channel.generateId(metadata.name, Channel.TYPES.TV);
+    // Generar ID único con nombre validado
+    const id = Channel.generateId(channelName, Channel.TYPES.TV);
 
     // Detectar calidad desde la URL
     const quality = QualityDetector.detectFromUrl(
@@ -430,7 +449,7 @@ export const EntryProcessor = {
 
     return {
       id,
-      name: metadata.name,
+      name: channelName,
       logo,
       streamUrl: entry.url,
       group: GenreNormalizer.normalize(metadata.group, config.defaultGenre),
