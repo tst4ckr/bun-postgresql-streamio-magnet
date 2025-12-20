@@ -166,7 +166,27 @@ export function generateCategorySeparator(category) {
 }
 
 export function createSlug(value) {
-    return String(value || '')
+    // Validar y limpiar el valor antes de procesar
+    if (value === null || value === undefined) {
+        return '';
+    }
+    
+    const stringValue = String(value).trim();
+    if (stringValue.length === 0) {
+        return '';
+    }
+    
+    // Eliminar "null" y "undefined" que puedan aparecer como strings
+    const cleanedValue = stringValue
+        .replace(/null/gi, '')
+        .replace(/undefined/gi, '')
+        .trim();
+    
+    if (cleanedValue.length === 0) {
+        return '';
+    }
+    
+    return cleanedValue
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
@@ -176,11 +196,23 @@ export function createSlug(value) {
 
 export function createTvgIdFromChannel(channel, options = {}) {
     const prefix = options.tvgIdPrefix ?? 'tv_';
-    const base = channel.name || '';
+    
+    // Validar que channel.name exista y sea válido antes de procesar
+    const base = (channel && channel.name && typeof channel.name === 'string' && channel.name.trim())
+        ? channel.name.trim()
+        : '';
+    
     const slug = createSlug(base);
+    
+    // Si el slug está vacío después de procesar, usar fallback
+    const finalSlug = slug || 'canal_desconocido';
+    
     const appendCountry = options.appendCountry ?? false;
-    const country = appendCountry && channel.country ? `_${String(channel.country).toLowerCase()}` : '';
-    return `${prefix}${slug}${country}`;
+    const country = appendCountry && channel && channel.country && typeof channel.country === 'string' && channel.country.trim()
+        ? `_${String(channel.country).toLowerCase().trim()}`
+        : '';
+    
+    return `${prefix}${finalSlug}${country}`;
 }
 
 export function assignDynamicTvgIds(channels, options = {}) {

@@ -55,9 +55,14 @@ export default class StremioAddonService {
         const genreSet = new Set();
         
         this.channels.forEach(channel => {
-            if (channel.genre) {
-                const channelGenres = channel.genre.split(',').map(g => g.trim());
-                channelGenres.forEach(genre => genreSet.add(genre));
+            // Validar que genre sea string antes de usar split
+            if (channel.genre && typeof channel.genre === 'string' && channel.genre.trim()) {
+                const channelGenres = channel.genre.split(',').map(g => g.trim()).filter(g => g.length > 0);
+                channelGenres.forEach(genre => {
+                    if (genre && typeof genre === 'string' && genre.trim()) {
+                        genreSet.add(genre);
+                    }
+                });
             }
         });
         
@@ -230,7 +235,10 @@ export default class StremioAddonService {
      * @returns {Object} Meta object para Stremio
      */
     channelToMeta(channel) {
-        const genres = channel.genre ? channel.genre.split(',').map(g => g.trim()) : [];
+        // Validar que genre sea string antes de usar split
+        const genres = (channel.genre && typeof channel.genre === 'string' && channel.genre.trim())
+            ? channel.genre.split(',').map(g => g.trim()).filter(g => g.length > 0)
+            : [];
         
         return {
             id: channel.id,
@@ -268,9 +276,11 @@ export default class StremioAddonService {
     generateChannelDescription(channel) {
         const parts = [];
         
-        if (channel.genre) {
-            const genres = channel.genre.split(',').map(g => g.trim());
-            parts.push(`Géneros: ${genres.join(', ')}`);
+        if (channel.genre && typeof channel.genre === 'string' && channel.genre.trim()) {
+            const genres = channel.genre.split(',').map(g => g.trim()).filter(g => g.length > 0);
+            if (genres.length > 0) {
+                parts.push(`Géneros: ${genres.join(', ')}`);
+            }
         }
         
         if (channel.country && channel.country !== 'Unknown') {
@@ -380,11 +390,13 @@ export default class StremioAddonService {
                 stats.activeChannels++;
             }
             
-            // Por género
-            if (channel.genre) {
-                const genres = channel.genre.split(',').map(g => g.trim());
+            // Por género - validar que genre sea string antes de usar split
+            if (channel.genre && typeof channel.genre === 'string' && channel.genre.trim()) {
+                const genres = channel.genre.split(',').map(g => g.trim()).filter(g => g.length > 0);
                 genres.forEach(genre => {
-                    stats.channelsByGenre[genre] = (stats.channelsByGenre[genre] || 0) + 1;
+                    if (genre && typeof genre === 'string' && genre.trim()) {
+                        stats.channelsByGenre[genre] = (stats.channelsByGenre[genre] || 0) + 1;
+                    }
                 });
             }
         });

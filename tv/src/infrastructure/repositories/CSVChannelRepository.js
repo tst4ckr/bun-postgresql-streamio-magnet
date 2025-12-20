@@ -411,9 +411,21 @@ export class CSVChannelRepository extends ChannelRepository {
   async getChannelsByLanguage(language) {
     await this.#refreshIfNeeded();
     
-    const channels = this.#channels.filter(channel => 
-      channel.language.toLowerCase() === language.toLowerCase()
-    );
+    // Validar que language sea string válido
+    const normalizedLanguage = (language && typeof language === 'string' && language.trim())
+      ? language.toLowerCase().trim()
+      : '';
+    
+    if (!normalizedLanguage) {
+      return [];
+    }
+    
+    const channels = this.#channels.filter(channel => {
+      const channelLanguage = (channel.language && typeof channel.language === 'string' && channel.language.trim())
+        ? channel.language.toLowerCase().trim()
+        : '';
+      return channelLanguage === normalizedLanguage;
+    });
     let filteredChannels = this.#filterActiveChannels(channels);
     
     // Aplicar filtros de contenido si están activos
@@ -499,15 +511,39 @@ export class CSVChannelRepository extends ChannelRepository {
     }
 
     if (filters.language) {
-      filteredChannels = filteredChannels.filter(channel => 
-        channel.language.toLowerCase() === filters.language.toLowerCase()
-      );
+      const normalizedFilterLanguage = (filters.language && typeof filters.language === 'string' && filters.language.trim())
+        ? filters.language.toLowerCase().trim()
+        : '';
+      
+      if (normalizedFilterLanguage) {
+        filteredChannels = filteredChannels.filter(channel => {
+          const channelLanguage = (channel.language && typeof channel.language === 'string' && channel.language.trim())
+            ? channel.language.toLowerCase().trim()
+            : '';
+          return channelLanguage === normalizedFilterLanguage;
+        });
+      }
     }
 
     if (filters.quality) {
-      filteredChannels = filteredChannels.filter(channel => 
-        channel.quality.value.toLowerCase() === filters.quality.toLowerCase()
-      );
+      const normalizedFilterQuality = (filters.quality && typeof filters.quality === 'string' && filters.quality.trim())
+        ? filters.quality.toLowerCase().trim()
+        : '';
+      
+      if (normalizedFilterQuality) {
+        filteredChannels = filteredChannels.filter(channel => {
+          // Validar que quality exista y tenga value antes de acceder
+          const qualityValue = (channel.quality && typeof channel.quality === 'object' && channel.quality.value)
+            ? channel.quality.value
+            : (typeof channel.quality === 'string' ? channel.quality : '');
+          
+          const channelQuality = (qualityValue && typeof qualityValue === 'string' && qualityValue.trim())
+            ? qualityValue.toLowerCase().trim()
+            : '';
+          
+          return channelQuality === normalizedFilterQuality;
+        });
+      }
     }
 
     if (typeof filters.isActive === 'boolean') {

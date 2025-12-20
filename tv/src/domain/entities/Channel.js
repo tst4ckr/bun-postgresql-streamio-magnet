@@ -167,14 +167,20 @@ export class Channel {
    * @returns {boolean}
    */
   #isValidStreamUrl(url) {
+    // Validar que url sea string válido antes de procesar
+    if (!url || typeof url !== 'string' || url.trim().length === 0) {
+      return false;
+    }
+    
     try {
       const urlObj = new URL(url);
       const validProtocols = ['http:', 'https:', 'rtmp:', 'rtmps:'];
       const validExtensions = ['.m3u8', '.m3u', '.ts'];
       
+      const urlLower = url.toLowerCase();
       return validProtocols.includes(urlObj.protocol) ||
-             validExtensions.some(ext => url.toLowerCase().includes(ext)) ||
-             url.toLowerCase().includes('stream');
+             validExtensions.some(ext => urlLower.includes(ext)) ||
+             urlLower.includes('stream');
     } catch {
       return false;
     }
@@ -207,12 +213,18 @@ export class Channel {
       return false;
     }
 
-    return this.#streamUrl.includes('.m3u8') || 
-           this.#streamUrl.startsWith('rtmp://') ||
-           this.#streamUrl.startsWith('rtmps://') ||
-           this.#streamUrl.includes('stream') ||
-           this.#streamUrl.startsWith('https://') ||
-           this.#streamUrl.startsWith('http://');
+    // Validar que streamUrl sea string antes de usar métodos de string
+    if (typeof this.#streamUrl !== 'string' || this.#streamUrl.trim().length === 0) {
+      return false;
+    }
+
+    const streamUrl = this.#streamUrl.trim();
+    return streamUrl.includes('.m3u8') || 
+           streamUrl.startsWith('rtmp://') ||
+           streamUrl.startsWith('rtmps://') ||
+           streamUrl.includes('stream') ||
+           streamUrl.startsWith('https://') ||
+           streamUrl.startsWith('http://');
   }
 
   /**
@@ -343,6 +355,18 @@ export class Channel {
    * @returns {Object}
    */
   toMetaDetail() {
+    // Validar propiedades antes de usar en template literals
+    const qualityValue = (this.#quality && typeof this.#quality === 'object' && this.#quality.value)
+      ? this.#quality.value
+      : (typeof this.#quality === 'string' ? this.#quality : 'Auto');
+    
+    const languageUpper = (this.#language && typeof this.#language === 'string' && this.#language.trim())
+      ? this.#language.toUpperCase()
+      : 'ES';
+    
+    const genre = this.#genre || 'General';
+    const country = this.#country || 'Internacional';
+    
     return {
       id: this.#id,
       type: this.#type,
@@ -350,22 +374,22 @@ export class Channel {
       poster: this.#logo || getFallbackLogoFromEnv(),
       posterShape: 'square',
       background: this.#logo,
-      genres: [this.#genre],
-      description: `Canal de ${this.#genre} en ${this.#language.toUpperCase()} desde ${this.#country}. Calidad: ${this.#quality.value}`,
-      country: this.#country,
-      language: this.#language,
+      genres: [genre],
+      description: `Canal de ${genre} en ${languageUpper} desde ${country}. Calidad: ${qualityValue}`,
+      country: country,
+      language: this.#language || 'es',
       runtime: 'En vivo',
-      releaseInfo: this.#country,
+      releaseInfo: country,
       links: [
         {
-          name: this.#genre,
+          name: genre,
           category: 'genre',
-          url: `stremio:///discover/catalog/${this.#type}/${this.#genre}`
+          url: `stremio:///discover/catalog/${this.#type}/${genre}`
         },
         {
-          name: this.#country,
+          name: country,
           category: 'country',
-          url: `stremio:///discover/catalog/${this.#type}/${this.#country}`
+          url: `stremio:///discover/catalog/${this.#type}/${country}`
         }
       ],
       behaviorHints: {
@@ -379,20 +403,35 @@ export class Channel {
    * @returns {Object}
    */
   toStream() {
+    // Validar propiedades antes de usar en template literals y operaciones
+    const qualityValue = (this.#quality && typeof this.#quality === 'object' && this.#quality.value)
+      ? this.#quality.value
+      : (typeof this.#quality === 'string' ? this.#quality : 'Auto');
+    
+    const languageUpper = (this.#language && typeof this.#language === 'string' && this.#language.trim())
+      ? this.#language.toUpperCase()
+      : 'ES';
+    
+    const genre = this.#genre || 'General';
+    const country = this.#country || 'Internacional';
+    const streamUrl = this.#streamUrl || '';
+    
     const stream = {
-      name: `${this.#name} (${this.#quality.value})`,
-      description: `${this.#genre} • ${this.#country} • ${this.#language.toUpperCase()}`,
-      url: this.#streamUrl
+      name: `${this.#name} (${qualityValue})`,
+      description: `${genre} • ${country} • ${languageUpper}`,
+      url: streamUrl
     };
 
     // Configurar hints de comportamiento para TV en vivo
     const behaviorHints = {};
 
-    // Para streams RTMP o no-HTTPS (común en IPTV)
-    if (this.#streamUrl.startsWith('rtmp') || 
-        this.#streamUrl.startsWith('http://') || 
-        !this.#streamUrl.startsWith('https://')) {
-      behaviorHints.notWebReady = true;
+    // Para streams RTMP o no-HTTPS (común en IPTV) - validar que streamUrl exista
+    if (streamUrl && typeof streamUrl === 'string') {
+      if (streamUrl.startsWith('rtmp') || 
+          streamUrl.startsWith('http://') || 
+          !streamUrl.startsWith('https://')) {
+        behaviorHints.notWebReady = true;
+      }
     }
 
     // Restricciones geográficas básicas

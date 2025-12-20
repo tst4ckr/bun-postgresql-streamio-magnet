@@ -428,6 +428,11 @@ export const EntryProcessor = {
       config.defaultQuality
     );
 
+    // Validar que quality tenga value antes de acceder
+    const qualityValue = (quality && typeof quality === 'object' && quality.value)
+      ? quality.value
+      : (typeof quality === 'string' ? quality : config.defaultQuality || 'Auto');
+
     // Procesar logo
     const logo = UrlValidator.validateLogoUrl(
       metadata.logo, 
@@ -455,7 +460,7 @@ export const EntryProcessor = {
       group: GenreNormalizer.normalize(metadata.group, config.defaultGenre),
       country,
       language,
-      quality: quality.value,
+      quality: qualityValue,
       tvgId: metadata.tvgId,
       originalData: {
         extinf: entry.extinf,
@@ -476,8 +481,17 @@ export const StatsCalculator = {
    */
   calculateGenreStats(channels) {
     const genreStats = {};
+    if (!Array.isArray(channels)) {
+      return genreStats;
+    }
+    
     channels.forEach(channel => {
-      genreStats[channel.genre] = (genreStats[channel.genre] || 0) + 1;
+      if (channel && channel.genre) {
+        const genre = typeof channel.genre === 'string' ? channel.genre.trim() : String(channel.genre || 'General');
+        if (genre) {
+          genreStats[genre] = (genreStats[genre] || 0) + 1;
+        }
+      }
     });
     return genreStats;
   },
@@ -489,8 +503,17 @@ export const StatsCalculator = {
    */
   calculateCountryStats(channels) {
     const countryStats = {};
+    if (!Array.isArray(channels)) {
+      return countryStats;
+    }
+    
     channels.forEach(channel => {
-      countryStats[channel.country] = (countryStats[channel.country] || 0) + 1;
+      if (channel && channel.country) {
+        const country = typeof channel.country === 'string' ? channel.country.trim() : String(channel.country || 'Internacional');
+        if (country) {
+          countryStats[country] = (countryStats[country] || 0) + 1;
+        }
+      }
     });
     return countryStats;
   },
@@ -503,14 +526,24 @@ export const StatsCalculator = {
   calculate(data) {
     const { validChannels, errors, processingTime } = data;
     
+    // Validar arrays antes de procesar
+    const validChannelsArray = Array.isArray(validChannels) ? validChannels : [];
+    const errorsArray = Array.isArray(errors) ? errors : [];
+    const total = validChannelsArray.length + errorsArray.length;
+    
+    // Validar división por cero antes de calcular successRate
+    const successRate = (total > 0)
+      ? (validChannelsArray.length / total * 100).toFixed(1)
+      : '0.0';
+    
     return {
-      totalChannels: validChannels.length,
-      totalErrors: errors.length,
-      processingTime,
-      genreStats: this.calculateGenreStats(validChannels),
-      countryStats: this.calculateCountryStats(validChannels),
-      errorStats: this.calculateErrorStats(errors),
-      successRate: validChannels.length / (validChannels.length + errors.length) * 100
+      totalChannels: validChannelsArray.length,
+      totalErrors: errorsArray.length,
+      processingTime: processingTime || 0,
+      genreStats: this.calculateGenreStats(validChannelsArray),
+      countryStats: this.calculateCountryStats(validChannelsArray),
+      errorStats: this.calculateErrorStats(errorsArray),
+      successRate: parseFloat(successRate)
     };
   },
 
@@ -521,9 +554,17 @@ export const StatsCalculator = {
    */
   calculateErrorStats(errors) {
     const errorStats = {};
+    if (!Array.isArray(errors)) {
+      return errorStats;
+    }
+    
     errors.forEach(error => {
-      const category = error.category || 'Otros errores';
-      errorStats[category] = (errorStats[category] || 0) + 1;
+      if (error) {
+        const category = (error.category && typeof error.category === 'string' && error.category.trim())
+          ? error.category.trim()
+          : 'Otros errores';
+        errorStats[category] = (errorStats[category] || 0) + 1;
+      }
     });
     return errorStats;
   }

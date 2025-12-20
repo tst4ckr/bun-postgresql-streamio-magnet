@@ -193,13 +193,22 @@ class M3UChannelService {
             const filteredChannels = this._applyContentFilters(rawChannels);
             const uniqueChannels = await this._removeDuplicates(filteredChannels);
             
+            // Validar divisiones por cero antes de calcular eficiencias
+            const filteringEfficiency = (rawChannels.length > 0)
+                ? ((rawChannels.length - filteredChannels.length) / rawChannels.length * 100).toFixed(2)
+                : '0.00';
+            
+            const deduplicationEfficiency = (filteredChannels.length > 0)
+                ? ((filteredChannels.length - uniqueChannels.length) / filteredChannels.length * 100).toFixed(2)
+                : '0.00';
+            
             return {
                 totalChannels: rawChannels.length,
                 filteredChannels: filteredChannels.length,
                 uniqueChannels: uniqueChannels.length,
                 duplicatesRemoved: filteredChannels.length - uniqueChannels.length,
-                filteringEfficiency: ((rawChannels.length - filteredChannels.length) / rawChannels.length * 100).toFixed(2),
-                deduplicationEfficiency: ((filteredChannels.length - uniqueChannels.length) / filteredChannels.length * 100).toFixed(2)
+                filteringEfficiency,
+                deduplicationEfficiency
             };
         } catch (error) {
             this.errorHandler.handleAsyncError(error, 'M3UChannelService.generateProcessingStats');

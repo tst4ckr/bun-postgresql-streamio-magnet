@@ -614,34 +614,44 @@ export class IPTVProcessor {
         }
 
         // Procesamiento de conversión
-        if (conversionResult.status === 'fulfilled') {
-            const convertedChannels = conversionResult.value.processed;
+        if (conversionResult.status === 'fulfilled' && conversionResult.value) {
+            const convertedChannels = conversionResult.value.processed || [];
+            const stats = conversionResult.value.stats || {};
+            
             if (this.options.enableLogging) {
                 console.log(`📊 Canales procesados para conversión: ${convertedChannels.length}`);
-                console.log(`🔄 Conversiones HTTPS→HTTP: ${conversionResult.value.stats.converted}`);
-                console.log(`✅ URLs HTTP funcionales: ${conversionResult.value.stats.httpWorking}`);
+                console.log(`🔄 Conversiones HTTPS→HTTP: ${stats.converted || 0}`);
+                console.log(`✅ URLs HTTP funcionales: ${stats.httpWorking || 0}`);
             }
             
-            processedChannels = this._applyChannelUpdates(processedChannels, convertedChannels);
+            if (Array.isArray(convertedChannels)) {
+                processedChannels = this._applyChannelUpdates(processedChannels, convertedChannels);
+            }
             convertedChannelsCount = processedChannels.length;
         }
 
         // Procesamiento de validación
-        if (validationResult.status === 'fulfilled') {
-            const { validChannels, invalidChannels, stats } = validationResult.value;
+        if (validationResult.status === 'fulfilled' && validationResult.value) {
+            const value = validationResult.value;
+            const validChannels = Array.isArray(value.validChannels) ? value.validChannels : [];
+            const invalidChannels = Array.isArray(value.invalidChannels) ? value.invalidChannels : [];
+            const stats = value.stats || {};
             
-            processedChannels = processedChannels.filter(channel => 
-                validChannels.some(valid => valid.id === channel.id)
-            );
+            // Filtrar canales válidos solo si hay canales válidos
+            if (validChannels.length > 0) {
+                processedChannels = processedChannels.filter(channel => 
+                    channel && channel.id && validChannels.some(valid => valid && valid.id === channel.id)
+                );
+            }
             
             if (this.options.enableLogging) {
                 console.log(`📊 Canales validados: ${processedChannels.length} (${invalidChannels.length} inválidos)`);
                 
-                if (stats.processingTime) {
+                if (stats && typeof stats.processingTime === 'number' && stats.processingTime > 0) {
                     console.log(`⏱️  Tiempo de validación: ${(stats.processingTime/1000).toFixed(1)}s`);
                 }
             }
-        } else if (validationResult.fallback) {
+        } else if (validationResult && validationResult.fallback) {
             if (this.options.enableLogging) {
                 console.warn(`⚠️  Usando fallback para validación: todos los canales marcados como válidos`);
             }
@@ -655,24 +665,49 @@ export class IPTVProcessor {
     }
 
     _calculateDeduplicationStats(before, after) {
+        // Validar división por cero
+        const efficiency = (before > 0) 
+            ? ((after / before) * 100).toFixed(1)
+            : '0.0';
+        
         return {
             beforeDedup: before,
             afterDedup: after,
             duplicatesRemoved: before - after,
-            efficiency: ((after / before) * 100).toFixed(1)
+            efficiency
         };
     }
 
     _applyChannelUpdates(baseChannels, updatedChannels) {
+        // Validar que ambos arrays existan antes de procesar
+        if (!Array.isArray(baseChannels)) {
+            return [];
+        }
+        if (!Array.isArray(updatedChannels)) {
+            return baseChannels;
+        }
+        
         return baseChannels.map(channel => {
-            const updated = updatedChannels.find(c => c.id === channel.id);
+            if (!channel || !channel.id) {
+                return channel;
+            }
+            
+            const updated = updatedChannels.find(c => c && c.id && c.id === channel.id);
             return updated || channel;
         });
     }
 
     async _processInChunks(channels, services) {
+        // Validar que channels sea un array antes de procesar
+        if (!Array.isArray(channels) || channels.length === 0) {
+            if (this.options.enableLogging) {
+                console.warn('   ⚠️  No hay canales para procesar en chunks');
+            }
+            return { enhancedChannels: [] };
+        }
+        
         const { nameCleaningService, genreDetectionService, logoGenerationService } = services;
-        const CHUNK_SIZE = this.options.chunkSize;
+        const CHUNK_SIZE = this.options.chunkSize || 15;
         
         // Dividir canales en chunks
         const chunks = [];
@@ -751,25 +786,31 @@ export class IPTVProcessor {
                 // Para cumplir las guías oficiales de Stremio (poster 1:0.675 o 1:1, PNG), generamos por defecto el formato 'poster' (1:0.675)
                 const posterResults = await services.artworkGenerationService.generateMultiplePosters(channelsForLogos, { concurrency: 4, shape: 'poster' });
 
-                // 5. Integración de logos/background/poster
+                // 5. Integración de logos/background/poster - validar que los arrays existan
                 const logoMap = new Map();
-                logoResults.forEach(result => {
-                    if (result.success && result.logoPath) {
-                        logoMap.set(result.channelId, result.logoPath);
-                    }
-                });
+                if (Array.isArray(logoResults)) {
+                    logoResults.forEach(result => {
+                        if (result && result.success && result.logoPath && result.channelId) {
+                            logoMap.set(result.channelId, result.logoPath);
+                        }
+                    });
+                }
                 const bgMap = new Map();
-                bgResults.forEach(result => {
-                    if (result.success && result.backgroundPath) {
-                        bgMap.set(result.channelId, result.backgroundPath);
-                    }
-                });
+                if (Array.isArray(bgResults)) {
+                    bgResults.forEach(result => {
+                        if (result && result.success && result.backgroundPath && result.channelId) {
+                            bgMap.set(result.channelId, result.backgroundPath);
+                        }
+                    });
+                }
                 const posterMap = new Map();
-                posterResults.forEach(result => {
-                    if (result.success && result.posterPath) {
-                        posterMap.set(result.channelId, result.posterPath);
-                    }
-                });
+                if (Array.isArray(posterResults)) {
+                    posterResults.forEach(result => {
+                        if (result && result.success && result.posterPath && result.channelId) {
+                            posterMap.set(result.channelId, result.posterPath);
+                        }
+                    });
+                }
                 
                 // Normalizar rutas a esquema relativo bajo /static para el servidor del addon
                 // Guardamos solo 'logos/...', 'background/...', 'poster/...'
@@ -796,10 +837,10 @@ export class IPTVProcessor {
                     stats: {
                         chunkIndex,
                         processed: processedChunk.length,
-                        logosGenerated: logoResults.filter(r => r.success).length,
-                        backgroundsGenerated: bgResults.filter(r => r.success).length,
-                        postersGenerated: posterResults.filter(r => r.success).length,
-                        genreStats: genreResults.stats
+                        logosGenerated: Array.isArray(logoResults) ? logoResults.filter(r => r && r.success).length : 0,
+                        backgroundsGenerated: Array.isArray(bgResults) ? bgResults.filter(r => r && r.success).length : 0,
+                        postersGenerated: Array.isArray(posterResults) ? posterResults.filter(r => r && r.success).length : 0,
+                        genreStats: genreResults && genreResults.stats ? genreResults.stats : {}
                     }
                 };
             })
