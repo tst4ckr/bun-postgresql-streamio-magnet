@@ -158,6 +158,10 @@ class LogoGenerationService {
         
         if (words.length === 1) {
             // Si es una sola palabra, tomar las primeras 2-3 letras
+            // Validar que haya al menos una palabra antes de acceder al índice
+            if (words.length === 0 || !words[0]) {
+                return 'CH'; // Fallback si no hay palabras
+            }
             return words[0].substring(0, 3).toUpperCase();
         }
         

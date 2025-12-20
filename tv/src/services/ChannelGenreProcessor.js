@@ -27,20 +27,47 @@ export default class ChannelGenreProcessor {
      */
     async readChannelsFromCSV() {
         try {
+            // Validar que el archivo exista antes de leer
+            if (!fs.existsSync(this.csvPath)) {
+                throw new Error(`Archivo CSV no encontrado: ${this.csvPath}`);
+            }
+            
             const csvContent = fs.readFileSync(this.csvPath, 'utf-8');
+            
+            // Validar que el contenido no esté vacío
+            if (!csvContent || !csvContent.trim()) {
+                console.warn(`⚠️  Archivo CSV vacío: ${this.csvPath}`);
+                return [];
+            }
+            
             const lines = csvContent.trim().split('\n');
+            
+            // Validar que haya al menos una línea (header)
+            if (lines.length === 0 || !lines[0]) {
+                console.warn(`⚠️  Archivo CSV sin headers: ${this.csvPath}`);
+                return [];
+            }
+            
             const headers = lines[0].split(',');
             
-            const channels = lines.slice(1).map(line => {
-                const values = this.parseCSVLine(line);
-                const channel = {};
-                
-                headers.forEach((header, index) => {
-                    channel[header.trim()] = values[index]?.trim() || '';
+            // Validar que haya headers válidos
+            if (headers.length === 0 || headers.every(h => !h.trim())) {
+                console.warn(`⚠️  Headers inválidos en CSV: ${this.csvPath}`);
+                return [];
+            }
+            
+            const channels = lines.slice(1)
+                .filter(line => line && line.trim()) // Filtrar líneas vacías
+                .map(line => {
+                    const values = this.parseCSVLine(line);
+                    const channel = {};
+                    
+                    headers.forEach((header, index) => {
+                        channel[header.trim()] = values[index]?.trim() || '';
+                    });
+                    
+                    return channel;
                 });
-                
-                return channel;
-            });
 
             console.log(`✅ Leídos ${channels.length} canales desde ${this.csvPath}`);
             return channels;

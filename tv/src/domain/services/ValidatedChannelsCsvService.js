@@ -157,8 +157,11 @@ export class ValidatedChannelsCsvService {
     // Ordenar canales no prioritarios por categoría
     nonPriorityChannels.sort((a, b) => {
       // Extraer la categoría principal (antes de la coma) del género
-      const genreA = (a.genre || 'General').split(',')[0].trim().replace(/^"/, '').replace(/"$/, '');
-      const genreB = (b.genre || 'General').split(',')[0].trim().replace(/^"/, '').replace(/"$/, '');
+      // Validar que split retorne al menos un elemento antes de acceder a [0]
+      const genreASplit = (a.genre || 'General').split(',');
+      const genreBSplit = (b.genre || 'General').split(',');
+      const genreA = (genreASplit.length > 0 ? genreASplit[0] : 'General').trim().replace(/^"/, '').replace(/"$/, '');
+      const genreB = (genreBSplit.length > 0 ? genreBSplit[0] : 'General').trim().replace(/^"/, '').replace(/"$/, '');
       
       const priorityA = priorityCategories.indexOf(genreA);
       const priorityB = priorityCategories.indexOf(genreB);

@@ -227,8 +227,38 @@ export default class CSVDataCleaner {
      */
     async cleanCSVFile(inputPath, outputPath = null) {
         try {
+            // Validar que el archivo exista
+            if (!fs.existsSync(inputPath)) {
+                throw new Error(`Archivo no encontrado: ${inputPath}`);
+            }
+            
             const content = fs.readFileSync(inputPath, 'utf8');
+            
+            // Validar que el contenido no esté vacío
+            if (!content || !content.trim()) {
+                console.warn(`[WARN] Archivo CSV vacío: ${inputPath}`);
+                return {
+                    success: false,
+                    error: 'Archivo CSV vacío',
+                    inputPath,
+                    outputPath: null,
+                    linesProcessed: 0
+                };
+            }
+            
             const lines = content.split('\n');
+            
+            // Validar que haya al menos una línea
+            if (lines.length === 0) {
+                console.warn(`[WARN] Archivo CSV sin líneas: ${inputPath}`);
+                return {
+                    success: false,
+                    error: 'Archivo CSV sin líneas',
+                    inputPath,
+                    outputPath: null,
+                    linesProcessed: 0
+                };
+            }
             
             console.log(`[INFO] Procesando ${lines.length} líneas del CSV...`);
             
@@ -243,9 +273,22 @@ export default class CSVDataCleaner {
             if (!outputPath) {
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
                 const backupPath = inputPath.replace('.csv', `.backup-${timestamp}.csv`);
+                
+                // Validar que el directorio del backup exista
+                const backupDir = require('path').dirname(backupPath);
+                if (!fs.existsSync(backupDir)) {
+                    fs.mkdirSync(backupDir, { recursive: true });
+                }
+                
                 fs.copyFileSync(inputPath, backupPath);
                 console.log(`[INFO] Backup creado: ${backupPath}`);
                 outputPath = inputPath;
+            }
+            
+            // Validar que el directorio de salida exista
+            const outputDir = require('path').dirname(outputPath);
+            if (!fs.existsSync(outputDir)) {
+                fs.mkdirSync(outputDir, { recursive: true });
             }
             
             fs.writeFileSync(outputPath, cleanedContent, 'utf8');
@@ -255,14 +298,17 @@ export default class CSVDataCleaner {
                 success: true,
                 inputPath,
                 outputPath,
-                linesProcessed: lines.length - 1
+                linesProcessed: Math.max(0, lines.length - 1) // Asegurar que no sea negativo
             };
             
         } catch (error) {
             console.error(`[ERROR] Error procesando CSV: ${error.message}`);
             return {
                 success: false,
-                error: error.message
+                error: error.message,
+                inputPath,
+                outputPath: null,
+                linesProcessed: 0
             };
         }
     }

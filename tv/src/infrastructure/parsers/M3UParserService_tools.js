@@ -36,7 +36,11 @@ export const ContentPreprocessor = {
       throw new Error('El contenido M3U debe ser una cadena no vacía');
     }
 
-    const firstLine = content.trim().split('\n')[0];
+    const lines = content.trim().split('\n');
+    if (lines.length === 0 || !lines[0]) {
+      return false;
+    }
+    const firstLine = lines[0];
     const isValidFormat = firstLine.startsWith('#EXTM3U');
     
     if (!isValidFormat && strictMode) {
