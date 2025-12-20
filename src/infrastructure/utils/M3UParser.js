@@ -118,6 +118,11 @@ export class M3UParser {
       throw new Error('Tv name is required');
     }
 
+    // Validar y registrar nombres sospechosos con "undefined"
+    if (tvInfo.name && (tvInfo.name.includes('undefined') || tvInfo.name.includes('sundefinedeundefined'))) {
+      console.warn(`[M3UParser] Nombre de canal sospechoso detectado: "${tvInfo.name}"`, { extinfLine });
+    }
+
     return tvInfo;
   }
 

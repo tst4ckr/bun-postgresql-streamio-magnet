@@ -80,6 +80,14 @@ export class CsvTvRepository {
               return;
             }
 
+            // Validar y registrar nombres sospechosos con "undefined"
+            if (data.name && (data.name.includes('undefined') || data.name.includes('sundefinedeundefined'))) {
+              this.#logger.warn(`[CsvTvRepository] Nombre de canal sospechoso detectado: "${data.name}"`, { 
+                row: data,
+                csvPath: this.#csvPath 
+              });
+            }
+
             // Fallbacks: si no existen poster o background, usar el logo temporalmente
             const logoValue = data.logo || data['tvg-logo'];
             const posterValue = data.poster || logoValue;

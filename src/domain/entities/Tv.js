@@ -75,9 +75,47 @@ export class Tv {
       }
     }
 
+    // Validar y sanitizar el nombre del canal
+    if (tvData.name) {
+      const sanitizedName = this.#sanitizeChannelName(tvData.name);
+      if (sanitizedName !== tvData.name) {
+        console.warn(`[Tv] Nombre de canal sanitizado: "${tvData.name}" -> "${sanitizedName}"`);
+        tvData.name = sanitizedName;
+      }
+    }
+
     if (!this.#isValidStreamUrl(tvData.streamUrl)) {
       throw new Error('Tv stream URL must be a valid HTTP/HTTPS URL');
     }
+  }
+
+  /**
+   * Sanitiza el nombre del canal eliminando valores undefined y patrones inválidos.
+   * @private
+   * @param {string} name - Nombre original del canal
+   * @returns {string} Nombre sanitizado
+   */
+  #sanitizeChannelName(name) {
+    if (!name || typeof name !== 'string') {
+      return 'Canal sin nombre';
+    }
+
+    // Detectar y eliminar patrones como "sundefinedeundefined"
+    let sanitized = name.trim();
+    
+    // Eliminar patrones de undefined en nombres
+    sanitized = sanitized.replace(/sundefinedeundefined/gi, '');
+    sanitized = sanitized.replace(/undefined/gi, '');
+    
+    // Eliminar espacios múltiples resultantes
+    sanitized = sanitized.replace(/\s+/g, ' ').trim();
+    
+    // Si después de la limpieza el nombre está vacío, usar un nombre por defecto
+    if (!sanitized || sanitized.length === 0) {
+      return 'Canal sin nombre';
+    }
+    
+    return sanitized;
   }
 
   /**
