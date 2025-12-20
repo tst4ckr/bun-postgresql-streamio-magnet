@@ -253,10 +253,42 @@ export class CascadingMagnetRepository extends MagnetRepository {
     }
 
     const startTime = Date.now();
-    this.#logger.info(`Búsqueda en cascada iniciada para content ID: ${contentId} (${type})`, { component: 'CascadingMagnetRepository' });
+    
+    // Extraer season/episode del contentId o de options para logging y caché
+    let targetSeason = options.season;
+    let targetEpisode = options.episode;
+    let baseContentId = contentId;
+    
+    if (contentId.includes(':')) {
+      const parts = contentId.split(':');
+      if (parts.length >= 3) {
+        baseContentId = parts[0];
+        if (targetSeason === undefined) {
+          const seasonPart = parts[parts.length - 2];
+          if (/^\d+$/.test(seasonPart)) {
+            targetSeason = parseInt(seasonPart, 10);
+          }
+        }
+        if (targetEpisode === undefined) {
+          const episodePart = parts[parts.length - 1];
+          if (/^\d+$/.test(episodePart)) {
+            targetEpisode = parseInt(episodePart, 10);
+          }
+        }
+      }
+    }
+    
+    // Sincronizar options con season/episode extraídos
+    const searchOptions = {
+      ...options,
+      season: targetSeason,
+      episode: targetEpisode
+    };
+    
+    this.#logger.info(`Búsqueda en cascada iniciada para content ID: ${contentId} (${type}, season=${targetSeason}, episode=${targetEpisode})`, { component: 'CascadingMagnetRepository' });
 
-    // Verificar cache primero
-    const cacheKey = cacheService.generateMagnetCacheKey(contentId, type, options);
+    // Verificar cache primero - usar baseContentId + season/episode para consistencia con StreamHandler
+    const cacheKey = cacheService.generateMagnetCacheKey(baseContentId, type, searchOptions);
     const cachedResults = cacheService.get(cacheKey);
 
     if (cachedResults) {
@@ -278,14 +310,14 @@ export class CascadingMagnetRepository extends MagnetRepository {
 
       // Verificar si las fuentes locales ya fueron agotadas para evitar búsquedas redundantes
       if (!this.#isSourceExhausted(contentId, 'magnets.csv')) {
-        searchPromises.push(this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv'));
+        searchPromises.push(this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv', type, searchOptions));
       } else {
         searchPromises.push(Promise.resolve([]));
         this.#logger.debug(`Saltando búsqueda en magnets.csv - fuente agotada para ${contentId}`);
       }
 
       if (!this.#isSourceExhausted(contentId, 'torrentio.csv')) {
-        searchPromises.push(this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv'));
+        searchPromises.push(this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv', type, searchOptions));
       } else {
         searchPromises.push(Promise.resolve([]));
         this.#logger.debug(`Saltando búsqueda en torrentio.csv - fuente agotada para ${contentId}`);
@@ -294,7 +326,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       // Para anime, verificar también si ya fue agotado
       if (type === 'anime' || idType === 'kitsu' || idType === 'mal' || idType === 'anilist') {
         if (!this.#isSourceExhausted(contentId, 'anime.csv')) {
-          searchPromises.push(this.#searchInRepositoryByContentId(this.#animeRepository, contentId, 'anime.csv'));
+          searchPromises.push(this.#searchInRepositoryByContentId(this.#animeRepository, contentId, 'anime.csv', type, searchOptions));
         } else {
           searchPromises.push(Promise.resolve([]));
           this.#logger.debug(`Saltando búsqueda en anime.csv - fuente agotada para ${contentId}`);
@@ -305,7 +337,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
 
       // Repositorio en inglés como fuente local adicional
       if (!this.#isSourceExhausted(contentId, 'english.csv')) {
-        searchPromises.push(this.#searchInRepositoryByContentId(this.#englishRepository, contentId, 'english.csv'));
+        searchPromises.push(this.#searchInRepositoryByContentId(this.#englishRepository, contentId, 'english.csv', type, searchOptions));
       } else {
         searchPromises.push(Promise.resolve([]));
         this.#logger.debug(`Saltando búsqueda en english.csv - fuente agotada para ${contentId}`);
@@ -419,7 +451,7 @@ export class CascadingMagnetRepository extends MagnetRepository {
       // Paso 2: Buscar en archivo english.csv (solo si no fue agotada)
       if (!this.#isSourceExhausted(contentId, 'english.csv')) {
         this.#logger.info(`No se encontraron magnets en API español, buscando en english.csv para ${contentId}`, { component: 'CascadingMagnetRepository' });
-        const englishResults = await this.#searchInRepositoryByContentId(this.#englishRepository, contentId, 'english.csv');
+        const englishResults = await this.#searchInRepositoryByContentId(this.#englishRepository, contentId, 'english.csv', type, searchOptions);
 
         if (englishResults.length > 0) {
           const enrichedEnglishResults = this.#enrichMagnetsWithMetadata(englishResults, metadata);
@@ -525,14 +557,16 @@ export class CascadingMagnetRepository extends MagnetRepository {
    * @param {CSVMagnetRepository} repository - Repositorio donde buscar
    * @param {string} contentId - ID de contenido
    * @param {string} sourceName - Nombre de la fuente para logging
+   * @param {string} type - Tipo de contenido
+   * @param {Object} options - Opciones de búsqueda (season, episode)
    * @returns {Promise<Magnet[]>} Array de magnets encontrados
    */
-  async #searchInRepositoryByContentId(repository, contentId, sourceName) {
+  async #searchInRepositoryByContentId(repository, contentId, sourceName, type = 'movie', options = {}) {
     try {
-      return await repository.getMagnetsByContentId(contentId);
+      return await repository.getMagnetsByContentId(contentId, type, options);
     } catch (error) {
       if (error instanceof MagnetNotFoundError) {
-        this.#logger.debug(`No se encontraron magnets en ${sourceName} para content ID: ${contentId}`);
+        this.#logger.debug(`No se encontraron magnets en ${sourceName} para content ID: ${contentId} (season=${options.season}, episode=${options.episode})`);
         return [];
       }
       this.#logger.error(`Error buscando en ${sourceName} para content ID ${contentId}:`, error, { component: 'CascadingMagnetRepository' });
@@ -1032,15 +1066,36 @@ export class CascadingMagnetRepository extends MagnetRepository {
       // Detectar tipo de ID y aplicar estrategia específica
       const idType = this.#detectIdType(contentId);
 
+      // Extraer season/episode del contentId para fallback
+      let fallbackSeason = undefined;
+      let fallbackEpisode = undefined;
+      let fallbackBaseId = contentId;
+      
+      if (contentId.includes(':')) {
+        const parts = contentId.split(':');
+        if (parts.length >= 3) {
+          fallbackBaseId = parts[0];
+          const seasonPart = parts[parts.length - 2];
+          const episodePart = parts[parts.length - 1];
+          if (/^\d+$/.test(seasonPart)) fallbackSeason = parseInt(seasonPart, 10);
+          if (/^\d+$/.test(episodePart)) fallbackEpisode = parseInt(episodePart, 10);
+        }
+      }
+      
+      const fallbackOptions = {
+        season: fallbackSeason,
+        episode: fallbackEpisode
+      };
+      
       // Buscar en todas las fuentes locales simultáneamente usando Promise.allSettled
       const searchPromises = [
-        this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv'),
-        this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv')
+        this.#searchInRepositoryByContentId(this.#primaryRepository, contentId, 'magnets.csv', type, fallbackOptions),
+        this.#searchInRepositoryByContentId(this.#secondaryRepository, contentId, 'torrentio.csv', type, fallbackOptions)
       ];
 
       // Para anime, priorizar búsqueda en repositorio de anime
       if (type === 'anime' || idType === 'kitsu' || idType === 'mal' || idType === 'anilist') {
-        searchPromises.push(this.#searchInRepositoryByContentId(this.#animeRepository, contentId, 'anime.csv'));
+        searchPromises.push(this.#searchInRepositoryByContentId(this.#animeRepository, contentId, 'anime.csv', type, fallbackOptions));
       } else {
         searchPromises.push(Promise.resolve([]));
       }

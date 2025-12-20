@@ -102,7 +102,16 @@ export class StreamHandler {
     }
     
     const { season, episode } = this.#extractSeasonEpisode(id);
-    const streamCacheKey = cacheService.generateStreamCacheKey(id, type, { season, episode });
+    
+    // Extraer el ID base sin season:episode para la clave de caché
+    // Esto asegura que cada episodio tenga su propia clave de caché
+    const baseContentId = this.#getBaseContentId(id, season, episode);
+    
+    this.#logger.debug(`Extracción de ID: original=${id}, base=${baseContentId}, season=${season}, episode=${episode}`);
+    
+    const streamCacheKey = cacheService.generateStreamCacheKey(baseContentId, type, { season, episode });
+    this.#logger.debug(`Clave de caché generada: ${streamCacheKey}`);
+    
     const cachedStreams = await safeExecute(
       () => cacheService.get(streamCacheKey),
       { operation: 'cache.get', cacheKey: streamCacheKey }
@@ -113,7 +122,7 @@ export class StreamHandler {
     
     if (cachedStreams && !cachedStreams.error) {
       const duration = Date.now() - startTime;
-      this.#logger.debug(`Streams obtenidos desde cache para ${id} (${idDetection.type}) en ${duration}ms`);
+      this.#logger.debug(`Streams obtenidos desde cache para ${id} (${idDetection.type}) en ${duration}ms, clave: ${streamCacheKey}`);
       return cachedStreams;
     }
     
@@ -158,7 +167,7 @@ export class StreamHandler {
       }
     }
 
-    const magnets = await this.#getMagnets(id, type);
+    const magnets = await this.#getMagnets(id, type, season, episode);
     
     if (!magnets || magnets.length === 0) {
       this.#logger.warn(`No se encontraron magnets para: ${id} (${idDetection.type})`);
@@ -384,10 +393,12 @@ export class StreamHandler {
    * @private
    * @param {string} contentId - ID del contenido
    * @param {string} type - Tipo de contenido (movie, series, anime)
+   * @param {number|undefined} season - Temporada (para series/anime)
+   * @param {number|undefined} episode - Episodio (para series/anime)
    * @returns {Promise<Array|null>} Lista de magnets o null si no se encuentran
    */
-  async #getMagnets(contentId, type = 'movie') {
-    this.#logger.debug(`Iniciando búsqueda de magnets para ${contentId} (${type})`);
+  async #getMagnets(contentId, type = 'movie', season = undefined, episode = undefined) {
+    this.#logger.debug(`Iniciando búsqueda de magnets para ${contentId} (${type}, season=${season}, episode=${episode})`);
     
 
     const idDetection = this.#detectContentIdType(contentId);
@@ -399,8 +410,11 @@ export class StreamHandler {
       this.#logger.debug(`Tipo de ID detectado: ${idDetection.type} para ${contentId}`);
     }
     
+    // Preparar opciones de búsqueda con season/episode
+    const searchOptions = { season, episode };
+    
     // Intentar búsqueda con ID original primero
-    let magnetsResult = await this.#searchMagnetsWithId(contentId, type, idDetection);
+    let magnetsResult = await this.#searchMagnetsWithId(contentId, type, idDetection, searchOptions);
     
     // Si no se encuentran magnets y el ID no es IMDb, intentar conversión
     if ((!magnetsResult || magnetsResult.length === 0) && 
@@ -408,11 +422,11 @@ export class StreamHandler {
         idDetection.type !== 'imdb' && 
         idDetection.type !== 'imdb_series') {
       
-      magnetsResult = await this.#searchMagnetsWithConversion(contentId, type, idDetection);
+      magnetsResult = await this.#searchMagnetsWithConversion(contentId, type, idDetection, searchOptions);
     }
     
     if (magnetsResult && magnetsResult.length > 0) {
-      this.#logger.debug(`Encontrados ${magnetsResult.length} magnets para ${contentId}`);
+      this.#logger.debug(`Encontrados ${magnetsResult.length} magnets para ${contentId} (season=${season}, episode=${episode})`);
       
 
       const sources = [...new Set(magnetsResult.map(m => m.provider || 'Unknown'))];
@@ -431,22 +445,25 @@ export class StreamHandler {
    * @param {string} contentId - ID del contenido
    * @param {string} type - Tipo de contenido
    * @param {Object} idDetection - Resultado de detección de ID
+   * @param {Object} options - Opciones de búsqueda (season, episode)
    * @returns {Promise<Array|null>} Lista de magnets
    */
-  async #searchMagnetsWithId(contentId, type, idDetection) {
+  async #searchMagnetsWithId(contentId, type, idDetection, options = {}) {
     const magnetsResult = await safeExecute(
-      () => this.#magnetRepository.getMagnetsByContentId(contentId, type),
+      () => this.#magnetRepository.getMagnetsByContentId(contentId, type, options),
       { 
         operation: 'repository.getMagnetsByContentId',
         contentId,
         type,
-        idType: idDetection.type
+        idType: idDetection.type,
+        season: options.season,
+        episode: options.episode
       }
     );
     
     if (magnetsResult.error) {
       if (magnetsResult.error instanceof MagnetNotFoundError) {
-        this.#logger.info(`No se encontraron magnets para ${contentId} con ID original`);
+        this.#logger.info(`No se encontraron magnets para ${contentId} con ID original (season=${options.season}, episode=${options.episode})`);
         return null;
       }
       throw createError(
@@ -465,47 +482,59 @@ export class StreamHandler {
    * @param {string} contentId - ID del contenido
    * @param {string} type - Tipo de contenido
    * @param {Object} idDetection - Resultado de detección de ID
+   * @param {Object} options - Opciones de búsqueda (season, episode)
    * @returns {Promise<Array|null>} Lista de magnets
    */
-  async #searchMagnetsWithConversion(contentId, type, idDetection) {
-    this.#logger.debug(`Intentando conversión de ID ${idDetection.type} a IMDb para ${contentId}`);
+  async #searchMagnetsWithConversion(contentId, type, idDetection, options = {}) {
+    this.#logger.debug(`Intentando conversión de ID ${idDetection.type} a IMDb para ${contentId} (season=${options.season}, episode=${options.episode})`);
     
     try {
-      // Intentar conversión a IMDb
+      // Extraer ID base para conversión (sin season:episode)
+      const baseContentId = this.#getBaseContentId(contentId, options.season, options.episode);
+      
+      // Intentar conversión a IMDb usando el ID base
       const conversionResult = await safeExecute(
-        () => this.#unifiedIdService.convertId(contentId, 'imdb'),
-        { operation: 'unifiedId.convertId', contentId, targetService: 'imdb' }
+        () => this.#unifiedIdService.convertId(baseContentId, 'imdb'),
+        { operation: 'unifiedId.convertId', contentId: baseContentId, targetService: 'imdb' }
       );
       
       if (conversionResult.error || !conversionResult.success) {
-        this.#logger.warn(`No se pudo convertir ${contentId} a IMDb: ${conversionResult.error?.message || 'Conversión fallida'}`);
+        this.#logger.warn(`No se pudo convertir ${baseContentId} a IMDb: ${conversionResult.error?.message || 'Conversión fallida'}`);
         return null;
       }
       
       const imdbId = conversionResult.convertedId;
-      this.#logger.debug(`ID convertido: ${contentId} -> ${imdbId}`);
       
+      // Reconstruir el ID completo con season/episode si existen
+      let finalImdbId = imdbId;
+      if (options.season !== undefined && options.episode !== undefined) {
+        finalImdbId = `${imdbId}:${options.season}:${options.episode}`;
+      }
+      
+      this.#logger.debug(`ID convertido: ${baseContentId} -> ${finalImdbId}`);
 
       const magnetsResult = await safeExecute(
-        () => this.#magnetRepository.getMagnetsByContentId(imdbId, type),
+        () => this.#magnetRepository.getMagnetsByContentId(finalImdbId, type, options),
         { 
           operation: 'repository.getMagnetsByContentId',
-          contentId: imdbId,
+          contentId: finalImdbId,
           originalId: contentId,
-          type
+          type,
+          season: options.season,
+          episode: options.episode
         }
       );
       
       if (magnetsResult.error) {
         if (magnetsResult.error instanceof MagnetNotFoundError) {
-          this.#logger.info(`No se encontraron magnets para ${imdbId} (convertido desde ${contentId})`);
+          this.#logger.info(`No se encontraron magnets para ${finalImdbId} (convertido desde ${contentId})`);
           return null;
         }
         throw magnetsResult.error;
       }
       
       if (magnetsResult && magnetsResult.length > 0) {
-        this.#logger.debug(`Encontrados ${magnetsResult.length} magnets usando ID convertido ${imdbId}`);
+        this.#logger.debug(`Encontrados ${magnetsResult.length} magnets usando ID convertido ${finalImdbId}`);
       }
       
       return magnetsResult;
@@ -942,6 +971,54 @@ export class StreamHandler {
     }
   }
 
+  /**
+   * Extrae el ID base del contentId, removiendo season:episode si están presentes
+   * @private
+   * @param {string} contentId - ID completo del contenido (puede incluir season:episode)
+   * @param {number|undefined} season - Temporada extraída (opcional, para validación)
+   * @param {number|undefined} episode - Episodio extraído (opcional, para validación)
+   * @returns {string} ID base sin season:episode
+   */
+  #getBaseContentId(contentId, season, episode) {
+    if (!contentId || typeof contentId !== 'string') {
+      return contentId;
+    }
+    
+    // Si hay season y episode, significa que el contentId incluye esta información
+    // Necesitamos extraer solo la parte base del ID
+    if (season !== undefined && episode !== undefined) {
+      const parts = contentId.split(':');
+      
+      // Validar que las últimas dos partes sean números que coincidan con season y episode
+      if (parts.length >= 3) {
+        const lastPart = parts[parts.length - 1];
+        const secondLastPart = parts[parts.length - 2];
+        
+        // Verificar que las últimas dos partes sean números y coincidan con season/episode
+        const lastIsEpisode = /^\d+$/.test(lastPart) && parseInt(lastPart, 10) === episode;
+        const secondLastIsSeason = /^\d+$/.test(secondLastPart) && parseInt(secondLastPart, 10) === season;
+        
+        if (lastIsEpisode && secondLastIsSeason) {
+          // Remover las últimas 2 partes (season:episode)
+          return parts.slice(0, -2).join(':');
+        }
+      }
+      
+      // Si no se pudo validar, intentar remover las últimas 2 partes si son números
+      if (parts.length >= 3) {
+        const lastPart = parts[parts.length - 1];
+        const secondLastPart = parts[parts.length - 2];
+        
+        if (/^\d+$/.test(lastPart) && /^\d+$/.test(secondLastPart)) {
+          // Asumir que son season:episode y removerlas
+          return parts.slice(0, -2).join(':');
+        }
+      }
+    }
+    
+    // Si no hay season/episode o no se pudo extraer, devolver el ID completo
+    return contentId;
+  }
 
 }
 

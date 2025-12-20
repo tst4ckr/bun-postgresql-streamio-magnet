@@ -14,6 +14,9 @@ const MagnetSchema = z.object({
   filename: z.string().optional(),
   seeders: z.number().optional(),
   peers: z.number().optional(),
+  // Campos de temporada y episodio para series/anime
+  season: z.number().int().positive().optional(),
+  episode: z.number().int().positive().optional(),
 });
 
 export class Magnet {

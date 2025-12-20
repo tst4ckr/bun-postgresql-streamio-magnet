@@ -177,22 +177,59 @@ export class CacheService {
 
   /**
    * Genera una clave de cache para búsquedas de magnets
-   * @param {string} contentId - ID del contenido
+   * @param {string} contentId - ID del contenido (debe ser el ID base sin season:episode)
    * @param {string} type - Tipo de contenido
-   * @param {Object} options - Opciones adicionales
+   * @param {Object} options - Opciones adicionales (season, episode, etc.)
    * @returns {string} Clave de cache generada
    */
   generateMagnetCacheKey(contentId, type, options = {}) {
-    const baseKey = `magnets:${type}:${contentId}`;
+    // Extraer season/episode de options o del contentId
+    let baseContentId = contentId;
+    let season = options.season;
+    let episode = options.episode;
     
-    if (Object.keys(options).length === 0) {
+    // Si el contentId incluye season:episode, extraerlos
+    if (contentId.includes(':')) {
+      const parts = contentId.split(':');
+      if (parts.length >= 3) {
+        baseContentId = parts[0];
+        if (season === undefined) {
+          const seasonPart = parts[parts.length - 2];
+          if (/^\d+$/.test(seasonPart)) {
+            season = parseInt(seasonPart, 10);
+          }
+        }
+        if (episode === undefined) {
+          const episodePart = parts[parts.length - 1];
+          if (/^\d+$/.test(episodePart)) {
+            episode = parseInt(episodePart, 10);
+          }
+        }
+      }
+    }
+    
+    const baseKey = `magnets:${type}:${baseContentId}`;
+    
+    // Construir opciones relevantes (priorizar season/episode)
+    const relevantOptions = {};
+    if (season !== undefined) relevantOptions.season = season;
+    if (episode !== undefined) relevantOptions.episode = episode;
+    
+    // Agregar otras opciones si existen
+    Object.keys(options).forEach(key => {
+      if (key !== 'season' && key !== 'episode' && options[key] !== undefined) {
+        relevantOptions[key] = options[key];
+      }
+    });
+    
+    if (Object.keys(relevantOptions).length === 0) {
       return baseKey;
     }
     
-    // Incluir opciones relevantes en la clave
-    const optionsStr = Object.keys(options)
+    // Incluir opciones relevantes en la clave, ordenadas para consistencia
+    const optionsStr = Object.keys(relevantOptions)
       .sort()
-      .map(key => `${key}:${options[key]}`)
+      .map(key => `${key}:${relevantOptions[key]}`)
       .join('|');
     
     return `${baseKey}:${optionsStr}`;
