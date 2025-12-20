@@ -423,10 +423,22 @@ export class Channel {
       ? name.trim() 
       : 'canal_desconocido';
     
-    const sanitized = validName
+    // Eliminar "null" o "undefined" que puedan aparecer como strings en el nombre
+    // Esto previene IDs como "tv_america_tv_hdnull"
+    const cleanedName = validName
+      .replace(/null/gi, '')  // Eliminar "null" (case-insensitive)
+      .replace(/undefined/gi, '')  // Eliminar "undefined" (case-insensitive)
+      .trim();
+    
+    // Si después de limpiar queda vacío, usar fallback
+    const finalName = cleanedName || 'canal_desconocido';
+    
+    const sanitized = finalName
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, '')
       .replace(/\s+/g, '_')
+      .replace(/_+/g, '_')  // Eliminar guiones bajos múltiples
+      .replace(/^_+|_+$/g, '')  // Eliminar guiones bajos al inicio y final
       .substring(0, 50);
     
     return `${prefix}${sanitized}`;
