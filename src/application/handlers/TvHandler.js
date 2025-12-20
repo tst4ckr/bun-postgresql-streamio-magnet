@@ -167,8 +167,13 @@ export class TvHandler {
         const tv = await this.#getTvById(channelId);
         return {
           streams: [tv.toStremioStream()],
-          // Use TV-specific cache for live streams to avoid over-caching
-          cacheMaxAge: this.#config.cache.tvCacheMaxAge
+          // Cache aumentado para streams en vivo: mayor tiempo de caché para evitar caídas
+          // cacheMaxAge: tiempo máximo de caché (1 hora)
+          // staleRevalidate: tiempo para servir contenido obsoleto mientras se revalida (30 min)
+          // staleError: tiempo para servir contenido obsoleto en caso de error (2 horas)
+          cacheMaxAge: this.#config.cache.tvCacheMaxAge,
+          staleRevalidate: this.#config.cache.tvStreamStaleRevalidate,
+          staleError: this.#config.cache.tvStreamStaleError
         };
       },
       {

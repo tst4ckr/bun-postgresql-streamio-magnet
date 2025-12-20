@@ -158,11 +158,12 @@ export class TVAddonConfig {
       },
 
       // Configuración de cache optimizada para streams en vivo según SDK
+      // Aumentado para evitar caídas: valores más altos permiten mayor estabilidad
       cache: {
-        // Cache corto para streams en vivo (recomendación SDK: 0-600 segundos)
-        streamCacheMaxAge: parseInt(process.env.STREAM_CACHE_MAX_AGE) || 120, // 2 minutos
-        streamStaleRevalidate: parseInt(process.env.STREAM_STALE_REVALIDATE) || 300, // 5 minutos
-        streamStaleError: parseInt(process.env.STREAM_STALE_ERROR) || 900, // 15 minutos
+        // Cache aumentado para streams en vivo (recomendación SDK: 0-600 segundos, pero aumentamos para estabilidad)
+        streamCacheMaxAge: parseInt(process.env.STREAM_CACHE_MAX_AGE) || 3600, // 1 hora (aumentado de 2 minutos)
+        streamStaleRevalidate: parseInt(process.env.STREAM_STALE_REVALIDATE) || 1800, // 30 minutos (aumentado de 5 minutos)
+        streamStaleError: parseInt(process.env.STREAM_STALE_ERROR) || 7200, // 2 horas (aumentado de 15 minutos)
         
         // catalogCacheMaxAge removed - catalog functionality disabled
         

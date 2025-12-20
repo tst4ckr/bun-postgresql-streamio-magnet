@@ -227,12 +227,12 @@ export const CACHE_CONSTANTS = {
   ANIME_METADATA_EXPIRY: 604800000, // 1 semana
   UNIFIED_ID_CACHE_EXPIRY: 24 * 60 * 60 * 1000, // 24 horas
 
-  // Cache específico para TV M3U
-  TV_CACHE_MAX_AGE: 300, // 5 minutos (streams en vivo)
+  // Cache específico para TV M3U - Aumentado para evitar caídas en streams en vivo
+  TV_CACHE_MAX_AGE: 3600, // 1 hora (streams en vivo) - aumentado de 5 minutos para mayor estabilidad
   TV_CATALOG_MAX_AGE: 1800, // 30 minutos (catálogo de canales)
   TV_M3U_CACHE_TIMEOUT: 300000, // 5 minutos para cache M3U
-  TV_STREAM_STALE_REVALIDATE: 300, // 5 minutos
-  TV_STREAM_STALE_ERROR: 1800, // 30 minutos
+  TV_STREAM_STALE_REVALIDATE: 1800, // 30 minutos - aumentado para permitir revalidación más flexible
+  TV_STREAM_STALE_ERROR: 7200, // 2 horas - aumentado para servir contenido obsoleto más tiempo en caso de error
 
   // Límites de cache
   MAX_CACHE_SIZE: 1000,
