@@ -1095,7 +1095,8 @@ export class StreamHandler {
    * @returns {Object}
    */
   #createErrorResponse(error, type = 'movie') {
-    this.#logger.error(`Error en stream handler: ${error.message}`);
+    const errorMessage = error?.message || error?.toString() || 'Error desconocido';
+    this.#logger.error(`Error en stream handler: ${errorMessage}`, { error, type });
     
     // Determinar el tiempo de cache basado en el tipo de error
     let cacheMaxAge = 300; // 5 minutos por defecto

@@ -406,8 +406,13 @@ export class CascadingMagnetRepository extends MagnetRepository {
 
       // Paso 1: Buscar en API de Torrentio en español (solo si no fue agotada)
       if (!this.#isSourceExhausted(contentId, 'api-spanish')) {
-        this.#logger.info(`No se encontraron magnets locales, consultando API Torrentio en español para ${contentId} (${type})`, { component: 'CascadingMagnetRepository' });
-        const spanishApiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFallback(contentId, type);
+        this.#logger.info(`No se encontraron magnets locales, consultando API Torrentio en español para ${contentId} (${type}, season=${searchOptions.season}, episode=${searchOptions.episode})`, { component: 'CascadingMagnetRepository' });
+        const spanishApiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFallback(
+          baseContentId, 
+          type, 
+          searchOptions.season, 
+          searchOptions.episode
+        );
 
         if (spanishApiResults.length > 0) {
           this.#logger.info(`Encontrados ${spanishApiResults.length} magnets en API Torrentio español para ${contentId}`);
@@ -435,7 +440,12 @@ export class CascadingMagnetRepository extends MagnetRepository {
           this.#logger.info(`Búsqueda completada con API español en ${duration}ms`);
           if (process.env.ALWAYS_SEARCH_ENGLISH === 'true') {
             try {
-              await this.#torrentioApiService.searchMagnetsInEnglish(contentId, type);
+              await this.#torrentioApiService.searchMagnetsInEnglish(
+                baseContentId, 
+                type, 
+                searchOptions.season, 
+                searchOptions.episode
+              );
               await this.#reinitializeRepository(this.#englishRepository, 'english.csv');
             } catch (e) { }
           }
@@ -489,8 +499,13 @@ export class CascadingMagnetRepository extends MagnetRepository {
 
       // Paso 3: Buscar en API de Torrentio en inglés (solo si no fue agotada)
       if (!this.#isSourceExhausted(contentId, 'api-english')) {
-        this.#logger.info(`No se encontraron magnets en english.csv, consultando API Torrentio en inglés para ${contentId}`, { component: 'CascadingMagnetRepository' });
-        const englishApiResults = await this.#torrentioApiService.searchMagnetsInEnglish(contentId, type);
+        this.#logger.info(`No se encontraron magnets en english.csv, consultando API Torrentio en inglés para ${contentId} (season=${searchOptions.season}, episode=${searchOptions.episode})`, { component: 'CascadingMagnetRepository' });
+        const englishApiResults = await this.#torrentioApiService.searchMagnetsInEnglish(
+          baseContentId, 
+          type, 
+          searchOptions.season, 
+          searchOptions.episode
+        );
 
         if (englishApiResults.length > 0) {
           this.#logger.info(`Encontrados ${englishApiResults.length} magnets en API Torrentio inglés para ${contentId}`);
@@ -1128,8 +1143,21 @@ export class CascadingMagnetRepository extends MagnetRepository {
       }
 
       // Paso final: Buscar en API de Torrentio con fallback de idioma
-      this.#logger.info(`Consultando API Torrentio con fallback de idioma para ${contentId} (${type})`, { component: 'CascadingMagnetRepository' });
-      const apiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFallback(contentId, type);
+      // Extraer baseContentId para la API (sin season:episode si están en el contentId)
+      let fallbackBaseContentId = contentId;
+      if (contentId.includes(':')) {
+        const parts = contentId.split(':');
+        if (parts.length >= 3) {
+          fallbackBaseContentId = parts[0];
+        }
+      }
+      this.#logger.info(`Consultando API Torrentio con fallback de idioma para ${contentId} (${type}, season=${fallbackOptions.season}, episode=${fallbackOptions.episode})`, { component: 'CascadingMagnetRepository' });
+      const apiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFallback(
+        fallbackBaseContentId, 
+        type, 
+        fallbackOptions.season, 
+        fallbackOptions.episode
+      );
 
       if (apiResults.length > 0) {
         this.#logger.info(`Encontrados ${apiResults.length} magnets en API Torrentio (fallback con idioma) para ${contentId}`, { component: 'CascadingMagnetRepository' });
