@@ -365,7 +365,7 @@ export class CacheService {
     const baseTTLs = {
       movie: 2700000,  // 45 minutos
       series: 1800000, // 30 minutos
-      anime: 3600000   // 1 hora
+      anime: 300000    // 5 minutos - reducido para evitar problemas entre capítulos
     };
     
     let baseTTL = baseTTLs[contentType] || 1800000;

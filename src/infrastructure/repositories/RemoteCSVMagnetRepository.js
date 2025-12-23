@@ -201,36 +201,51 @@ export class RemoteCSVMagnetRepository extends MagnetRepository {
     }
     
     const filtered = magnets.filter(magnet => {
-      // Si el magnet tiene season/episode explícitos, usarlos
-      if (magnet.season !== undefined && magnet.episode !== undefined) {
-        const seasonMatch = targetSeason === undefined || magnet.season === targetSeason;
-        const episodeMatch = targetEpisode === undefined || magnet.episode === targetEpisode;
-        return seasonMatch && episodeMatch;
-      }
+      let magnetSeason, magnetEpisode;
       
-      // Si el magnet no tiene season/episode pero el content_id los incluye, extraerlos
-      if (magnet.content_id && magnet.content_id.includes(':')) {
+      // Prioridad 1: Si el magnet tiene season/episode explícitos, usarlos
+      if (magnet.season !== undefined && magnet.episode !== undefined) {
+        magnetSeason = magnet.season;
+        magnetEpisode = magnet.episode;
+      }
+      // Prioridad 2: Si el magnet no tiene season/episode pero el content_id los incluye, extraerlos
+      else if (magnet.content_id && magnet.content_id.includes(':')) {
         const parts = magnet.content_id.split(':');
         if (parts.length >= 3) {
-          const magnetSeason = parseInt(parts[parts.length - 2], 10);
-          const magnetEpisode = parseInt(parts[parts.length - 1], 10);
+          const seasonPart = parts[parts.length - 2];
+          const episodePart = parts[parts.length - 1];
           
-          if (!isNaN(magnetSeason) && !isNaN(magnetEpisode)) {
-            const seasonMatch = targetSeason === undefined || magnetSeason === targetSeason;
-            const episodeMatch = targetEpisode === undefined || magnetEpisode === targetEpisode;
-            return seasonMatch && episodeMatch;
+          if (/^\d+$/.test(seasonPart) && /^\d+$/.test(episodePart)) {
+            magnetSeason = parseInt(seasonPart, 10);
+            magnetEpisode = parseInt(episodePart, 10);
           }
         }
       }
       
-      // Si no se puede determinar season/episode del magnet, incluir solo si no se especificó filtro estricto
-      // Para series/anime, si se especifica season/episode, solo incluir magnets que coincidan
+      // Si se especificó season y episode, hacer coincidencia estricta
       if (targetSeason !== undefined && targetEpisode !== undefined) {
-        // Filtro estricto: solo incluir si tiene season/episode y coincide
+        // Solo incluir si el magnet tiene season/episode Y coinciden exactamente
+        if (magnetSeason !== undefined && magnetEpisode !== undefined) {
+          const exactMatch = magnetSeason === targetSeason && magnetEpisode === targetEpisode;
+          if (!exactMatch) {
+            this.#logger?.debug(`Magnets filtrado: magnet S${magnetSeason}E${magnetEpisode} no coincide con S${targetSeason}E${targetEpisode}`);
+          }
+          return exactMatch;
+        }
+        // Si el magnet no tiene season/episode y se requiere coincidencia exacta, excluir
         return false;
       }
       
-      // Si solo se especifica season o episode, ser más permisivo
+      // Si solo se especifica season o episode, hacer coincidencia parcial
+      if (targetSeason !== undefined) {
+        return magnetSeason === targetSeason;
+      }
+      
+      if (targetEpisode !== undefined) {
+        return magnetEpisode === targetEpisode;
+      }
+      
+      // Si no se especificó filtro, incluir todos
       return true;
     });
     

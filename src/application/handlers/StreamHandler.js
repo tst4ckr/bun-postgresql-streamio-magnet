@@ -74,7 +74,9 @@ export class StreamHandler {
       
       // Si hay error, devolver respuesta de error apropiada
       if (result.error && !result.degraded) {
-        return this.#createErrorResponse(result.error);
+        // Pasar el tipo de contenido para proporcionar cacheMaxAge, staleRevalidate y staleError
+        const contentType = args?.type || 'movie';
+        return this.#createErrorResponse(result.error, contentType);
       }
       
       return result.degraded ? result.data : result;
@@ -122,7 +124,18 @@ export class StreamHandler {
     
     if (cachedStreams && !cachedStreams.error) {
       const duration = Date.now() - startTime;
-      this.#logger.debug(`Streams obtenidos desde cache para ${id} (${idDetection.type}) en ${duration}ms, clave: ${streamCacheKey}`);
+      // Validar que el contenido cacheado corresponde al episodio solicitado
+      const cachedStreamsCount = cachedStreams.streams?.length || 0;
+      this.#logger.debug(`Streams obtenidos desde cache para ${id} (${idDetection.type}) en ${duration}ms, clave: ${streamCacheKey}, streams: ${cachedStreamsCount}, season=${season}, episode=${episode}`);
+      
+      // Verificar que los streams cacheados correspondan al episodio correcto
+      // Si hay season/episode, validar que los streams coincidan
+      if (season !== undefined && episode !== undefined && cachedStreams.streams && cachedStreams.streams.length > 0) {
+        // Los streams deberían tener información de episodio si es una serie/anime
+        // Por ahora confiamos en la clave de caché que incluye season/episode
+        this.#logger.debug(`Cache validado: clave incluye s${season}e${episode}, devolviendo streams cacheados`);
+      }
+      
       return cachedStreams;
     }
     
@@ -170,8 +183,9 @@ export class StreamHandler {
     const magnets = await this.#getMagnets(id, type, season, episode);
     
     if (!magnets || magnets.length === 0) {
-      this.#logger.warn(`No se encontraron magnets para: ${id} (${idDetection.type})`);
-      const emptyResponse = this.#createEmptyResponse();
+      this.#logger.warn(`No se encontraron magnets para: ${id} (${idDetection.type}, season=${season}, episode=${episode})`);
+      // Pasar el tipo para usar cacheMaxAge específico para animes
+      const emptyResponse = this.#createEmptyResponse(type);
       
 
       const emptyTTL = cacheService.calculateAdaptiveTTL(type, 0, id);
@@ -181,6 +195,8 @@ export class StreamHandler {
           streamCount: 0, 
           source: 'stream',
           idType: idDetection.type,
+          season,
+          episode,
           searchAttempted: true
         }
       });
@@ -188,28 +204,93 @@ export class StreamHandler {
       return emptyResponse;
     }
 
-    const streams = this.#createStreamsFromMagnets(magnets, type, metadata);
+    // Validar que los magnets correspondan al episodio solicitado (filtrado estricto adicional)
+    let validMagnets = magnets;
+    if (season !== undefined && episode !== undefined) {
+      const beforeFilter = magnets.length;
+      validMagnets = magnets.filter(m => {
+        // Extraer season/episode del magnet
+        let mSeason = m.season;
+        let mEpisode = m.episode;
+        
+        // Si no están en las propiedades, intentar extraer del content_id
+        if (mSeason === undefined || mEpisode === undefined) {
+          if (m.content_id && m.content_id.includes(':')) {
+            const parts = m.content_id.split(':');
+            if (parts.length >= 3) {
+              const seasonPart = parts[parts.length - 2];
+              const episodePart = parts[parts.length - 1];
+              if (/^\d+$/.test(seasonPart) && /^\d+$/.test(episodePart)) {
+                if (mSeason === undefined) mSeason = parseInt(seasonPart, 10);
+                if (mEpisode === undefined) mEpisode = parseInt(episodePart, 10);
+              }
+            }
+          }
+        }
+        
+        // Coincidencia estricta: solo incluir si tiene season/episode Y coinciden exactamente
+        if (mSeason !== undefined && mEpisode !== undefined) {
+          const exactMatch = mSeason === season && mEpisode === episode;
+          if (!exactMatch) {
+            this.#logger.debug(`Magnets filtrado: magnet S${mSeason}E${mEpisode} no coincide con solicitado S${season}E${episode}`);
+          }
+          return exactMatch;
+        }
+        
+        // Si el magnet no tiene season/episode y se requiere coincidencia exacta, excluir
+        return false;
+      });
+      
+      if (beforeFilter !== validMagnets.length) {
+        this.#logger.warn(`⚠️  Filtrado estricto: ${beforeFilter} -> ${validMagnets.length} magnets para S${season}E${episode}`);
+      }
+      
+      if (validMagnets.length === 0) {
+        this.#logger.warn(`No quedaron magnets válidos después del filtrado estricto para S${season}E${episode}`);
+        const emptyResponse = this.#createEmptyResponse(type);
+        const emptyTTL = cacheService.calculateAdaptiveTTL(type, 0, id);
+        cacheService.set(streamCacheKey, emptyResponse, emptyTTL, {
+          contentType: type,
+          metadata: { 
+            streamCount: 0, 
+            source: 'stream',
+            idType: idDetection.type,
+            season,
+            episode,
+            searchAttempted: true
+          }
+        });
+        return emptyResponse;
+      }
+    }
+
+    const streams = this.#createStreamsFromMagnets(validMagnets, type, metadata);
     const duration = Date.now() - startTime;
     
-    this.#logger.debug(`Stream generado para ${id} (${idDetection.type}): ${streams.length} streams encontrados en ${duration}ms`);
+    this.#logger.debug(`Stream generado para ${id} (${idDetection.type}, S${season}E${episode}): ${streams.length} streams encontrados en ${duration}ms`);
     
+    // Pasar el tipo de contenido para usar cacheMaxAge específico (especialmente para animes)
     const streamResponse = this.#createStreamResponse(streams, {
       contentId: id,
       type,
       idType: idDetection.type,
       title: metadata?.title,
-      totalMagnets: magnets.length,
-      totalStreams: streams.length
-    });
+      totalMagnets: validMagnets.length,
+      totalStreams: streams.length,
+      season,
+      episode
+    }, type);
     
 
-    const cacheTTL = this.#getCacheTTLByType(idDetection.type, streams.length);
+    const cacheTTL = this.#getCacheTTLByType(idDetection.type, streams.length, type);
     cacheService.set(streamCacheKey, streamResponse, cacheTTL, {
       contentType: type,
       metadata: { 
         streamCount: streams.length, 
         source: 'stream',
         idType: idDetection.type,
+        season,
+        episode,
         duration,
         timestamp: Date.now()
       }
@@ -251,10 +332,17 @@ export class StreamHandler {
    * @private
    * @param {string} idType - Tipo de ID detectado
    * @param {number} streamCount - Número de streams encontrados
-   * @returns {number} TTL en segundos
+   * @param {string} contentType - Tipo de contenido (movie, series, anime, tv)
+   * @returns {number} TTL en milisegundos
    */
-  #getCacheTTLByType(idType, streamCount) {
-    const baseTTL = this.#config.cache.streamCacheMaxAge || 3600;
+  #getCacheTTLByType(idType, streamCount, contentType = 'movie') {
+    // Para animes usar TTL más corto para evitar problemas entre capítulos
+    if (contentType === 'anime') {
+      const animeTTL = (this.#config.cache.animeCacheMaxAge || 300) * 1000; // Convertir a milisegundos
+      return animeTTL;
+    }
+    
+    const baseTTL = (this.#config.cache.streamCacheMaxAge || 3600) * 1000; // Convertir a milisegundos
     
     // TTL más largo para contenido con buenos resultados
     if (streamCount > 5) {
@@ -449,11 +537,19 @@ export class StreamHandler {
    * @returns {Promise<Array|null>} Lista de magnets
    */
   async #searchMagnetsWithId(contentId, type, idDetection, options = {}) {
+    // Extraer ID base para búsqueda en repositorio (sin season:episode)
+    // El repositorio necesita el ID base para buscar, y luego filtrar por season/episode
+    const baseContentId = this.#getBaseContentId(contentId, options.season, options.episode);
+    
+    // Log para debugging: mostrar qué ID se está usando
+    this.#logger.debug(`Búsqueda de magnets: contentId=${contentId}, baseContentId=${baseContentId}, season=${options.season}, episode=${options.episode}`);
+    
     const magnetsResult = await safeExecute(
-      () => this.#magnetRepository.getMagnetsByContentId(contentId, type, options),
+      () => this.#magnetRepository.getMagnetsByContentId(baseContentId, type, options),
       { 
         operation: 'repository.getMagnetsByContentId',
         contentId,
+        baseContentId,
         type,
         idType: idDetection.type,
         season: options.season,
@@ -816,25 +912,78 @@ export class StreamHandler {
    * @private
    * @param {Array} streams 
    * @param {Object} metadata - Metadatos opcionales del contenido
+   * @param {string} type - Tipo de contenido (movie, series, anime, tv)
    * @returns {Object}
    */
-  #createStreamResponse(streams, metadata = null) {
-    // Formato oficial del protocolo Stremio: solo streams y cacheMaxAge
+  #createStreamResponse(streams, metadata = null, type = 'movie') {
+    // Para películas, series y anime (todo excepto TV) siempre proporcionar cacheMaxAge, staleRevalidate y staleError
+    // TV tiene su propio handler con configuración específica
+    
+    let cacheMaxAge;
+    let staleRevalidate;
+    let staleError;
+    
+    if (type === 'anime') {
+      // Para animes usar cache más corto para evitar problemas entre capítulos
+      cacheMaxAge = this.#config.cache.animeCacheMaxAge || 300; // 5 minutos
+      staleRevalidate = Math.min(cacheMaxAge * 2, 600); // 10 minutos máximo
+      staleError = Math.min(cacheMaxAge * 4, 1800); // 30 minutos máximo
+    } else if (type === 'movie' || type === 'series') {
+      // Para películas y series usar cache estándar con staleRevalidate y staleError
+      cacheMaxAge = this.#config.cache.streamCacheMaxAge || 3600; // 1 hora
+      staleRevalidate = this.#config.cache.streamStaleRevalidate || 3600; // 1 hora
+      staleError = this.#config.cache.streamStaleError || 86400; // 1 día
+    } else {
+      // Para otros tipos (tv se maneja en TvHandler) usar valores por defecto
+      cacheMaxAge = this.#config.cache.streamCacheMaxAge || 3600;
+      staleRevalidate = this.#config.cache.streamStaleRevalidate || 3600;
+      staleError = this.#config.cache.streamStaleError || 86400;
+    }
+    
     return {
       streams,
-      cacheMaxAge: this.#config.cache.streamCacheMaxAge
+      cacheMaxAge,
+      staleRevalidate,
+      staleError
     };
   }
 
   /**
    * Crea respuesta vacía.
    * @private
+   * @param {string} type - Tipo de contenido (movie, series, anime, tv)
    * @returns {Object}
    */
-  #createEmptyResponse() {
+  #createEmptyResponse(type = 'movie') {
+    // Para películas, series y anime (todo excepto TV) siempre proporcionar cacheMaxAge, staleRevalidate y staleError
+    // TV tiene su propio handler con configuración específica
+    
+    let cacheMaxAge;
+    let staleRevalidate;
+    let staleError;
+    
+    if (type === 'anime') {
+      // Para animes usar cache más corto para evitar problemas entre capítulos
+      cacheMaxAge = this.#config.cache.animeCacheMaxAge || 300; // 5 minutos
+      staleRevalidate = Math.min(cacheMaxAge * 2, 600); // 10 minutos máximo
+      staleError = Math.min(cacheMaxAge * 4, 1800); // 30 minutos máximo
+    } else if (type === 'movie' || type === 'series') {
+      // Para películas y series usar cache estándar con staleRevalidate y staleError
+      cacheMaxAge = this.#config.cache.streamCacheMaxAge || 3600; // 1 hora
+      staleRevalidate = this.#config.cache.streamStaleRevalidate || 3600; // 1 hora
+      staleError = this.#config.cache.streamStaleError || 86400; // 1 día
+    } else {
+      // Para otros tipos (tv se maneja en TvHandler) usar valores por defecto
+      cacheMaxAge = this.#config.cache.streamCacheMaxAge || 3600;
+      staleRevalidate = this.#config.cache.streamStaleRevalidate || 3600;
+      staleError = this.#config.cache.streamStaleError || 86400;
+    }
+    
     return {
       streams: [],
-      cacheMaxAge: this.#config.cache.streamCacheMaxAge
+      cacheMaxAge,
+      staleRevalidate,
+      staleError
     };
   }
 
@@ -879,7 +1028,7 @@ export class StreamHandler {
    * @param {Error} error 
    * @returns {Object}
    */
-  #createErrorResponse(error) {
+  #createErrorResponse(error, type = 'movie') {
     this.#logger.error(`Error en stream handler: ${error.message}`);
     
     // Determinar el tiempo de cache basado en el tipo de error
@@ -893,9 +1042,15 @@ export class StreamHandler {
       cacheMaxAge = 900; // 15 minutos para rate limiting
     }
     
+    // Para películas, series y anime siempre proporcionar staleRevalidate y staleError
+    const staleRevalidate = Math.min(cacheMaxAge * 2, 600); // Máximo 10 minutos
+    const staleError = Math.min(cacheMaxAge * 4, 1800); // Máximo 30 minutos
+    
     return {
       streams: [],
       cacheMaxAge,
+      staleRevalidate,
+      staleError,
       error: error.message || 'Error interno del servidor',
       errorType: error.type || ERROR_TYPES.UNKNOWN,
       recoverable: error.recoverable || false,

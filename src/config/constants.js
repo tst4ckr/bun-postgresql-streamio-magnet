@@ -218,7 +218,7 @@ export const CACHE_CONSTANTS = {
   STREAM_MAX_AGE: 3600, // 1 hora
   STREAM_STALE_REVALIDATE: 3600, // 1 hora
   STREAM_STALE_ERROR: 86400, // 1 día
-  ANIME_MAX_AGE: 7200, // 2 horas
+  ANIME_MAX_AGE: 300, // 5 minutos - reducido para evitar problemas entre capítulos
   METADATA_MAX_AGE: 86400, // 1 día
 
   // Cache de metadatos
