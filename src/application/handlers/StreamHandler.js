@@ -93,6 +93,8 @@ export class StreamHandler {
     const { type, id } = args;
     const startTime = Date.now();
     
+    // Según la documentación de Stremio: args.id para series viene en formato "tt0898266:9:17" (Meta ID:season:episode)
+    // Cada episodio es una petición única, así que debemos tratar cada ID como único
     this.#logger.debug(`Petición de stream iniciada para content ID: ${id} (${type})`);
     
     const idDetection = this.#detectContentIdType(id);
@@ -103,16 +105,19 @@ export class StreamHandler {
       this.#logger.debug(`Tipo de ID detectado: ${idDetection.type} para ${id}`);
     }
     
+    // Extraer season/episode del ID según formato de Stremio: "id:season:episode"
     const { season, episode } = this.#extractSeasonEpisode(id);
     
-    // Extraer el ID base sin season:episode para la clave de caché
-    // Esto asegura que cada episodio tenga su propia clave de caché
+    // Extraer el ID base sin season:episode para búsqueda en repositorio
+    // IMPORTANTE: El ID completo (id) es único por episodio según Stremio
     const baseContentId = this.#getBaseContentId(id, season, episode);
     
     this.#logger.debug(`Extracción de ID: original=${id}, base=${baseContentId}, season=${season}, episode=${episode}`);
     
+    // Generar clave de caché que incluya explícitamente season/episode para diferenciar episodios
+    // Usar el ID completo como parte de la clave para máxima especificidad
     const streamCacheKey = cacheService.generateStreamCacheKey(baseContentId, type, { season, episode });
-    this.#logger.debug(`Clave de caché generada: ${streamCacheKey}`);
+    this.#logger.debug(`Clave de caché generada: ${streamCacheKey} (para episodio S${season}E${episode})`);
     
     const cachedStreams = await safeExecute(
       () => cacheService.get(streamCacheKey),
@@ -124,19 +129,36 @@ export class StreamHandler {
     
     if (cachedStreams && !cachedStreams.error) {
       const duration = Date.now() - startTime;
-      // Validar que el contenido cacheado corresponde al episodio solicitado
       const cachedStreamsCount = cachedStreams.streams?.length || 0;
+      
+      // Validar que el contenido cacheado corresponde al episodio solicitado
+      // La clave de caché ya incluye season/episode, pero validamos por seguridad
       this.#logger.debug(`Streams obtenidos desde cache para ${id} (${idDetection.type}) en ${duration}ms, clave: ${streamCacheKey}, streams: ${cachedStreamsCount}, season=${season}, episode=${episode}`);
       
-      // Verificar que los streams cacheados correspondan al episodio correcto
-      // Si hay season/episode, validar que los streams coincidan
+      // Verificación adicional: asegurar que los streams cacheados correspondan al episodio correcto
       if (season !== undefined && episode !== undefined && cachedStreams.streams && cachedStreams.streams.length > 0) {
-        // Los streams deberían tener información de episodio si es una serie/anime
-        // Por ahora confiamos en la clave de caché que incluye season/episode
-        this.#logger.debug(`Cache validado: clave incluye s${season}e${episode}, devolviendo streams cacheados`);
+        // La clave de caché ya garantiza unicidad por episodio (incluye s{season}e{episode})
+        // Pero validamos que los metadatos del caché coincidan
+        const cachedMetadata = cachedStreams._metadata || {};
+        if (cachedMetadata.season !== undefined && cachedMetadata.episode !== undefined) {
+          if (cachedMetadata.season !== season || cachedMetadata.episode !== episode) {
+            this.#logger.warn(`⚠️  INCONSISTENCIA DE CACHÉ: Caché contiene S${cachedMetadata.season}E${cachedMetadata.episode} pero se solicitó S${season}E${episode}. Limpiando caché.`);
+            // Invalidar este caché y continuar con búsqueda fresca
+            cacheService.delete(streamCacheKey);
+            // Continuar con el flujo normal (no retornar aquí)
+          } else {
+            this.#logger.debug(`✅ Cache validado: clave incluye s${season}e${episode}, metadatos coinciden, devolviendo streams cacheados`);
+            return cachedStreams;
+          }
+        } else {
+          // Si no hay metadatos de season/episode en el caché, confiar en la clave
+          this.#logger.debug(`Cache validado: clave incluye s${season}e${episode}, devolviendo streams cacheados`);
+          return cachedStreams;
+        }
+      } else {
+        // Para movies o cuando no hay season/episode, devolver directamente
+        return cachedStreams;
       }
-      
-      return cachedStreams;
     }
     
 
@@ -180,6 +202,8 @@ export class StreamHandler {
       }
     }
 
+    // Según Stremio: cada episodio tiene su propio ID único (id:season:episode)
+    // Debemos buscar magnets específicos para este episodio exacto
     const magnets = await this.#getMagnets(id, type, season, episode);
     
     if (!magnets || magnets.length === 0) {
@@ -197,19 +221,21 @@ export class StreamHandler {
           idType: idDetection.type,
           season,
           episode,
-          searchAttempted: true
+          searchAttempted: true,
+          originalId: id // Guardar ID original para debugging
         }
       });
       
       return emptyResponse;
     }
 
-    // Validar que los magnets correspondan al episodio solicitado (filtrado estricto adicional)
+    // Validación estricta adicional: asegurar que todos los magnets correspondan al episodio solicitado
+    // Esto es una capa de seguridad adicional después del filtrado del repositorio
     let validMagnets = magnets;
     if (season !== undefined && episode !== undefined) {
       const beforeFilter = magnets.length;
       validMagnets = magnets.filter(m => {
-        // Extraer season/episode del magnet
+        // Extraer season/episode del magnet (prioridad: propiedades directas > content_id)
         let mSeason = m.season;
         let mEpisode = m.episode;
         
@@ -232,21 +258,23 @@ export class StreamHandler {
         if (mSeason !== undefined && mEpisode !== undefined) {
           const exactMatch = mSeason === season && mEpisode === episode;
           if (!exactMatch) {
-            this.#logger.debug(`Magnets filtrado: magnet S${mSeason}E${mEpisode} no coincide con solicitado S${season}E${episode}`);
+            this.#logger.debug(`Magnets filtrado: magnet S${mSeason}E${mEpisode} no coincide con solicitado S${season}E${episode} (ID: ${id})`);
           }
           return exactMatch;
         }
         
         // Si el magnet no tiene season/episode y se requiere coincidencia exacta, excluir
+        // Esto previene devolver streams de otros episodios
+        this.#logger.debug(`Magnets excluido: no tiene season/episode válido para S${season}E${episode} (ID: ${id})`);
         return false;
       });
       
       if (beforeFilter !== validMagnets.length) {
-        this.#logger.warn(`⚠️  Filtrado estricto: ${beforeFilter} -> ${validMagnets.length} magnets para S${season}E${episode}`);
+        this.#logger.warn(`⚠️  Filtrado estricto adicional: ${beforeFilter} -> ${validMagnets.length} magnets para S${season}E${episode} (ID: ${id})`);
       }
       
       if (validMagnets.length === 0) {
-        this.#logger.warn(`No quedaron magnets válidos después del filtrado estricto para S${season}E${episode}`);
+        this.#logger.warn(`No quedaron magnets válidos después del filtrado estricto para S${season}E${episode} (ID: ${id})`);
         const emptyResponse = this.#createEmptyResponse(type);
         const emptyTTL = cacheService.calculateAdaptiveTTL(type, 0, id);
         cacheService.set(streamCacheKey, emptyResponse, emptyTTL, {
@@ -257,11 +285,14 @@ export class StreamHandler {
             idType: idDetection.type,
             season,
             episode,
-            searchAttempted: true
+            searchAttempted: true,
+            originalId: id
           }
         });
         return emptyResponse;
       }
+      
+      this.#logger.info(`✅ Validación exitosa: ${validMagnets.length} magnets válidos para S${season}E${episode} (ID: ${id})`);
     }
 
     const streams = this.#createStreamsFromMagnets(validMagnets, type, metadata);
@@ -283,6 +314,9 @@ export class StreamHandler {
     
 
     const cacheTTL = this.#getCacheTTLByType(idDetection.type, streams.length, type);
+    
+    // Guardar en caché con metadatos que incluyan season/episode para validación futura
+    // Según Stremio: cada episodio es único, así que el caché debe ser específico por episodio
     cacheService.set(streamCacheKey, streamResponse, cacheTTL, {
       contentType: type,
       metadata: { 
@@ -291,10 +325,13 @@ export class StreamHandler {
         idType: idDetection.type,
         season,
         episode,
+        originalId: id, // Guardar ID original completo para debugging
         duration,
         timestamp: Date.now()
       }
     });
+    
+    this.#logger.info(`✅ Streams guardados en caché para ${id} (S${season}E${episode}): ${streams.length} streams, TTL: ${cacheTTL}ms`);
     
     return streamResponse;
   }
@@ -537,13 +574,16 @@ export class StreamHandler {
    * @returns {Promise<Array|null>} Lista de magnets
    */
   async #searchMagnetsWithId(contentId, type, idDetection, options = {}) {
+    // Según Stremio: contentId viene en formato "id:season:episode" para series
     // Extraer ID base para búsqueda en repositorio (sin season:episode)
-    // El repositorio necesita el ID base para buscar, y luego filtrar por season/episode
+    // El repositorio busca por ID base y luego filtra estrictamente por season/episode
     const baseContentId = this.#getBaseContentId(contentId, options.season, options.episode);
     
-    // Log para debugging: mostrar qué ID se está usando
+    // Log detallado para debugging: mostrar qué ID se está usando
     this.#logger.debug(`Búsqueda de magnets: contentId=${contentId}, baseContentId=${baseContentId}, season=${options.season}, episode=${options.episode}`);
     
+    // IMPORTANTE: Pasar baseContentId al repositorio, pero mantener season/episode en options
+    // para filtrado estricto. El repositorio debe filtrar solo magnets que coincidan exactamente.
     const magnetsResult = await safeExecute(
       () => this.#magnetRepository.getMagnetsByContentId(baseContentId, type, options),
       { 

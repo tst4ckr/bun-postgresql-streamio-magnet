@@ -348,8 +348,16 @@ export class CacheService {
     const { quality = 'all', language = 'es', season, episode } = options;
     const parts = ['stream', contentType, contentId, quality, language];
     
-    if (season !== undefined) parts.push(`s${season}`);
-    if (episode !== undefined) parts.push(`e${episode}`);
+    // Para series/anime, incluir season/episode explícitamente en la clave
+    // Esto asegura que cada episodio tenga su propia entrada de caché única
+    // Según Stremio: cada episodio es una petición única con ID "id:season:episode"
+    if (season !== undefined && episode !== undefined) {
+      parts.push(`s${season}e${episode}`);
+    } else if (season !== undefined) {
+      parts.push(`s${season}`);
+    } else if (episode !== undefined) {
+      parts.push(`e${episode}`);
+    }
     
     return parts.join(':');
   }
