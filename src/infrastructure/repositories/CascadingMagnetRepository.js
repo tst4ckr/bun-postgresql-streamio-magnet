@@ -291,10 +291,18 @@ export class CascadingMagnetRepository extends MagnetRepository {
     const cacheKey = cacheService.generateMagnetCacheKey(baseContentId, type, searchOptions);
     const cachedResults = cacheService.get(cacheKey);
 
-    if (cachedResults) {
+    // Solo usar caché si tiene resultados. Si el caché está vacío, continuar con búsqueda en APIs
+    // Esto evita que un caché vacío previo bloquee búsquedas en APIs cuando hay nuevos datos disponibles
+    if (cachedResults && Array.isArray(cachedResults) && cachedResults.length > 0) {
       const duration = Date.now() - startTime;
-      this.#logger.info(`Resultados obtenidos desde cache para ${contentId} en ${duration}ms`);
+      this.#logger.info(`Resultados obtenidos desde cache para ${contentId} en ${duration}ms (${cachedResults.length} magnets)`);
       return cachedResults;
+    }
+    
+    // Si el caché está vacío o no existe, limpiar caché y continuar con búsqueda completa
+    if (cachedResults && cachedResults.length === 0) {
+      this.#logger.debug(`Caché vacío encontrado para ${contentId}, continuando con búsqueda completa en APIs`);
+      cacheService.delete(cacheKey);
     }
 
     try {
@@ -404,58 +412,102 @@ export class CascadingMagnetRepository extends MagnetRepository {
         return finalResults;
       }
 
-      // Paso 1: Buscar en API de Torrentio en español (solo si no fue agotada)
-      if (!this.#isSourceExhausted(contentId, 'api-spanish')) {
+      // Paso 1: Buscar en API de Torrentio en español (siempre intentar, incluso si fue marcada como agotada)
+      // Para series, cada episodio es único, así que no debemos bloquear basándonos en otros episodios
+      const apiSpanishKey = `${baseContentId}:api-spanish`; // Usar baseContentId para no bloquear por episodio
+      const wasExhausted = this.#isSourceExhausted(baseContentId, 'api-spanish');
+      
+      if (!wasExhausted) {
         this.#logger.info(`No se encontraron magnets locales, consultando API Torrentio en español para ${contentId} (${type}, season=${searchOptions.season}, episode=${searchOptions.episode})`, { component: 'CascadingMagnetRepository' });
-        const spanishApiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFallback(
-          baseContentId, 
-          type, 
-          searchOptions.season, 
-          searchOptions.episode
-        );
+        try {
+          const spanishApiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFallback(
+            baseContentId, 
+            type, 
+            searchOptions.season, 
+            searchOptions.episode
+          );
 
-        if (spanishApiResults.length > 0) {
-          this.#logger.info(`Encontrados ${spanishApiResults.length} magnets en API Torrentio español para ${contentId}`);
+          if (spanishApiResults.length > 0) {
+            this.#logger.info(`Encontrados ${spanishApiResults.length} magnets en API Torrentio español para ${contentId}`);
 
-          // Enriquecer resultados de API con metadatos
-          const enrichedSpanishResults = this.#enrichMagnetsWithMetadata(spanishApiResults, metadata);
+            // Enriquecer resultados de API con metadatos
+            const enrichedSpanishResults = this.#enrichMagnetsWithMetadata(spanishApiResults, metadata);
 
-          // Cachear resultados de API con TTL más corto
-          const apiCacheTTL = this.#getCacheTTL(type, enrichedSpanishResults.length, true);
-          cacheService.set(cacheKey, enrichedSpanishResults, apiCacheTTL, {
-            contentType: type,
-            metadata: {
-              resultCount: enrichedSpanishResults.length,
-              source: 'api',
-              language: 'spanish',
-              duration: Date.now() - startTime
+            // Cachear resultados de API con TTL más corto
+            const apiCacheTTL = this.#getCacheTTL(type, enrichedSpanishResults.length, true);
+            cacheService.set(cacheKey, enrichedSpanishResults, apiCacheTTL, {
+              contentType: type,
+              metadata: {
+                resultCount: enrichedSpanishResults.length,
+                source: 'api',
+                language: 'spanish',
+                season: searchOptions.season,
+                episode: searchOptions.episode,
+                duration: Date.now() - startTime
+              }
+            });
+
+            // Reinicializar repositorio secundario para incluir nuevos datos
+            await this.#reinitializeSecondaryRepository();
+            this.#clearExhaustedSource(baseContentId, 'torrentio.csv');
+            this.#clearExhaustedSource(baseContentId, 'api-spanish'); // Limpiar marca de agotado
+
+            const duration = Date.now() - startTime;
+            this.#logger.info(`Búsqueda completada con API español en ${duration}ms`);
+            if (process.env.ALWAYS_SEARCH_ENGLISH === 'true') {
+              try {
+                await this.#torrentioApiService.searchMagnetsInEnglish(
+                  baseContentId, 
+                  type, 
+                  searchOptions.season, 
+                  searchOptions.episode
+                );
+                await this.#reinitializeRepository(this.#englishRepository, 'english.csv');
+              } catch (e) { }
             }
-          });
-
-          // Reinicializar repositorio secundario para incluir nuevos datos
-          await this.#reinitializeSecondaryRepository();
-          this.#clearExhaustedSource(contentId, 'torrentio.csv');
-
-          const duration = Date.now() - startTime;
-          this.#logger.info(`Búsqueda completada con API español en ${duration}ms`);
-          if (process.env.ALWAYS_SEARCH_ENGLISH === 'true') {
-            try {
-              await this.#torrentioApiService.searchMagnetsInEnglish(
-                baseContentId, 
-                type, 
-                searchOptions.season, 
-                searchOptions.episode
-              );
-              await this.#reinitializeRepository(this.#englishRepository, 'english.csv');
-            } catch (e) { }
+            return enrichedSpanishResults;
+          } else {
+            // Solo marcar como agotada si realmente no hay resultados después de intentar
+            this.#logger.warn(`API Torrentio español no devolvió resultados para ${contentId} (S${searchOptions.season}E${searchOptions.episode})`);
+            // NO marcar como agotada inmediatamente - puede haber otros episodios disponibles
           }
-          return enrichedSpanishResults;
-        } else {
-          // Marcar API español como agotada
-          this.#markSourceAsExhausted(contentId, 'api-spanish');
+        } catch (apiError) {
+          this.#logger.error(`Error consultando API Torrentio español para ${contentId}:`, apiError);
+          // No marcar como agotada por errores temporales
         }
       } else {
-        this.#logger.debug(`Saltando API Torrentio español - fuente agotada para ${contentId}`);
+        this.#logger.debug(`Saltando API Torrentio español - fuente agotada para ${baseContentId} (pero puede haber nuevos episodios)`);
+        // Para series, intentar de todos modos si es un episodio diferente
+        if (type === 'series' && searchOptions.season !== undefined && searchOptions.episode !== undefined) {
+          this.#logger.info(`Reintentando API español para episodio específico ${contentId} aunque la serie esté marcada como agotada`);
+          try {
+            const spanishApiResults = await this.#torrentioApiService.searchMagnetsWithLanguageFallback(
+              baseContentId, 
+              type, 
+              searchOptions.season, 
+              searchOptions.episode
+            );
+            if (spanishApiResults.length > 0) {
+              const enrichedSpanishResults = this.#enrichMagnetsWithMetadata(spanishApiResults, metadata);
+              const apiCacheTTL = this.#getCacheTTL(type, enrichedSpanishResults.length, true);
+              cacheService.set(cacheKey, enrichedSpanishResults, apiCacheTTL, {
+                contentType: type,
+                metadata: {
+                  resultCount: enrichedSpanishResults.length,
+                  source: 'api',
+                  language: 'spanish',
+                  season: searchOptions.season,
+                  episode: searchOptions.episode,
+                  duration: Date.now() - startTime
+                }
+              });
+              this.#clearExhaustedSource(baseContentId, 'api-spanish');
+              return enrichedSpanishResults;
+            }
+          } catch (retryError) {
+            this.#logger.debug(`Reintento de API español falló para ${contentId}:`, retryError.message);
+          }
+        }
       }
 
       // Paso 2: Buscar en archivo english.csv (solo si no fue agotada)
@@ -497,46 +549,86 @@ export class CascadingMagnetRepository extends MagnetRepository {
         this.#logger.debug(`Saltando english.csv - fuente agotada para ${contentId}`);
       }
 
-      // Paso 3: Buscar en API de Torrentio en inglés (solo si no fue agotada)
-      if (!this.#isSourceExhausted(contentId, 'api-english')) {
+      // Paso 3: Buscar en API de Torrentio en inglés (siempre intentar para series)
+      const apiEnglishExhausted = this.#isSourceExhausted(baseContentId, 'api-english');
+      if (!apiEnglishExhausted) {
         this.#logger.info(`No se encontraron magnets en english.csv, consultando API Torrentio en inglés para ${contentId} (season=${searchOptions.season}, episode=${searchOptions.episode})`, { component: 'CascadingMagnetRepository' });
-        const englishApiResults = await this.#torrentioApiService.searchMagnetsInEnglish(
-          baseContentId, 
-          type, 
-          searchOptions.season, 
-          searchOptions.episode
-        );
+        try {
+          const englishApiResults = await this.#torrentioApiService.searchMagnetsInEnglish(
+            baseContentId, 
+            type, 
+            searchOptions.season, 
+            searchOptions.episode
+          );
 
-        if (englishApiResults.length > 0) {
-          this.#logger.info(`Encontrados ${englishApiResults.length} magnets en API Torrentio inglés para ${contentId}`);
+          if (englishApiResults.length > 0) {
+            this.#logger.info(`Encontrados ${englishApiResults.length} magnets en API Torrentio inglés para ${contentId}`);
 
-          // Enriquecer resultados de API con metadatos
-          const enrichedEnglishApiResults = this.#enrichMagnetsWithMetadata(englishApiResults, metadata);
+            // Enriquecer resultados de API con metadatos
+            const enrichedEnglishApiResults = this.#enrichMagnetsWithMetadata(englishApiResults, metadata);
 
-          // Cachear resultados de API con TTL más corto
-          const apiCacheTTL = this.#getCacheTTL(type, enrichedEnglishApiResults.length, true);
-          cacheService.set(cacheKey, enrichedEnglishApiResults, apiCacheTTL, {
-            contentType: type,
-            metadata: {
-              resultCount: enrichedEnglishApiResults.length,
-              source: 'api',
-              language: 'english',
-              duration: Date.now() - startTime
-            }
-          });
+            // Cachear resultados de API con TTL más corto
+            const apiCacheTTL = this.#getCacheTTL(type, enrichedEnglishApiResults.length, true);
+            cacheService.set(cacheKey, enrichedEnglishApiResults, apiCacheTTL, {
+              contentType: type,
+              metadata: {
+                resultCount: enrichedEnglishApiResults.length,
+                source: 'api',
+                language: 'english',
+                season: searchOptions.season,
+                episode: searchOptions.episode,
+                duration: Date.now() - startTime
+              }
+            });
 
-          // Reinicializar repositorio de inglés para incluir nuevos datos
-          await this.#reinitializeRepository(this.#englishRepository, 'english.csv');
+            // Reinicializar repositorio de inglés para incluir nuevos datos
+            await this.#reinitializeRepository(this.#englishRepository, 'english.csv');
+            this.#clearExhaustedSource(baseContentId, 'api-english'); // Limpiar marca de agotado
 
-          const duration = Date.now() - startTime;
-          this.#logger.info(`Búsqueda completada con API inglés en ${duration}ms`);
-          return enrichedEnglishApiResults;
-        } else {
-          // Marcar API inglesa como agotada
-          this.#markSourceAsExhausted(contentId, 'api-english');
+            const duration = Date.now() - startTime;
+            this.#logger.info(`Búsqueda completada con API inglés en ${duration}ms`);
+            return enrichedEnglishApiResults;
+          } else {
+            this.#logger.warn(`API Torrentio inglés no devolvió resultados para ${contentId} (S${searchOptions.season}E${searchOptions.episode})`);
+            // NO marcar como agotada - puede haber otros episodios disponibles
+          }
+        } catch (apiError) {
+          this.#logger.error(`Error consultando API Torrentio inglés para ${contentId}:`, apiError);
+          // No marcar como agotada por errores temporales
         }
       } else {
-        this.#logger.debug(`Saltando API Torrentio inglés - fuente agotada para ${contentId}`);
+        this.#logger.debug(`Saltando API Torrentio inglés - fuente agotada para ${baseContentId}`);
+        // Para series, intentar de todos modos si es un episodio diferente
+        if (type === 'series' && searchOptions.season !== undefined && searchOptions.episode !== undefined) {
+          this.#logger.info(`Reintentando API inglés para episodio específico ${contentId}`);
+          try {
+            const englishApiResults = await this.#torrentioApiService.searchMagnetsInEnglish(
+              baseContentId, 
+              type, 
+              searchOptions.season, 
+              searchOptions.episode
+            );
+            if (englishApiResults.length > 0) {
+              const enrichedEnglishApiResults = this.#enrichMagnetsWithMetadata(englishApiResults, metadata);
+              const apiCacheTTL = this.#getCacheTTL(type, enrichedEnglishApiResults.length, true);
+              cacheService.set(cacheKey, enrichedEnglishApiResults, apiCacheTTL, {
+                contentType: type,
+                metadata: {
+                  resultCount: enrichedEnglishApiResults.length,
+                  source: 'api',
+                  language: 'english',
+                  season: searchOptions.season,
+                  episode: searchOptions.episode,
+                  duration: Date.now() - startTime
+                }
+              });
+              this.#clearExhaustedSource(baseContentId, 'api-english');
+              return enrichedEnglishApiResults;
+            }
+          } catch (retryError) {
+            this.#logger.debug(`Reintento de API inglés falló para ${contentId}:`, retryError.message);
+          }
+        }
       }
 
       // No se encontraron magnets en ninguna fuente
@@ -639,8 +731,9 @@ export class CascadingMagnetRepository extends MagnetRepository {
 
     if (!exhaustedTime) return false;
 
-    // TTL de 5 minutos para fuentes agotadas
-    const TTL = 5 * 60 * 1000;
+    // TTL más corto para APIs (2 minutos) y más largo para CSVs (5 minutos)
+    // Esto permite reintentar APIs más frecuentemente ya que pueden tener nuevos datos
+    const TTL = source.startsWith('api-') ? 2 * 60 * 1000 : 5 * 60 * 1000;
     const isExpired = Date.now() - exhaustedTime > TTL;
 
     if (isExpired) {
