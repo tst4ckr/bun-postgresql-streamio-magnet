@@ -229,11 +229,18 @@ export class StreamHandler {
       return emptyResponse;
     }
 
-    // Validación estricta adicional: asegurar que todos los magnets correspondan al episodio solicitado
-    // Esto es una capa de seguridad adicional después del filtrado del repositorio
+    // Validación adicional: verificar que los magnets correspondan al episodio solicitado
+    // El repositorio ya filtró, pero hacemos una validación final para seguridad
     let validMagnets = magnets;
-    if (season !== undefined && episode !== undefined) {
+    if (season !== undefined && episode !== undefined && magnets.length > 0) {
       const beforeFilter = magnets.length;
+      
+      // Logging detallado del primer magnet para diagnóstico
+      if (magnets.length > 0) {
+        const firstMagnet = magnets[0];
+        this.#logger.debug(`Validando magnet: content_id=${firstMagnet.content_id}, season=${firstMagnet.season}, episode=${firstMagnet.episode}, name=${firstMagnet.name?.substring(0, 50)}`);
+      }
+      
       validMagnets = magnets.filter(m => {
         // Extraer season/episode del magnet (prioridad: propiedades directas > content_id)
         let mSeason = m.season;
@@ -254,27 +261,45 @@ export class StreamHandler {
           }
         }
         
-        // Coincidencia estricta: solo incluir si tiene season/episode Y coinciden exactamente
+        // Si el magnet tiene season/episode explícitos, validar coincidencia exacta
         if (mSeason !== undefined && mEpisode !== undefined) {
           const exactMatch = mSeason === season && mEpisode === episode;
           if (!exactMatch) {
-            this.#logger.debug(`Magnets filtrado: magnet S${mSeason}E${mEpisode} no coincide con solicitado S${season}E${episode} (ID: ${id})`);
+            this.#logger.debug(`Magnets filtrado: magnet S${mSeason}E${mEpisode} no coincide con solicitado S${season}E${episode} (ID: ${id}, content_id: ${m.content_id})`);
           }
           return exactMatch;
         }
         
-        // Si el magnet no tiene season/episode y se requiere coincidencia exacta, excluir
-        // Esto previene devolver streams de otros episodios
-        this.#logger.debug(`Magnets excluido: no tiene season/episode válido para S${season}E${episode} (ID: ${id})`);
+        // Si el magnet NO tiene season/episode pero el repositorio ya lo filtró,
+        // confiar en el filtrado del repositorio (puede ser un magnet genérico de la serie)
+        // PERO solo si el content_id base coincide con el ID base solicitado
+        const baseContentId = this.#getBaseContentId(id, season, episode);
+        const magnetBaseId = m.content_id?.split(':')[0];
+        
+        if (magnetBaseId && magnetBaseId === baseContentId) {
+          // El repositorio ya filtró por season/episode, así que confiamos en su criterio
+          // Este magnet probablemente corresponde al episodio aunque no tenga season/episode explícito
+          this.#logger.debug(`Magnets aceptado sin season/episode explícito: content_id base coincide (${baseContentId}), confiando en filtrado del repositorio`);
+          return true;
+        }
+        
+        // Si no podemos determinar season/episode y el content_id base no coincide, excluir
+        this.#logger.debug(`Magnets excluido: no tiene season/episode válido y content_id base no coincide (magnet: ${magnetBaseId}, esperado: ${baseContentId})`);
         return false;
       });
       
       if (beforeFilter !== validMagnets.length) {
-        this.#logger.warn(`⚠️  Filtrado estricto adicional: ${beforeFilter} -> ${validMagnets.length} magnets para S${season}E${episode} (ID: ${id})`);
+        this.#logger.warn(`⚠️  Filtrado adicional: ${beforeFilter} -> ${validMagnets.length} magnets para S${season}E${episode} (ID: ${id})`);
       }
       
       if (validMagnets.length === 0) {
-        this.#logger.warn(`No quedaron magnets válidos después del filtrado estricto para S${season}E${episode} (ID: ${id})`);
+        // Log detallado para diagnóstico
+        this.#logger.warn(`No quedaron magnets válidos después del filtrado para S${season}E${episode} (ID: ${id})`);
+        if (magnets.length > 0) {
+          const sampleMagnet = magnets[0];
+          this.#logger.warn(`Magnet de ejemplo rechazado: content_id=${sampleMagnet.content_id}, season=${sampleMagnet.season}, episode=${sampleMagnet.episode}`);
+        }
+        
         const emptyResponse = this.#createEmptyResponse(type);
         const emptyTTL = cacheService.calculateAdaptiveTTL(type, 0, id);
         cacheService.set(streamCacheKey, emptyResponse, emptyTTL, {
@@ -286,7 +311,8 @@ export class StreamHandler {
             season,
             episode,
             searchAttempted: true,
-            originalId: id
+            originalId: id,
+            rejectedMagnets: magnets.length
           }
         });
         return emptyResponse;
